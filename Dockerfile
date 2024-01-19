@@ -1,47 +1,32 @@
-# Start with the latest Ubuntu base image
+# Use an official base image
 FROM ubuntu:latest
 
-# Update the package lists and install essential Python and development tools
-# python3-pip: For installing Python packages
-# python3-dev: Headers for Python development (required for some Python packages)
-# build-essential: Essential tools for compiling and building software
-# libssl-dev: SSL development libraries, needed for building Python packages that require secure connections
-# libffi-dev: Foreign Function Interface library, needed by some Python packages
-# python3-setuptools: Tools for building Python packages
-# git: Version control system
+# Install wget and bzip2, which are required for installing Miniconda
 RUN apt-get update && \
-    apt-get install -y python3-pip python3-dev build-essential libssl-dev libffi-dev python3-setuptools git vim
+    apt-get install -y wget bzip2 git vim
+
+# Install Miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /miniconda.sh && \
+    bash /miniconda.sh -b -p /miniconda && \
+    rm /miniconda.sh
+
+# Add Conda to PATH
+ENV PATH=/miniconda/bin:$PATH
 
 # Set the working directory in the container to /workspace
-# This is where the code will reside within the container
 WORKDIR /workspace
 
-# Add the Deadsnakes PPA to get access to newer Python versions
-# software-properties-common: Allows you to manage additional software repositories
-RUN apt-get install # Clone the repository
-RUN git clone git@github.com:chaitanya-m/auto_scientist.git-y software-properties-common
-RUN add-apt-repository ppa:deadsnakes/ppa
+# Copy the environment.yml file into the container at /workspace
+COPY environment.yml /workspace/
 
-# Update package lists to include packages from Deadsnakes
-RUN apt-get update
+# Create the Conda environment
+RUN conda env create -f environment.yml
 
-# Install Python 3.10 from Deadsnakes PPA
-RUN apt-get install -y python3.10
-
-# Set Python 3.10 as the default Python version
-# This step ensures that "python" command invokes Python 3.10
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
-
-# If you have a requirements.txt file, you can uncomment these lines to install Python dependencies
-# COPY requirements.txt .
-# RUN pip install --no-cache-dir -r requirements.txt
-
-# Set the default command for the container to launch a bash shell
-# This command runs when the container starts and gives you an interactive shell
-CMD ["/bin/bash"]
+# Activate the environment
+SHELL ["conda", "run", "-n", "myenv", "/bin/bash", "-c"]
 
 ########## VARIABLE BEHAVIOUR ##############
 
-# Clone the repository into /workspace
+# Clone the repository at the end to ensure variability in build
 RUN git clone git@github.com:chaitanya-m/auto_scientist.git /workspace
 
