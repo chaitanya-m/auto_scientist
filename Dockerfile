@@ -1,20 +1,31 @@
-# Use an official base image
-FROM ubuntu:latest
+# Start with an official Python base image which supports multiple architectures
+FROM python:3.10-slim
 
-# Install wget and bzip2, which are required for installing Miniconda
-RUN apt-get update && \
-    apt-get install -y wget bzip2 git vim
+# Install essential tools
+RUN apt-get update && apt-get install -y wget git vim
+
+# Set the working directory in the container to /workspace
+WORKDIR /workspace
+
+# Copy the README.md file into the container at /workspace
+COPY README.md /workspace/
 
 # Install Miniconda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /miniconda.sh && \
+RUN ARCH="$(uname -m)"; \
+    if [ "$ARCH" = "x86_64" ]; then \
+        MINICONDA_VERSION="Miniconda3-latest-Linux-x86_64.sh"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        MINICONDA_VERSION="Miniconda3-latest-Linux-aarch64.sh"; \
+    else \
+        echo "Unsupported architecture: $ARCH"; \
+        exit 1; \
+    fi; \
+    wget https://repo.anaconda.com/miniconda/$MINICONDA_VERSION -O /miniconda.sh && \
     bash /miniconda.sh -b -p /miniconda && \
     rm /miniconda.sh
 
 # Add Conda to PATH
 ENV PATH=/miniconda/bin:$PATH
-
-# Set the working directory in the container to /workspace
-WORKDIR /workspace
 
 # Copy the environment.yml file into the container at /workspace
 COPY environment.yml /workspace/
@@ -25,8 +36,13 @@ RUN conda env create -f environment.yml
 # Activate the environment
 SHELL ["conda", "run", "-n", "myenv", "/bin/bash", "-c"]
 
-########## VARIABLE BEHAVIOUR ##############
+# Copy the startup script into the container
+COPY startup.sh /startup.sh
 
-# Clone the repository at the end to ensure variability in build
-RUN git clone git@github.com:chaitanya-m/auto_scientist.git /workspace
+# Set the script to be executable
+RUN chmod +x /startup.sh
+
+# Run the startup script when the container launches
+CMD ["/startup.sh"]
+
 
