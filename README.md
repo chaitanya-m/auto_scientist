@@ -30,3 +30,10 @@ Use the `docker_build_run_lde.sh` script to build and run this Docker container.
 ## Post-Setup
 
 After running the container, you can clone the repository within the Docker environment using your own SSH credentials, ensuring secure access to the repository.
+
+To clone the repository, use the following command in the terminal within the Docker container:
+
+```bash
+git clone git@github.com:chaitanya-m/auto_scientist.git
+
+
