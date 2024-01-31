@@ -7,6 +7,9 @@ RUN apt-get update && apt-get install -y wget git vim
 # Set the working directory in the container to /workspace
 WORKDIR /workspace
 
+# Copy the script to get the repository into /workspace
+COPY get_repo.sh /workspace/get_repo.sh
+
 # Install Miniconda
 RUN ARCH="$(uname -m)"; \
     if [ "$ARCH" = "x86_64" ]; then \
@@ -33,18 +36,12 @@ RUN conda env create -f environment.yml && rm /workspace/environment.yml
 # Activate the environment
 SHELL ["conda", "run", "-n", "myenv", "/bin/bash", "-c"]
 
-# Copy the startup script into the container
-COPY startup.sh /startup.sh
+# Copy the startup script into /workspace
+COPY startup.sh /workspace/startup.sh
 
-# Set the script to be executable
-RUN chmod +x /startup.sh
+# Set the scripts to be executable
+RUN chmod +x /workspace/get_repo.sh /workspace/startup.sh
 
 # Run the startup script when the container launches
-CMD ["/startup.sh"]
-
-# Copy the script to get the repository into the container
-COPY get_repo.sh /get_repo.sh
-
-# Set the script to be executable
-RUN chmod +x /get_repo.sh
+CMD ["/workspace/startup.sh"]
 
