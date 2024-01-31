@@ -36,4 +36,9 @@ To clone the repository, use the following command in the terminal within the Do
 ```bash
 git clone git@github.com:chaitanya-m/auto_scientist.git
 
+OR
+
+```bash
+chmod +x get_repo.sh
+./get_repo.sh
 
