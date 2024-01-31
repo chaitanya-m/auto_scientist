@@ -43,7 +43,7 @@ RUN chmod +x /startup.sh
 CMD ["/startup.sh"]
 
 # Copy the script to get the repository into the container
-chmod +x get_repo.sh
+COPY get_repo.sh /get_repo.sh
 
 # Set the script to be executable
 RUN chmod +x /get_repo.sh

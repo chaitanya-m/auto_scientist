@@ -28,5 +28,5 @@ fi
 docker build -t linux-dev-env .
 
 # Run the Docker container with the specified or default settings
-docker run -it -v "$SSH_PATH:/root/.ssh" -v "$GITCONFIG_PATH:/root/.gitconfig" --name "$CONTAINER_NAME" linux-dev-env
+docker run -it -v "$SSH_PATH:/root/.ssh" -v "$GITCONFIG_PATH:/root/.gitconfig" --name "$CONTAINER_NAME" linux-dev-env &
 
