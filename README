@@ -1,8 +1,0 @@
-
-Use your own git ssh keys: modify the below command as required. Then run the command.
-
- docker run -it \
-    -v ~/.ssh:/root/.ssh \
-    -v ~/.gitconfig:/root/.gitconfig \
-    --name lde_instance \           
-    linux-dev-env
