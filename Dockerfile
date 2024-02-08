@@ -2,7 +2,8 @@
 FROM python:3.10-slim
 
 # Install essential tools
-RUN apt-get update && apt-get install -y wget git vim
+RUN apt-get update && apt-get install -y wget git vim \
+    build-essential gcc g++
 
 # Set the working directory in the container to /workspace
 WORKDIR /workspace
