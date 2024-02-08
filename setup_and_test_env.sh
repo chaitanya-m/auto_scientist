@@ -24,3 +24,5 @@ TEST_SCRIPT_PATH="./test_sklearn.py"
 echo "Running test_sklearn.py within the '$ENV_NAME' environment..."
 conda run -n $ENV_NAME python $TEST_SCRIPT_PATH
 
+conda activate $ENV_NAME
+
