@@ -3,29 +3,31 @@
 
 Welcome to the auto_scientist project Docker environment.
 
-## Using the docker_build_run_lde.sh Script
+## Using the build_docker.sh and run_docker.sh Scripts
 
-Use the `docker_build_run_lde.sh` script to build and run this Docker container. This script allows specifying the container name, SSH path, and Gitconfig path as arguments.
+Use the `build_docker.sh` script to build this Docker container. This script allows specifying the container name, SSH path, and Gitconfig path as arguments.
+
+'run_docker.sh' takes a container name as optional argument and otherwise defaults to dev0.
 
 ### Usage
 
 - To run with default settings:
   ```bash
-  ./docker_build_run_lde.sh
+  ./build_docker.sh
 
 - To specify a custom container name:
   ```bash
-  ./docker_build_run_lde.sh my_custom_container_name
+  ./build_docker.sh my_custom_container_name
 
 - To specify custom container name, SSH path, and Gitconfig path:
   ```bash
-  ./docker_build_run_lde.sh my_custom_container_name /path/to/ssh /path/to/gitconfig
+  ./build_docker.sh my_custom_container_name /path/to/ssh /path/to/gitconfig
 
 - Default SSH path: $HOME/.ssh
 
 - Default Gitconfig path: $HOME/.gitconfig
 
-- Refer to the script for more detailed usage instructions.
+- Refer to the scripts for more detailed usage instructions.
 
 ## Post-Setup
 

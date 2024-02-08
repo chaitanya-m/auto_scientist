@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Default values for optional arguments
-CONTAINER_NAME="lde_instance"
+CONTAINER_NAME="dev0"
 SSH_PATH="$HOME/.ssh"
 GITCONFIG_PATH="$HOME/.gitconfig"
 
 # Function to display usage
 usage() {
     echo "Usage: $0 [container name] [ssh path] [gitconfig path]"
-    echo " - Container name: Name of the Docker container (default: lde_instance)"
+    echo " - Container name: Name of the Docker container (default: dev0)"
     echo " - SSH path: Path to the SSH directory (default: $HOME/.ssh)"
     echo " - Gitconfig path: Path to the .gitconfig file (default: $HOME/.gitconfig)"
 }
