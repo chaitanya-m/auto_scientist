@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  dev0:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: linux-dev-env
+    container_name: dev0
+    volumes:
+      - $HOME/.ssh:/root/.ssh:ro
+      - $HOME/.gitconfig:/root/.gitconfig:ro
+      - ./local_results:/results
+    # Add other configurations here as needed, e.g., ports, environment variables
+
