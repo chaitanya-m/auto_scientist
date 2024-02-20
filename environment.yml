@@ -9,5 +9,6 @@ dependencies:
   - pip
   - pip:
       - scikit-multiflow==0.5.3
+      - river>=0.21.0  
   - matplotlib=3.5.1
 
