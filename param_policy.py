@@ -20,24 +20,14 @@ max_examples = 20000  # Adjust this value as needed
 delta_easy = 1e-3
 delta_hard = 1e-7
 
-seed1 = 0
-seed2 = 3
+seed0 = 0
+seed1 = 3
 
-
-# Create RandomRBF generators with different seeds
-generator1 = RandomRBF(
-    seed_model=seed1, seed_sample=seed1,
-    n_classes=3, n_features=2, n_centroids=3
-)
-generator2 = RandomRBF(
-    seed_model=seed2, seed_sample=seed2,
-    n_classes=3, n_features=2, n_centroids=3
-)
-
-# Create ConceptDriftStream with gradual shift at change_point
-drift_stream = ConceptDriftStream(
-    stream=generator1, drift_stream=generator2, position=change_point, seed=seed1
-)
+preinitialized_params_RandomRBF = {
+    'n_classes': 3,
+    'n_features': 2,
+    'n_centroids': 3,
+}
 
 # FUNCTIONS
 
@@ -46,7 +36,7 @@ import pandas as pd
 
 def prequential_evaluation(model=None, stream=None, max_examples=20000, 
                            evaluation_interval=1000, change_point=10000, 
-                           delta_easy = 1e-3, delta_hard=1e-3, 
+                           delta_easy = 1e-3, delta_hard=1e-7, 
                            update_delta_when_accuracy_drops=False, 
                            update_delta_accuracy_threshold = 0.8):
     accuracies = []
@@ -90,6 +80,54 @@ def prequential_evaluation(model=None, stream=None, max_examples=20000,
 
 
 
+def data_stream_template_factory(stream_type, preinitialized_params):
+    def constructor(seed):
+        if stream_type == 'RandomRBF':
+            return RandomRBF(seed_model=seed, seed_sample=seed, **preinitialized_params)
+        else:
+            raise ValueError(f"Unknown stream type: {stream_type}")
+    return constructor
+
+
+
+# Run seeded experiments
+def run_seeded_experiments(
+        update_delta_accuracy_threshold=0.8,
+        update_delta_when_accuracy_drops=False,
+        delta_easy = 1e-3, 
+        delta_hard = 1e-7,
+        max_examples = 20000, 
+        evaluation_interval = 1000, 
+        change_point = 10000,
+        stream_type='RandomRBF', 
+        preinitialized_params = preinitialized_params_RandomRBF,
+        seeds=[0,3], 
+        num_comparisons=10):
+
+    dfs = []
+    stream_factory = data_stream_template_factory(stream_type, preinitialized_params)
+    seed0, seed1 = seeds
+
+
+    # Run prequential_evaluation with new streams and store the results in a list of dataframes
+    for i in range(num_comparisons):
+
+        # Create ConceptDriftStream with gradual shift at change_point
+        concept_drift_stream = ConceptDriftStream(
+        stream=stream_factory(seed=seed0), 
+        drift_stream=stream_factory(seed=seed1), position=change_point, seed=seed0
+        )
+
+        model = UpdatableHoeffdingTreeClassifier()
+        dfs.append(prequential_evaluation(
+            model, concept_drift_stream, max_examples, evaluation_interval, 
+            change_point, delta_easy, delta_hard, 
+            update_delta_when_accuracy_drops=update_delta_when_accuracy_drops, 
+            update_delta_accuracy_threshold=update_delta_accuracy_threshold))
+        
+        seed0 += 1
+        seed1 += 1
+    return dfs
 
 
 # CLASSES
@@ -105,11 +143,23 @@ class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
 
 # MAIN
         
-# Create an instance of your custom class
-model = UpdatableHoeffdingTreeClassifier()
 
-# Run the prequential evaluation function
-df = prequential_evaluation(model, drift_stream, max_examples, evaluation_interval, change_point, delta_easy, delta_hard, update_delta_when_accuracy_drops=True)
 
-print(df)
+# Run seeded experiments
+dfs = run_seeded_experiments(
+    update_delta_accuracy_threshold=0.8,
+    update_delta_when_accuracy_drops=True,
+    delta_easy = 1e-3, 
+    delta_hard = 1e-7,
+    max_examples = 20000, 
+    evaluation_interval = 1000, 
+    change_point = 10000,
+    stream_type='RandomRBF', 
+    preinitialized_params = preinitialized_params_RandomRBF,
+    seeds=[0,3], 
+    num_comparisons=2)
+
+
+print(dfs[0])
+print(dfs[1])
 
