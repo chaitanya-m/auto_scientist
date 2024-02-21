@@ -1,57 +1,44 @@
 # Import necessary libraries
 from river.datasets.synth import RandomRBF, ConceptDriftStream
-from river import linear_model, tree
-import matplotlib.pyplot as plt
-from collections import deque
+from river import tree
+import pandas as pd
 import random
 import numpy as np
-import pandas as pd
-
-random.seed(0)
-np.random.seed(0)
 
 # CONSTANTS
-
-RANDOM_SEED = 0
-CHANGE_POINT = 10000
-EVALUATION_INTERVAL = 1000
-MAX_EXAMPLES = 20000
-DELTA_EASY = 1e-3
-DELTA_HARD = 1e-7
-SEED0 = 0
-SEED1 = 3
-UPDATE_DELTA_ACCURACY_THRESHOLD = 0.8
-NUM_RUNS = 2
-STREAM_TYPE = 'RandomRBF'
-SEEDS = [SEED0, SEED1]
-
-PREINITIALIZED_PARAMS_RANDOM_RBF = {
-    'n_classes': 3,
-    'n_features': 2,
-    'n_centroids': 3,
+CONFIG = {
+    'random_seed': 0,
+    'change_point': 10000,
+    'evaluation_interval': 1000,
+    'max_examples': 20000,
+    'delta_easy': 1e-3,
+    'delta_hard': 1e-7,
+    'seed0': 0,
+    'seed1': 3,
+    'update_delta_accuracy_threshold': 0.8,
+    'num_runs': 2,
+    'stream_type': 'RandomRBF',
+    'preinitialized_params_random_rbf': {
+        'n_classes': 3,
+        'n_features': 2,
+        'n_centroids': 3,
+    },
+    'update_delta_when_accuracy_drops': True,
 }
 
 # Set random seeds
-random.seed(RANDOM_SEED)
-np.random.seed(RANDOM_SEED)
+random.seed(CONFIG['random_seed'])
+np.random.seed(CONFIG['random_seed'])
 
 # FUNCTIONS
-
-# Prequential training and evaluation function
-
-def prequential_evaluation(model=None, stream=None, max_examples=20000, 
-                           evaluation_interval=1000, change_point=10000, 
-                           delta_easy = 1e-3, delta_hard=1e-7, 
-                           update_delta_when_accuracy_drops=False, 
-                           update_delta_accuracy_threshold = 0.8):
+def prequential_evaluation(model, stream, config):
     accuracies = []
     accuracy_changes = []
-
     step = 0
     correct_predictions = 0
     total_predictions = 0
     prev_accuracy = 0
-    for x, y in stream.take(max_examples):
+    for x, y in stream.take(config['max_examples']):
         prediction = model.predict_one(x)
         model.learn_one(x, y)
 
@@ -60,7 +47,7 @@ def prequential_evaluation(model=None, stream=None, max_examples=20000,
         total_predictions += 1
 
         step += 1
-        if step % evaluation_interval == 0:
+        if step % config['evaluation_interval'] == 0:
             accuracy = correct_predictions / total_predictions
             accuracy_change = accuracy - prev_accuracy
             prev_accuracy = accuracy
@@ -71,19 +58,17 @@ def prequential_evaluation(model=None, stream=None, max_examples=20000,
             correct_predictions = 0
             total_predictions = 0
 
-            if update_delta_when_accuracy_drops:
-                if accuracy < update_delta_accuracy_threshold:
-                    model.update_delta(delta_easy)
+            if config['update_delta_when_accuracy_drops']:
+                if accuracy < config['update_delta_accuracy_threshold']:
+                    model.update_delta(config['delta_easy'])
                 else:
-                    model.update_delta(delta_hard)
+                    model.update_delta(config['delta_hard'])
 
-    evaluation_steps = list(range(evaluation_interval, max_examples + 1, evaluation_interval))
+    evaluation_steps = list(range(config['evaluation_interval'], config['max_examples'] + 1, config['evaluation_interval']))
     data = list(zip(evaluation_steps, accuracy_changes[1:], accuracies[1:]))
     df = pd.DataFrame(data, columns=['Evaluation Step', 'Change in Accuracy', 'Accuracy'])
 
     return df
-
-
 
 def data_stream_template_factory(stream_type, preinitialized_params):
     def constructor(seed):
@@ -93,75 +78,37 @@ def data_stream_template_factory(stream_type, preinitialized_params):
             raise ValueError(f"Unknown stream type: {stream_type}")
     return constructor
 
-
-
-# Run seeded experiments
-def run_seeded_experiments(
-        update_delta_accuracy_threshold=0.8,
-        update_delta_when_accuracy_drops=False,
-        delta_easy = 1e-3, 
-        delta_hard = 1e-7,
-        max_examples = 20000, 
-        evaluation_interval = 1000, 
-        change_point = 10000,
-        stream_type='RandomRBF', 
-        preinitialized_params = PREINITIALIZED_PARAMS_RANDOM_RBF,
-        seeds=[0,3], 
-        num_comparisons=NUM_RUNS):
-
+def run_seeded_experiments(config):
     dfs = []
-    stream_factory = data_stream_template_factory(stream_type, preinitialized_params)
-    seed0, seed1 = seeds
+    stream_factory = data_stream_template_factory(config['stream_type'], config['preinitialized_params_random_rbf'])
+    seed0, seed1 = config['seed0'], config['seed1']
 
-
-    # Run prequential_evaluation with new streams and store the results in a list of dataframes
-    for i in range(num_comparisons):
-
-        # Create ConceptDriftStream with gradual shift at change_point
+    for i in range(config['num_runs']):
         concept_drift_stream = ConceptDriftStream(
-        stream=stream_factory(seed=seed0), 
-        drift_stream=stream_factory(seed=seed1), position=change_point, seed=seed0
+            stream=stream_factory(seed=seed0), 
+            drift_stream=stream_factory(seed=seed1), 
+            position=config['change_point'], 
+            seed=seed0
         )
 
-        model = UpdatableHoeffdingTreeClassifier()
-        dfs.append(prequential_evaluation(
-            model, concept_drift_stream, max_examples, evaluation_interval, 
-            change_point, delta_easy, delta_hard, 
-            update_delta_when_accuracy_drops=update_delta_when_accuracy_drops, 
-            update_delta_accuracy_threshold=update_delta_accuracy_threshold))
+        model = UpdatableHoeffdingTreeClassifier(delta=config['delta_hard'])
+        dfs.append(prequential_evaluation(model, concept_drift_stream, config))
         
         seed0 += 1
         seed1 += 1
     return dfs
 
-
 # CLASSES
-
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
-    def __init__(self, delta=DELTA_HARD):
+    def __init__(self, delta):
         super().__init__(delta=delta)
 
     def update_delta(self, new_delta):
         self.delta = new_delta
 
-
-
 # MAIN
-        
 def main():
-    # Run seeded experiments
-    evaluation_results = run_seeded_experiments(
-        update_delta_accuracy_threshold=UPDATE_DELTA_ACCURACY_THRESHOLD,
-        update_delta_when_accuracy_drops=True,
-        delta_easy=DELTA_EASY, 
-        delta_hard=DELTA_HARD,
-        max_examples=MAX_EXAMPLES, 
-        evaluation_interval=EVALUATION_INTERVAL, 
-        change_point=CHANGE_POINT,
-        stream_type=STREAM_TYPE, 
-        preinitialized_params=PREINITIALIZED_PARAMS_RANDOM_RBF,
-        seeds=SEEDS, 
-        num_comparisons=NUM_RUNS)
+    evaluation_results = run_seeded_experiments(CONFIG)
 
     for i, result in enumerate(evaluation_results):
         print(f"Result {i+1}:")
@@ -170,4 +117,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
