@@ -65,7 +65,7 @@ def prequential_evaluation(model, stream, config):
                     model.update_delta(config['delta_hard'])
 
     evaluation_steps = list(range(config['evaluation_interval'], config['max_examples'] + 1, config['evaluation_interval']))
-    data = list(zip(evaluation_steps, accuracy_changes[1:], accuracies[1:]))
+    data = list(zip(evaluation_steps, accuracy_changes[0:], accuracies[0:]))
     df = pd.DataFrame(data, columns=['Evaluation Step', 'Change in Accuracy', 'Accuracy'])
 
     return df
