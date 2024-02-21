@@ -21,7 +21,7 @@ DELTA_HARD = 1e-7
 SEED0 = 0
 SEED1 = 3
 UPDATE_DELTA_ACCURACY_THRESHOLD = 0.8
-NUM_COMPARISONS = 2
+NUM_RUNS = 2
 STREAM_TYPE = 'RandomRBF'
 SEEDS = [SEED0, SEED1]
 
@@ -107,7 +107,7 @@ def run_seeded_experiments(
         stream_type='RandomRBF', 
         preinitialized_params = PREINITIALIZED_PARAMS_RANDOM_RBF,
         seeds=[0,3], 
-        num_comparisons=10):
+        num_comparisons=NUM_RUNS):
 
     dfs = []
     stream_factory = data_stream_template_factory(stream_type, preinitialized_params)
@@ -161,10 +161,12 @@ def main():
         stream_type=STREAM_TYPE, 
         preinitialized_params=PREINITIALIZED_PARAMS_RANDOM_RBF,
         seeds=SEEDS, 
-        num_comparisons=NUM_COMPARISONS)
+        num_comparisons=NUM_RUNS)
 
-    print(evaluation_results[0])
-    print(evaluation_results[1])
+    for i, result in enumerate(evaluation_results):
+        print(f"Result {i+1}:")
+        print(result)
+        print("\n")
 
 if __name__ == "__main__":
     main()
