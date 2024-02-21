@@ -3,36 +3,41 @@ from river.datasets.synth import RandomRBF, ConceptDriftStream
 from river import linear_model, tree
 import matplotlib.pyplot as plt
 from collections import deque
-
 import random
 import numpy as np
 import pandas as pd
+
 random.seed(0)
 np.random.seed(0)
 
 # CONSTANTS
 
-# Define constants with named attributes
-change_point = 10000
-evaluation_interval = 1000
-max_examples = 20000  # Adjust this value as needed
+RANDOM_SEED = 0
+CHANGE_POINT = 10000
+EVALUATION_INTERVAL = 1000
+MAX_EXAMPLES = 20000
+DELTA_EASY = 1e-3
+DELTA_HARD = 1e-7
+SEED0 = 0
+SEED1 = 3
+UPDATE_DELTA_ACCURACY_THRESHOLD = 0.8
+NUM_COMPARISONS = 2
+STREAM_TYPE = 'RandomRBF'
+SEEDS = [SEED0, SEED1]
 
-delta_easy = 1e-3
-delta_hard = 1e-7
-
-seed0 = 0
-seed1 = 3
-
-preinitialized_params_RandomRBF = {
+PREINITIALIZED_PARAMS_RANDOM_RBF = {
     'n_classes': 3,
     'n_features': 2,
     'n_centroids': 3,
 }
 
+# Set random seeds
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+
 # FUNCTIONS
 
 # Prequential training and evaluation function
-import pandas as pd
 
 def prequential_evaluation(model=None, stream=None, max_examples=20000, 
                            evaluation_interval=1000, change_point=10000, 
@@ -100,7 +105,7 @@ def run_seeded_experiments(
         evaluation_interval = 1000, 
         change_point = 10000,
         stream_type='RandomRBF', 
-        preinitialized_params = preinitialized_params_RandomRBF,
+        preinitialized_params = PREINITIALIZED_PARAMS_RANDOM_RBF,
         seeds=[0,3], 
         num_comparisons=10):
 
@@ -133,7 +138,7 @@ def run_seeded_experiments(
 # CLASSES
 
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
-    def __init__(self, delta=delta_hard):
+    def __init__(self, delta=DELTA_HARD):
         super().__init__(delta=delta)
 
     def update_delta(self, new_delta):
@@ -143,23 +148,24 @@ class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
 
 # MAIN
         
+def main():
+    # Run seeded experiments
+    evaluation_results = run_seeded_experiments(
+        update_delta_accuracy_threshold=UPDATE_DELTA_ACCURACY_THRESHOLD,
+        update_delta_when_accuracy_drops=True,
+        delta_easy=DELTA_EASY, 
+        delta_hard=DELTA_HARD,
+        max_examples=MAX_EXAMPLES, 
+        evaluation_interval=EVALUATION_INTERVAL, 
+        change_point=CHANGE_POINT,
+        stream_type=STREAM_TYPE, 
+        preinitialized_params=PREINITIALIZED_PARAMS_RANDOM_RBF,
+        seeds=SEEDS, 
+        num_comparisons=NUM_COMPARISONS)
 
+    print(evaluation_results[0])
+    print(evaluation_results[1])
 
-# Run seeded experiments
-dfs = run_seeded_experiments(
-    update_delta_accuracy_threshold=0.8,
-    update_delta_when_accuracy_drops=True,
-    delta_easy = 1e-3, 
-    delta_hard = 1e-7,
-    max_examples = 20000, 
-    evaluation_interval = 1000, 
-    change_point = 10000,
-    stream_type='RandomRBF', 
-    preinitialized_params = preinitialized_params_RandomRBF,
-    seeds=[0,3], 
-    num_comparisons=2)
-
-
-print(dfs[0])
-print(dfs[1])
+if __name__ == "__main__":
+    main()
 
