@@ -14,14 +14,14 @@ CONFIG = {
     'delta_easy': 1e-3,
     'delta_hard': 1e-7,
     'seed0': 0,
-    'seed1': 3,
-    'update_delta_accuracy_threshold': 0.8,
-    'num_runs': 2,
+    'seed1': 100,
+    'update_delta_accuracy_threshold': 0.9,
+    'num_runs': 10,
     'stream_type': 'RandomRBF',
     'preinitialized_params_random_rbf': {
-        'n_classes': 3,
-        'n_features': 2,
-        'n_centroids': 3,
+        'n_classes': 4,
+        'n_features': 4,
+        'n_centroids': 4,
     },
     'update_delta_when_accuracy_drops': True,
 }
@@ -98,6 +98,33 @@ def run_seeded_experiments(config):
         seed1 += 1
     return dfs
 
+def run_experiments_with_different_policies(config):
+    # Copy the configuration to avoid side effects
+    config_false = config.copy()
+    config_true = config.copy()
+
+    # Set 'update_delta_when_accuracy_drops' to False and True respectively
+    config_false['update_delta_when_accuracy_drops'] = False
+    config_true['update_delta_when_accuracy_drops'] = True
+
+    # Run experiments
+    results_false = run_seeded_experiments(config_false)
+    results_true = run_seeded_experiments(config_true)
+
+    # Calculate and print the average accuracy after the change point for each pair of experiments
+    for i in range(config['num_runs']):
+        df_false = results_false[i]
+        df_true = results_true[i]
+
+        avg_accuracy_false = df_false[df_false['Evaluation Step'] > config['change_point']]['Accuracy'].mean()
+        avg_accuracy_true = df_true[df_true['Evaluation Step'] > config['change_point']]['Accuracy'].mean()
+
+        print(f"Experiment {i+1}:")
+        print(f"Average accuracy with 'update_delta_when_accuracy_drops' set to False: {avg_accuracy_false}")
+        print(f"Average accuracy with 'update_delta_when_accuracy_drops' set to True: {avg_accuracy_true}")
+        print("\n")
+
+
 # CLASSES
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
     def __init__(self, delta):
@@ -108,12 +135,14 @@ class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
 
 # MAIN
 def main():
-    evaluation_results = run_seeded_experiments(CONFIG)
+    # evaluation_results = run_seeded_experiments(CONFIG)
 
-    for i, result in enumerate(evaluation_results):
-        print(f"Result {i+1}:")
-        print(result)
-        print("\n")
+    # for i, result in enumerate(evaluation_results):
+    #     print(f"Result {i+1}:")
+    #     print(result)
+    #     print("\n")
+
+    run_experiments_with_different_policies(CONFIG)
 
 if __name__ == "__main__":
     main()
