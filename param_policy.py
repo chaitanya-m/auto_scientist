@@ -5,6 +5,7 @@ import pandas as pd
 import random
 import numpy as np
 
+
 # CONSTANTS
 CONFIG = {
     'random_seed': 0,
@@ -127,6 +128,14 @@ def run_experiments_with_different_policies(config):
 
 # CLASSES
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
+    def __init__(self, delta):
+        super().__init__(delta=delta)
+
+    def update_delta(self, new_delta):
+        self.delta = new_delta
+
+
+class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
 
