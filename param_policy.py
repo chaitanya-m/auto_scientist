@@ -17,12 +17,13 @@ CONFIG = {
     'seed0': 0,
     'seed1': 100,
     'update_delta_accuracy_threshold': 0.9,
-    'num_runs': 10,
+    'num_runs': 2,
     'stream_type': 'RandomRBF',
+    'model': 'UpdatableEFDTClassifier',
     'preinitialized_params_random_rbf': {
-        'n_classes': 4,
-        'n_features': 4,
-        'n_centroids': 4,
+        'n_classes': 3,
+        'n_features': 2,
+        'n_centroids': 3,
     },
     'update_delta_when_accuracy_drops': True,
 }
@@ -92,7 +93,9 @@ def run_seeded_experiments(config):
             seed=seed0
         )
 
-        model = UpdatableHoeffdingTreeClassifier(delta=config['delta_hard'])
+        ModelClass = globals()[config['model']]
+        model = ModelClass(delta=config['delta_hard'])
+
         dfs.append(prequential_evaluation(model, concept_drift_stream, config))
         
         seed0 += 1
@@ -121,8 +124,8 @@ def run_experiments_with_different_policies(config):
         avg_accuracy_true = df_true[df_true['Evaluation Step'] > config['change_point']]['Accuracy'].mean()
 
         print(f"Experiment {i+1}:")
-        print(f"Average accuracy with 'update_delta_when_accuracy_drops' set to False: {avg_accuracy_false}")
-        print(f"Average accuracy with 'update_delta_when_accuracy_drops' set to True: {avg_accuracy_true}")
+        print(f"Average accuracy after drift with 'update_delta_when_accuracy_drops' set to False: {avg_accuracy_false}")
+        print(f"Average accuracy after drift with 'update_delta_when_accuracy_drops' set to True: {avg_accuracy_true}")
         print("\n")
 
 
