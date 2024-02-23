@@ -126,27 +126,13 @@ def run_experiment(config, seed0, seed1, stream_type):
 
 def run_seeded_experiments(config, stream_type):
     dfs = []
-    stream_factory = data_stream_template_factory(stream_type, config['streams'][stream_type])
     seed0, seed1 = config['seed0'], config['seed1']
 
     for i in range(config['num_runs']):
-        concept_drift_stream = ConceptDriftStream(
-            stream=stream_factory(seed=seed0), 
-            drift_stream=stream_factory(seed=seed1), 
-            position=config['change_point'], 
-            seed=seed0
-        )
+        df = run_experiment(config, seed0 + i, seed1 + i, stream_type)
+        dfs.append(df)
 
-        # Use the dictionary to get the class object
-        ModelClass = model_classes[config['model']]
-        model = ModelClass(delta=config['delta_hard'])
-
-        dfs.append(prequential_evaluation(model, concept_drift_stream, config))
-        
-        seed0 += 1
-        seed1 += 1
     return dfs
-
 
 def run_experiments_with_different_policies(config):
     # Copy the configuration to avoid side effects
