@@ -108,7 +108,6 @@ def data_stream_template_factory(stream_type, preinitialized_params):
             raise ValueError(f"Unknown stream type: {stream_type}")
     return constructor
 
-
 def run_experiment(config, seed0, seed1, stream_type):
     stream_factory = data_stream_template_factory(stream_type, config['streams'][stream_type])
 
@@ -119,7 +118,8 @@ def run_experiment(config, seed0, seed1, stream_type):
         seed=seed0
     )
 
-    ModelClass = globals()[config['model']]
+    # Use the dictionary to get the class object
+    ModelClass = model_classes[config['model']]
     model = ModelClass(delta=config['delta_hard'])
 
     return prequential_evaluation(model, concept_drift_stream, config)
@@ -137,7 +137,8 @@ def run_seeded_experiments(config, stream_type):
             seed=seed0
         )
 
-        ModelClass = globals()[config['model']]
+        # Use the dictionary to get the class object
+        ModelClass = model_classes[config['model']]
         model = ModelClass(delta=config['delta_hard'])
 
         dfs.append(prequential_evaluation(model, concept_drift_stream, config))
@@ -145,6 +146,7 @@ def run_seeded_experiments(config, stream_type):
         seed0 += 1
         seed1 += 1
     return dfs
+
 
 def run_experiments_with_different_policies(config):
     # Copy the configuration to avoid side effects
@@ -188,6 +190,13 @@ class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
 
     def update_delta(self, new_delta):
         self.delta = new_delta
+
+# Create a dictionary mapping class names to class objects
+model_classes = {
+    'UpdatableHoeffdingTreeClassifier': UpdatableHoeffdingTreeClassifier,
+    'UpdatableEFDTClassifier': UpdatableEFDTClassifier,
+    # Add more classes as needed
+}
 
 # MAIN
 def main():
