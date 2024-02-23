@@ -125,12 +125,12 @@ def run_experiment(config, seed0, seed1, stream_type):
     return prequential_evaluation(model, concept_drift_stream, config)
 
 def run_seeded_experiments(config, stream_type):
-    dfs = []
     seed0, seed1 = config['seed0'], config['seed1']
+    seeds0 = range(seed0, seed0 + config['num_runs'])
+    seeds1 = range(seed1, seed1 + config['num_runs'])
 
-    for i in range(config['num_runs']):
-        df = run_experiment(config, seed0 + i, seed1 + i, stream_type)
-        dfs.append(df)
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        dfs = list(executor.map(run_experiment, [config]*config['num_runs'], seeds0, seeds1, [stream_type]*config['num_runs']))
 
     return dfs
 
