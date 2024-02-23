@@ -14,7 +14,7 @@ CONFIG = {
     'change_point': 10000,
     'evaluation_interval': 1000,
     'max_examples': 20000,
-    'delta_easy': 1e-4,
+    'delta_easy': 1e-8,
     'delta_hard': 1e-7,
     'seed0': 0,
     'seed1': 3,
@@ -30,11 +30,11 @@ CONFIG = {
             'n_centroids': 3,
         },
         'RandomTree': {
-            'n_classes': 2,
-            'n_num_features': 2,
-            'n_cat_features': 2,
-            'n_categories_per_feature': 2,
-            'max_tree_depth': 6,
+            'n_classes': 3,
+            'n_num_features': 3,
+            'n_cat_features': 3,
+            'n_categories_per_feature': 3,
+            'max_tree_depth': 5,
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
         },
@@ -82,15 +82,15 @@ def prequential_evaluation(model, stream, config):
 
     return df
 
+
 def data_stream_template_factory(stream_type, preinitialized_params):
     def constructor(seed):
-        if stream_type in CONFIG['streams']:
-            if stream_type == 'RandomTree':
-                return globals()[stream_type](seed_tree=seed, seed_sample=seed, **preinitialized_params)
-            elif stream_type == 'RandomRBF':
-                return globals()[stream_type](seed_model=seed, seed_sample=seed, **preinitialized_params)
-            else:
-                raise ValueError(f"Unknown stream type: {stream_type}")
+        if stream_type == 'RandomTree':
+            return RandomTree(seed_tree=seed, seed_sample=seed, **preinitialized_params)
+        elif stream_type == 'RandomRBF':
+            return RandomRBF(seed_model=seed, seed_sample=seed, **preinitialized_params)
+        else:
+            raise ValueError(f"Unknown stream type: {stream_type}")
     return constructor
 
 
@@ -109,9 +109,9 @@ def run_experiment(config, seed0, seed1, stream_type):
 
     return prequential_evaluation(model, concept_drift_stream, config)
 
-def run_seeded_experiments(config):
+def run_seeded_experiments(config, stream_type):
     dfs = []
-    stream_factory = data_stream_template_factory(config['stream_type'], config['streams'][config['stream_type']])
+    stream_factory = data_stream_template_factory(stream_type, config['streams'][stream_type])
     seed0, seed1 = config['seed0'], config['seed1']
 
     for i in range(config['num_runs']):
@@ -142,8 +142,8 @@ def run_experiments_with_different_policies(config):
 
     # Run experiments
     for stream_type in config['streams']:
-        results_false = run_seeded_experiments(config_false)
-        results_true = run_seeded_experiments(config_true)
+        results_false = run_seeded_experiments(config_false, stream_type)
+        results_true = run_seeded_experiments(config_true, stream_type)
 
         # Calculate and print the average accuracy after the change point for each pair of experiments
         for i in range(config['num_runs']):
@@ -181,12 +181,13 @@ def main():
     random.seed(CONFIG['random_seed'])
     np.random.seed(CONFIG['random_seed'])
 
-    evaluation_results = run_seeded_experiments(CONFIG)
+    for stream_type in CONFIG['streams']:
+        evaluation_results = run_seeded_experiments(CONFIG, stream_type)
 
-    for i, result in enumerate(evaluation_results):
-        print(f"Result {i+1}:")
-        print(result)
-        print("\n")
+        for i, result in enumerate(evaluation_results):
+            print(f"Result {i+1} for stream {stream_type}:")
+            print(result)
+            print("\n")
 
     run_experiments_with_different_policies(CONFIG)
 
