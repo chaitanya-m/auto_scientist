@@ -14,11 +14,11 @@ CONFIG = {
     'change_point': 10000,
     'evaluation_interval': 1000,
     'max_examples': 20000,
-    'delta_easy': 1e-8,
+    'delta_easy': 1e-3,
     'delta_hard': 1e-7,
     'seed0': 0,
     'seed1': 3,
-    'update_delta_accuracy_threshold': 0.9,
+    'update_delta_accuracy_threshold': 0.98,
     'num_runs': 2,
     'model': 'UpdatableHoeffdingTreeClassifier',
     'stream_type': 'RandomRBF',
@@ -43,6 +43,20 @@ CONFIG = {
 }
 
 # FUNCTIONS
+def calculate_average_accuracy(correct_predictions, total_predictions):
+    return correct_predictions / total_predictions if total_predictions else 0
+
+def check_for_drift(epoch_accuracies, config, model):
+    if len(epoch_accuracies) == 10:
+        avg_accuracy_last_epoch = epoch_accuracies[-1]
+        avg_accuracy_last_10_epochs = sum(epoch_accuracies) / len(epoch_accuracies)
+
+        if avg_accuracy_last_epoch < config['update_delta_accuracy_threshold'] * avg_accuracy_last_10_epochs:
+            if config['update_delta_when_accuracy_drops']:
+                model.update_delta(config['delta_easy'])
+        else:
+            model.update_delta(config['delta_hard'])
+
 def prequential_evaluation(model, stream, config):
     accuracies = []
     accuracy_changes = []
@@ -50,6 +64,8 @@ def prequential_evaluation(model, stream, config):
     correct_predictions = 0
     total_predictions = 0
     prev_accuracy = 0
+    epoch_accuracies = []
+
     for x, y in stream.take(config['max_examples']):
         prediction = model.predict_one(x)
         model.learn_one(x, y)
@@ -60,28 +76,27 @@ def prequential_evaluation(model, stream, config):
 
         step += 1
         if step % config['evaluation_interval'] == 0:
-            accuracy = correct_predictions / total_predictions
+            accuracy = calculate_average_accuracy(correct_predictions, total_predictions)
             accuracy_change = accuracy - prev_accuracy
             prev_accuracy = accuracy
 
             accuracies.append(accuracy)
             accuracy_changes.append(accuracy_change)
 
+            epoch_accuracies.append(accuracy)
+            if len(epoch_accuracies) > 10:
+                epoch_accuracies.pop(0)
+
             correct_predictions = 0
             total_predictions = 0
 
-            if config['update_delta_when_accuracy_drops']:
-                if accuracy < config['update_delta_accuracy_threshold']:
-                    model.update_delta(config['delta_easy'])
-                else:
-                    model.update_delta(config['delta_hard'])
+            check_for_drift(epoch_accuracies, config, model)
 
     evaluation_steps = list(range(config['evaluation_interval'], config['max_examples'] + 1, config['evaluation_interval']))
     data = list(zip(evaluation_steps, accuracy_changes[0:], accuracies[0:]))
     df = pd.DataFrame(data, columns=['Evaluation Step', 'Change in Accuracy', 'Accuracy'])
 
     return df
-
 
 def data_stream_template_factory(stream_type, preinitialized_params):
     def constructor(seed):
