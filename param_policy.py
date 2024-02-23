@@ -58,6 +58,7 @@ def check_for_drift(epoch_accuracies, config, model):
             model.update_delta(config['delta_hard'])
 
 def prequential_evaluation(model, stream, config):
+    env = Environment()
     accuracies = []
     accuracy_changes = []
     step = 0
@@ -77,6 +78,11 @@ def prequential_evaluation(model, stream, config):
         step += 1
         if step % config['evaluation_interval'] == 0:
             accuracy = calculate_average_accuracy(correct_predictions, total_predictions)
+            env.update(accuracy)
+
+            # Now you can get the state of the environment at any time
+            # last_epoch_accuracy, avg_last_10_epoch_accuracy = env.get_state()
+
             accuracy_change = accuracy - prev_accuracy
             prev_accuracy = accuracy
 
@@ -183,6 +189,23 @@ model_classes = {
     'UpdatableEFDTClassifier': UpdatableEFDTClassifier,
     # Add more classes as needed
 }
+
+class Environment:
+    def __init__(self):
+        self.last_epoch_accuracy = 0
+        self.last_10_epoch_accuracies = []
+
+    def update(self, accuracy):
+        self.last_epoch_accuracy = accuracy
+        self.last_10_epoch_accuracies.append(accuracy)
+        if len(self.last_10_epoch_accuracies) > 10:
+            self.last_10_epoch_accuracies.pop(0)
+
+    def get_state(self):
+        avg_last_10_epoch_accuracy = sum(self.last_10_epoch_accuracies) / len(self.last_10_epoch_accuracies) if self.last_10_epoch_accuracies else 0
+        return self.last_epoch_accuracy, avg_last_10_epoch_accuracy
+
+
 
 # MAIN
 def main():
