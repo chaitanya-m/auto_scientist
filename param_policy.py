@@ -59,6 +59,8 @@ def check_for_drift(epoch_accuracies, config, model):
 
 def prequential_evaluation(model, stream, config):
     state = State()
+    agent = Agent(model, config['delta_easy'], config['delta_hard'])
+
     accuracies = []
     accuracy_changes = []
     step = 0
@@ -80,6 +82,9 @@ def prequential_evaluation(model, stream, config):
             accuracy = calculate_average_accuracy(correct_predictions, total_predictions)
             state.update(accuracy)
 
+            # Now the agent directly chooses and applies an action based on the current state
+            agent.choose_and_apply_action(state.get())
+
             # Now you can get the state of the environment at any time
             # last_epoch_accuracy, avg_last_10_epoch_accuracy = env.get_state()
 
@@ -96,7 +101,7 @@ def prequential_evaluation(model, stream, config):
             correct_predictions = 0
             total_predictions = 0
 
-            check_for_drift(epoch_accuracies, config, model)
+            #check_for_drift(epoch_accuracies, config, model)
 
     evaluation_steps = list(range(config['evaluation_interval'], config['max_examples'] + 1, config['evaluation_interval']))
     data = list(zip(evaluation_steps, accuracy_changes[0:], accuracies[0:]))
@@ -201,7 +206,7 @@ class State:
         if len(self.last_10_epoch_accuracies) > 10:
             self.last_10_epoch_accuracies.pop(0)
 
-    def get_state(self):
+    def get(self):
         avg_last_10_epoch_accuracy = sum(self.last_10_epoch_accuracies) / len(self.last_10_epoch_accuracies) if self.last_10_epoch_accuracies else 0
         return self.last_epoch_accuracy, avg_last_10_epoch_accuracy
 
@@ -211,14 +216,11 @@ class Agent:
         self.delta_easy = delta_easy
         self.delta_hard = delta_hard
 
-    def choose_action(self, state):
-        # Define your policy here. For now, we'll just randomly choose an action.
-        return random.choice([0, 1])
-
-    def apply_action(self, action):
-        if action == 0:
+    def choose_and_apply_action(self, state):
+        last_epoch_accuracy, avg_last_10_epoch_accuracy = state
+        if last_epoch_accuracy < avg_last_10_epoch_accuracy:
             self.model.delta = self.delta_easy
-        elif action == 1:
+        else:
             self.model.delta = self.delta_hard
 
 
