@@ -1,12 +1,17 @@
 # Import necessary libraries
 from river.datasets.synth import RandomRBF, RandomTree, ConceptDriftStream
-import concurrent.futures
 from river import tree
+
 import pandas as pd
 import random
 import numpy as np
 
+import concurrent.futures
+import queue
+import threading
 
+# Create a global queue for events
+event_queue = queue.Queue()
 
 # CONSTANTS
 CONFIG = {
@@ -155,7 +160,6 @@ class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
     def update_delta(self, new_delta):
         self.delta = new_delta
 
-
 class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
@@ -197,6 +201,20 @@ class Agent:
             self.model.delta = self.delta_easy
         else:
             self.model.delta = self.delta_hard
+
+class AgentListener(threading.Thread):
+    def __init__(self, agent):
+        super().__init__()
+        self.agent = agent
+        self.daemon = True  # Ensure thread exits when main program finishes
+
+    def run(self):
+        while True:
+            # Wait for an accuracy update event
+            accuracy = event_queue.get()
+
+            # Update the agent's state and choose an action
+            self.agent.choose_and_apply_action(accuracy)
 
 
 # MAIN
