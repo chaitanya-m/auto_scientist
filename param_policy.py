@@ -1,14 +1,15 @@
 # Import necessary libraries
+import concurrent.futures
+import queue
+import threading
+from collections import OrderedDict
+
 from river.datasets.synth import RandomRBF, RandomTree, ConceptDriftStream
 from river import tree
 
 import pandas as pd
 import random
 import numpy as np
-
-import concurrent.futures
-import queue
-import threading
 
 # CONSTANTS
 CONFIG = {
@@ -20,16 +21,16 @@ CONFIG = {
     'delta_hard': 1e-7,
     'seed0': 0,
     'seed1': 100,
-    'update_delta_accuracy_threshold': 0.98,
-    'num_runs': 10,
+    'update_delta_accuracy_threshold': 0.90,
+    'num_runs': 2,
     'model': 'UpdatableHoeffdingTreeClassifier',
     'stream_type': 'RandomRBF',
     'streams': {
-    #     'RandomRBF': {
-    #         'n_classes': 3,
-    #         'n_features': 2,
-    #         'n_centroids': 3,
-    #     },
+        'RandomRBF': {
+            'n_classes': 3,
+            'n_features': 2,
+            'n_centroids': 3,
+        },
         'RandomTree': {
             'n_classes': 3,
             'n_num_features': 3,
@@ -106,13 +107,6 @@ def run_experiment(config, seed0, seed1, stream_type):
     # Calculate 'Correct_Classification' column
     results_df['Correct_Classification'] = results_df['Prediction'] == results_df['Actual']
 
-    # print(df.head())
-
-    df = state.get_avg_accuracies_df()
-    print(df)
-
-
-
     return results_df
 
 def run_seeded_experiments(config, stream_type):
@@ -121,24 +115,26 @@ def run_seeded_experiments(config, stream_type):
     seeds1 = range(seed1, seed1 + config['num_runs'])
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        dfs = list(executor.map(run_experiment, [config]*config['num_runs'], seeds0, seeds1, [stream_type]*config['num_runs']))
+        results = list(executor.map(run_experiment, [config]*config['num_runs'], seeds0, seeds1, [stream_type]*config['num_runs']))
 
-    return dfs
+    # Create an OrderedDict where the keys are the thread numbers and the values are the results
+    results_dict = OrderedDict((i, result) for i, result in enumerate(results))
 
-def run_experiments_multiple_stream_types(config):
-    # Run experiments
-    for stream_type in config['streams']:
-        results = run_seeded_experiments(config, stream_type)
+    return results_dict
 
-        # Calculate and print the average accuracy after the change point for each pair of experiments
-        for i in range(config['num_runs']):
-            df = results[i]
+def run_experiments_multiple_configurations(configurations, default_config):
+    all_results = {}
 
-            avg_accuracy = df[df.index > config['change_point']]['Correct_Classification'].mean()
+    for config in configurations:
+        changed_features = {k: v for k, v in config.items() if v != default_config.get(k)}
+        results = {}
 
-            print(f"Experiment {i+1} for stream {stream_type}:")
-            print(f"Average accuracy after drift: {avg_accuracy}")
-            print("\n")
+        for stream_type in config['streams']:
+            results[stream_type] = run_seeded_experiments(config, stream_type)
+
+        all_results[str(changed_features)] = results
+
+    return all_results
 
 # CLASSES
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
@@ -279,7 +275,36 @@ def main():
     random.seed(CONFIG['random_seed'])
     np.random.seed(CONFIG['random_seed'])
 
-    run_experiments_multiple_stream_types(CONFIG)
+    default_config = {
+        **CONFIG,
+        'delta_easy': 1e-3,
+        'delta_hard': 1e-7,
+    }
+
+    configurations = [
+        default_config,
+        {
+            **CONFIG,
+            'delta_easy': 1e-7,
+            'delta_hard': 1e-7,
+        },
+        # Add more configurations here
+    ]
+
+    results = run_experiments_multiple_configurations(configurations, default_config)
+
+    # Now `results` is a dictionary where the keys are the string representations of the changed features and the values are the results of the experiments.
+
+    for changed_features, streams in results.items():
+        for stream_type, results_dict in streams.items():
+            for thread_number, df in results_dict.items():
+                # Calculate average epoch-wise accuracy for each run
+                avg_accuracy = df['Correct_Classification'].mean()
+
+                # Print the results
+                print(f"Stream: {stream_type}, Thread: {thread_number}, Changed Features: {changed_features}, Average Accuracy: {avg_accuracy}")
+
+
 
 if __name__ == "__main__":    
     main()
