@@ -295,16 +295,22 @@ def main():
 
     # Now `results` is a dictionary where the keys are the string representations of the changed features and the values are the results of the experiments.
 
+    data = []
+
     for changed_features, streams in results.items():
         for stream_type, results_dict in streams.items():
             for thread_number, df in results_dict.items():
                 # Calculate average epoch-wise accuracy for each run
                 avg_accuracy = df['Correct_Classification'].mean()
 
-                # Print the results
-                print(f"Stream: {stream_type}, Thread: {thread_number}, Changed Features: {changed_features}, Average Accuracy: {avg_accuracy}")
+                # Append the results to the data list
+                data.append([stream_type, thread_number, changed_features, avg_accuracy])
 
+    # Create a DataFrame with the data
+    df = pd.DataFrame(data, columns=['Stream Type', 'Thread Number', 'Changed Features', 'Average Accuracy'])
 
+    # Print the DataFrame
+    print(df)
 
 if __name__ == "__main__":    
     main()
