@@ -75,8 +75,8 @@ def prequential_evaluation(model, stream, config):
             accuracy = calculate_average_accuracy(correct_predictions, total_predictions)
             state.update(accuracy)
 
-            # Now the agent directly chooses and applies an action based on the current state
-            agent.choose_and_apply_action(state.get())
+            # Emit an accuracy update event instead of calling the agent directly
+            event_queue.put(state.get())  # Emit the entire state
 
             # Now you can get the state of the environment at any time
             # last_epoch_accuracy, avg_last_10_epoch_accuracy = env.get_state()
@@ -217,12 +217,17 @@ class AgentListener(threading.Thread):
             self.agent.choose_and_apply_action(accuracy)
 
 
-# MAIN
 def main():
-
     # Set random seeds
     random.seed(CONFIG['random_seed'])
     np.random.seed(CONFIG['random_seed'])
+
+    # Create an agent and start the listener thread
+    ModelClass = model_classes[CONFIG['model']]
+    model = ModelClass(delta=CONFIG['delta_hard'])
+    agent = Agent(model, CONFIG['delta_easy'], CONFIG['delta_hard'])
+    listener = AgentListener(agent)
+    listener.start()
 
     for stream_type in CONFIG['streams']:
         evaluation_results = run_seeded_experiments(CONFIG, stream_type)
@@ -236,4 +241,3 @@ def main():
 
 if __name__ == "__main__":    
     main()
-
