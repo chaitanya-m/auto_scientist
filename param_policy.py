@@ -10,9 +10,6 @@ import concurrent.futures
 import queue
 import threading
 
-# Create a global queue for events
-event_queue = queue.Queue()
-
 # CONSTANTS
 CONFIG = {
     'random_seed': 0,
@@ -28,11 +25,11 @@ CONFIG = {
     'model': 'UpdatableHoeffdingTreeClassifier',
     'stream_type': 'RandomRBF',
     'streams': {
-        'RandomRBF': {
-            'n_classes': 3,
-            'n_features': 2,
-            'n_centroids': 3,
-        },
+    #     'RandomRBF': {
+    #         'n_classes': 3,
+    #         'n_features': 2,
+    #         'n_centroids': 3,
+    #     },
         'RandomTree': {
             'n_classes': 3,
             'n_num_features': 3,
@@ -51,55 +48,18 @@ def calculate_average_accuracy(correct_predictions, total_predictions):
     return correct_predictions / total_predictions if total_predictions else 0
 
 def prequential_evaluation(model, stream, config):
-    state = State()
-    agent = Agent(model, config['delta_easy'], config['delta_hard'])
-
-    accuracies = []
-    accuracy_changes = []
-    step = 0
-    correct_predictions = 0
-    total_predictions = 0
-    prev_accuracy = 0
-    epoch_accuracies = []
-
     for x, y in stream.take(config['max_examples']):
         prediction = model.predict_one(x)
         model.learn_one(x, y)
+        yield prediction, y
 
-        if prediction == y:
-            correct_predictions += 1
-        total_predictions += 1
+def prequential_evaluation_with_queue(model, stream, config, accuracy_event_queue):
 
-        step += 1
-        if step % config['evaluation_interval'] == 0:
-            accuracy = calculate_average_accuracy(correct_predictions, total_predictions)
-            state.update(accuracy)
-
-            # Emit an accuracy update event instead of calling the agent directly
-            event_queue.put(state.get())  # Emit the entire state
-
-            # Now you can get the state of the environment at any time
-            # last_epoch_accuracy, avg_last_10_epoch_accuracy = env.get_state()
-
-            accuracy_change = accuracy - prev_accuracy
-            prev_accuracy = accuracy
-
-            accuracies.append(accuracy)
-            accuracy_changes.append(accuracy_change)
-
-            epoch_accuracies.append(accuracy)
-            if len(epoch_accuracies) > 10:
-                epoch_accuracies.pop(0)
-
-            correct_predictions = 0
-            total_predictions = 0
-
-
-    evaluation_steps = list(range(config['evaluation_interval'], config['max_examples'] + 1, config['evaluation_interval']))
-    data = list(zip(evaluation_steps, accuracy_changes[0:], accuracies[0:]))
-    df = pd.DataFrame(data, columns=['Evaluation Step', 'Change in Accuracy', 'Accuracy'])
-
-    return df
+    results = []
+    for prediction, y in prequential_evaluation(model, stream, config):
+        accuracy_event_queue.put((prediction, y)) 
+        results.append((prediction, y))
+    return results
 
 def data_stream_template_factory(stream_type, preinitialized_params):
     def constructor(seed):
@@ -112,6 +72,10 @@ def data_stream_template_factory(stream_type, preinitialized_params):
     return constructor
 
 def run_experiment(config, seed0, seed1, stream_type):
+    # Create queues for this experiment
+    accuracy_event_queue = queue.Queue()
+    state_update_queue = queue.Queue()
+
     stream_factory = data_stream_template_factory(stream_type, config['streams'][stream_type])
 
     concept_drift_stream = ConceptDriftStream(
@@ -125,7 +89,31 @@ def run_experiment(config, seed0, seed1, stream_type):
     ModelClass = model_classes[config['model']]
     model = ModelClass(delta=config['delta_hard'])
 
-    return prequential_evaluation(model, concept_drift_stream, config)
+    # Create a state and start the StateUpdater thread
+    state = State(config, state_update_queue)
+    state_updater = StateUpdater(state, accuracy_event_queue)
+    state_updater.start()
+
+    # Create an agent and start the AgentListener thread
+    agent = Agent(model, config['delta_easy'], config['delta_hard'])
+    agent_listener = AgentListener(agent, state_update_queue)
+    agent_listener.start()
+
+    # Convert generator to DataFrame before returning
+    results = list(prequential_evaluation_with_queue(model, concept_drift_stream, config, accuracy_event_queue))
+    results_df = pd.DataFrame(results, columns=['Prediction', 'Actual'])
+
+    # Calculate 'Correct_Classification' column
+    results_df['Correct_Classification'] = results_df['Prediction'] == results_df['Actual']
+
+    # print(df.head())
+
+    df = state.get_avg_accuracies_df()
+    print(df)
+
+
+
+    return results_df
 
 def run_seeded_experiments(config, stream_type):
     seed0, seed1 = config['seed0'], config['seed1']
@@ -137,7 +125,7 @@ def run_seeded_experiments(config, stream_type):
 
     return dfs
 
-def run_experiments_with_different_policies(config):
+def run_experiments_multiple_stream_types(config):
     # Run experiments
     for stream_type in config['streams']:
         results = run_seeded_experiments(config, stream_type)
@@ -146,7 +134,7 @@ def run_experiments_with_different_policies(config):
         for i in range(config['num_runs']):
             df = results[i]
 
-            avg_accuracy = df[df['Evaluation Step'] > config['change_point']]['Accuracy'].mean()
+            avg_accuracy = df[df.index > config['change_point']]['Correct_Classification'].mean()
 
             print(f"Experiment {i+1} for stream {stream_type}:")
             print(f"Average accuracy after drift: {avg_accuracy}")
@@ -174,20 +162,88 @@ model_classes = {
     # Add more classes as needed
 }
 
-class State:
-    def __init__(self):
-        self.last_epoch_accuracy = 0
-        self.last_10_epoch_accuracies = []
 
-    def update(self, accuracy):
-        self.last_epoch_accuracy = accuracy
-        self.last_10_epoch_accuracies.append(accuracy)
-        if len(self.last_10_epoch_accuracies) > 10:
-            self.last_10_epoch_accuracies.pop(0)
+class StateUpdater(threading.Thread):
+    def __init__(self, state, accuracy_event_queue):
+        super().__init__()
+        self.state = state
+        self.daemon = True  # Ensure thread exits when main program finishes
+        self.accuracy_event_queue = accuracy_event_queue
+
+    def run(self):
+        while True:
+            # Wait for a prediction and true value from the event_queue
+            prediction, y = self.accuracy_event_queue.get()
+
+            # Update the state with the prediction and true value
+            self.state.update(prediction, y)
+            
+class State:
+    def __init__(self, config, state_update_queue):
+        self.config = config
+
+        self.step = 0
+        self.evaluation_steps = []
+
+        self.correct_predictions = 0
+        self.total_predictions = 0
+
+        self.all_epoch_accuracies = [] 
+
+        self.last_10_accuracies = []
+        self.avg_last_10_epoch_accuracies = 0
+        self.avg_accuracies = []  # Store average accuracies
+
+        self.state_update_queue = state_update_queue
+
+    def update(self, prediction, y):
+        if prediction == y:
+            self.correct_predictions += 1
+        self.total_predictions += 1
+        self.step += 1
+
+        if self.step % self.config['evaluation_interval'] == 0:
+            accuracy = self.calculate_average_accuracy()
+            self.avg_accuracies.append(accuracy)
+            self.all_epoch_accuracies.append(accuracy)  # renamed from accuracies
+            self.evaluation_steps.append(self.step)
+            self.correct_predictions = 0
+            self.total_predictions = 0
+
+            # Update the last 10 accuracies
+            self.last_10_accuracies.append(accuracy)
+            if len(self.last_10_accuracies) > 10:
+                self.last_10_accuracies.pop(0)  # Remove the oldest accuracy
+
+            # Update the average of the last 10 accuracies
+            self.avg_last_10_epoch_accuracies = self.get_average_of_last_10_accuracies()
+
+            # Put the updated state into the state_update_queue
+            self.state_update_queue.put((self.last_10_accuracies[-1], self.avg_last_10_epoch_accuracies))
+
+
+    def calculate_average_accuracy(self):
+        return self.correct_predictions / self.total_predictions if self.total_predictions else 0
 
     def get(self):
-        avg_last_10_epoch_accuracy = sum(self.last_10_epoch_accuracies) / len(self.last_10_epoch_accuracies) if self.last_10_epoch_accuracies else 0
-        return self.last_epoch_accuracy, avg_last_10_epoch_accuracy
+        data = list(zip(self.evaluation_steps, self.all_epoch_accuracies))  # renamed from accuracies
+        df = pd.DataFrame(data, columns=['Evaluation Step', 'Correct_Classification'])
+        return df
+
+    def get_last_10_accuracies(self):
+        return self.last_10_accuracies
+
+    def get_average_of_last_10_accuracies(self):
+        if self.last_10_accuracies:
+            return sum(self.last_10_accuracies) / len(self.last_10_accuracies)
+        else:
+            return 0
+        
+    def get_avg_accuracies_df(self):
+        """Return a DataFrame with average accuracies every 1000 epochs."""
+        df = pd.DataFrame(self.avg_accuracies, columns=['Average Accuracy'])
+        df.index = df.index * self.config['evaluation_interval']  # Set the index to the epoch number
+        return df
 
 class Agent:
     def __init__(self, model, delta_easy, delta_hard):
@@ -203,18 +259,19 @@ class Agent:
             self.model.delta = self.delta_hard
 
 class AgentListener(threading.Thread):
-    def __init__(self, agent):
+    def __init__(self, agent, state_update_queue):
         super().__init__()
         self.agent = agent
         self.daemon = True  # Ensure thread exits when main program finishes
+        self.state_update_queue = state_update_queue
 
     def run(self):
         while True:
-            # Wait for an accuracy update event
-            accuracy = event_queue.get()
+            # Wait for an state update event
+            state = self.state_update_queue.get()
 
             # Update the agent's state and choose an action
-            self.agent.choose_and_apply_action(accuracy)
+            self.agent.choose_and_apply_action(state)
 
 
 def main():
@@ -222,22 +279,7 @@ def main():
     random.seed(CONFIG['random_seed'])
     np.random.seed(CONFIG['random_seed'])
 
-    # Create an agent and start the listener thread
-    ModelClass = model_classes[CONFIG['model']]
-    model = ModelClass(delta=CONFIG['delta_hard'])
-    agent = Agent(model, CONFIG['delta_easy'], CONFIG['delta_hard'])
-    listener = AgentListener(agent)
-    listener.start()
-
-    for stream_type in CONFIG['streams']:
-        evaluation_results = run_seeded_experiments(CONFIG, stream_type)
-
-        for i, result in enumerate(evaluation_results):
-            print(f"Result {i+1} for stream {stream_type}:")
-            print(result)
-            print("\n")
-
-    run_experiments_with_different_policies(CONFIG)
+    run_experiments_multiple_stream_types(CONFIG)
 
 if __name__ == "__main__":    
     main()
