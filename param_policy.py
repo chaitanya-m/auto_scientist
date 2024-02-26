@@ -21,16 +21,16 @@ CONFIG = {
     'delta_hard': 1e-7,
     'seed0': 0,
     'seed1': 100,
-    'update_delta_accuracy_threshold': 0.90,
-    'num_runs': 2,
+    'update_delta_dropped_accuracy': 0.8,
+    'num_runs': 10,
     'model': 'UpdatableHoeffdingTreeClassifier',
     'stream_type': 'RandomRBF',
     'streams': {
-        'RandomRBF': {
-            'n_classes': 3,
-            'n_features': 2,
-            'n_centroids': 3,
-        },
+        # 'RandomRBF': {
+        #     'n_classes': 3,
+        #     'n_features': 2,
+        #     'n_centroids': 3,
+        # },
         'RandomTree': {
             'n_classes': 3,
             'n_num_features': 3,
@@ -96,7 +96,7 @@ def run_experiment(config, seed0, seed1, stream_type):
     state_updater.start()
 
     # Create an agent and start the AgentListener thread
-    agent = Agent(model, config['delta_easy'], config['delta_hard'])
+    agent = Agent(model, config)
     agent_listener = AgentListener(agent, state_update_queue)
     agent_listener.start()
 
@@ -242,17 +242,16 @@ class State:
         return df
 
 class Agent:
-    def __init__(self, model, delta_easy, delta_hard):
+    def __init__(self, model, config):
         self.model = model
-        self.delta_easy = delta_easy
-        self.delta_hard = delta_hard
+        self.config = config
 
     def choose_and_apply_action(self, state):
         last_epoch_accuracy, avg_last_10_epoch_accuracy = state
-        if last_epoch_accuracy < avg_last_10_epoch_accuracy:
-            self.model.delta = self.delta_easy
+        if last_epoch_accuracy < avg_last_10_epoch_accuracy * self.config['update_delta_dropped_accuracy']:
+            self.model.delta = self.config['delta_easy']
         else:
-            self.model.delta = self.delta_hard
+            self.model.delta = self.config['delta_hard']
 
 class AgentListener(threading.Thread):
     def __init__(self, agent, state_update_queue):
@@ -295,7 +294,7 @@ def main():
 
     # Now `results` is a dictionary where the keys are the string representations of the changed features and the values are the results of the experiments.
 
-    data = []
+    dfs = {}
 
     for changed_features, streams in results.items():
         for stream_type, results_dict in streams.items():
@@ -303,14 +302,24 @@ def main():
                 # Calculate average epoch-wise accuracy for each run
                 avg_accuracy = df['Correct_Classification'].mean()
 
-                # Append the results to the data list
-                data.append([stream_type, thread_number, changed_features, avg_accuracy])
+                # Create a key for the stream-type and thread-number combination
+                key = (stream_type, thread_number)
 
-    # Create a DataFrame with the data
-    df = pd.DataFrame(data, columns=['Stream Type', 'Thread Number', 'Changed Features', 'Average Accuracy'])
+                # If the key is not in the dfs dictionary, add it with an empty list
+                if key not in dfs:
+                    dfs[key] = []
 
-    # Print the DataFrame
-    print(df)
+                # Append the results to the list
+                dfs[key].append({'Changed Features': changed_features, 'Average Accuracy': avg_accuracy})
+
+    # Convert the lists to DataFrames using pd.concat
+    for key, data in dfs.items():
+        dfs[key] = pd.DataFrame(data)
+
+    # Print the DataFrames
+    for key, df in dfs.items():
+        print(f"Stream Type: {key[0]}, Thread Number: {key[1]}")
+        print(df)
 
 if __name__ == "__main__":    
     main()
