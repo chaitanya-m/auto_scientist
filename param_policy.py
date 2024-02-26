@@ -22,7 +22,7 @@ CONFIG = {
     'seed0': 0,
     'seed1': 100,
     'update_delta_dropped_accuracy': 0.8,
-    'num_runs': 10,
+    'num_runs': 2,
     'model': 'UpdatableHoeffdingTreeClassifier',
     'stream_type': 'RandomRBF',
     'streams': {
@@ -274,6 +274,9 @@ def main():
     random.seed(CONFIG['random_seed'])
     np.random.seed(CONFIG['random_seed'])
 
+    delta_easy_values = [10**(-i) for i in range(3, 10)]
+    update_delta_dropped_accuracy_values = [0.6, 0.8, 0.9, 0.95, 0.99]
+
     default_config = {
         **CONFIG,
         'delta_easy': 1e-3,
@@ -281,13 +284,13 @@ def main():
     }
 
     configurations = [
-        default_config,
         {
             **CONFIG,
-            'delta_easy': 1e-7,
-            'delta_hard': 1e-7,
-        },
-        # Add more configurations here
+            'delta_easy': delta_easy,
+            'update_delta_dropped_accuracy': update_delta_dropped_accuracy,
+        }
+        for delta_easy in delta_easy_values
+        for update_delta_dropped_accuracy in update_delta_dropped_accuracy_values
     ]
 
     results = run_experiments_multiple_configurations(configurations, default_config)
@@ -319,7 +322,7 @@ def main():
     # Print the DataFrames
     for key, df in dfs.items():
         print(f"Stream Type: {key[0]}, Thread Number: {key[1]}")
-        print(df)
-
+        #print(df)
+        print(df.to_numpy())
 if __name__ == "__main__":    
     main()
