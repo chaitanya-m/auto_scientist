@@ -83,11 +83,6 @@ def run_experiment(config, seed0, seed1, stream_type):
     accuracy_event_queue = queue.Queue()
     state_update_queue = queue.Queue()
 
-
-
-
-
-
     # Create a state and start the StateUpdater thread
     state = State(config, state_update_queue)
     state_updater = StateUpdater(state, accuracy_event_queue)
@@ -170,8 +165,6 @@ model_classes = {
     # Add more classes as needed
 }
 
-
-
         # let's write some pseudocode for the agent
         # First create a Q-table. 
         # In the Q table:
@@ -188,14 +181,12 @@ model_classes = {
 
         # Initialize the Q-table
 
-
-
-
-
 class Experiment:
     def __init__(self, config, num_seeds):
         self.config = config
         self.num_seeds = num_seeds
+        self.preq_accuracy = []  # Add this line
+
 
     def average_classification_accuracy(correct_predictions, total_predictions):
         return correct_predictions / total_predictions if total_predictions else 0
@@ -209,7 +200,7 @@ class Experiment:
 
     def run_one_epoch(self):
         # Initialize the total accuracy for this epoch
-        total_accuracy = 0
+        total_correctly_classified = 0
         total_samples = 0
 
         # Iterate over the data in the stream
@@ -221,19 +212,22 @@ class Experiment:
             self.model.learn_one(x, y)
 
             # Calculate the accuracy of the prediction against the actual output
-            accuracy = calculate_accuracy(prediction, y)
+            is_correctly_classified = self.classification_accuracy(prediction, y)
 
             # Add the accuracy to the total accuracy
-            total_accuracy += accuracy
+            total_correctly_classified += is_correctly_classified
 
             # Increment the total number of samples
             total_samples += 1
 
         # Calculate the prequential accuracy for this epoch
-        prequential_accuracy = total_accuracy / total_samples
+        epoch_prequential_accuracy = total_correctly_classified / total_samples
+
+        # Update the prequential accuracy list
+        self.preq_accuracy.append(epoch_prequential_accuracy)
 
         # Return the prequential accuracy
-        return prequential_accuracy
+        return epoch_prequential_accuracy
 
     def ensure_bounds(self, config):
         # Ensure the configuration values are within valid bounds
@@ -242,7 +236,6 @@ class Experiment:
         config['update_delta_dropped_accuracy'] = np.clip(config['update_delta_dropped_accuracy'], 0, 1)
         # Repeat for other parameters
         return config
-
 
 class Agent:
     def __init__(self, config, model, stream_factory, exploration_step_sizes, num_episodes, num_seeds):
