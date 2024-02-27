@@ -13,6 +13,7 @@ import numpy as np
 
 from multiprocessing import Pool
 
+
 def run_experiment_wrapper(args):
     agent, new_config, seed0, seed1, stream_type = args
     return run_experiment(agent, new_config, seed0, seed1, stream_type)
@@ -173,18 +174,6 @@ model_classes = {
 
 
 
-class Agent:
-    def __init__(self, config, model, stream_factory, exploration_step_sizes, num_episodes, num_seeds):
-        self.config = config
-        self.exploration_step_sizes = exploration_step_sizes
-        self.num_episodes = num_episodes
-        self.num_seeds = num_seeds
-        self.baseline = None
-        self.model = model
-        self.stream_factory = stream_factory
-
-    def find_best_parameters(self):
-
         # let's write some pseudocode for the agent
         # First create a Q-table. 
         # In the Q table:
@@ -199,26 +188,66 @@ class Agent:
         #   For each seed, if the strategy with agent intervention has a higher reward than the strategy without agent intervention
         #       then update the Q-table with the new reward, which is the difference between the two stream prediction accuracies
 
+        # Initialize the Q-table
 
 
-        
+class Agent:
+    def __init__(self, config, model, stream_factory, exploration_step_sizes, num_episodes, num_seeds):
+        self.config = config
+        self.exploration_step_sizes = exploration_step_sizes
+        self.num_episodes = num_episodes
+        self.num_seeds = num_seeds
+        self.model = model
+        self.stream_factory = stream_factory
+
+    def find_best_strategy(self):
+        # Initialize the Q-table
+        Q_table = {}
+
+        # Iterate over the number of episodes
         for episode in range(self.num_episodes):
-            concept_drift_stream = ConceptDriftStream(
-                stream=self.stream_factory.create(seed=self.config['seed0']), 
-                drift_stream=self.stream_factory.create(seed=self.config['seed1']), 
-                position=self.config['change_point'], 
-                seed=self.config['seed0']
-            )
+            # Initialize the accuracies for the strategies with and without agent intervention
+            accuracy_without_intervention = []
+            accuracy_with_intervention = []
 
-            action = self.choose_action()
-            reward = experiment.run(action)
-            if self.baseline is None:
-                self.baseline = reward
-            if reward > self.baseline:
-                self.baseline = reward
-            if self.baseline - reward > self.drop_threshold:
-                self.adjust_parameters(experiment)
-        return self.config
+            # Create a set of concept drift streams
+            concept_drift_streams = [ConceptDriftStream(
+                stream=self.stream_factory.create(seed=seed), 
+                drift_stream=self.stream_factory.create(seed=seed), 
+                position=self.config['change_point'], 
+                seed=seed
+            ) for seed in range(self.num_seeds)]
+
+            # Run the experiments without any agent intervention
+            with Pool() as pool:
+                accuracy_without_intervention = pool.map(self.run_experiment, [(stream, False) for stream in concept_drift_streams])
+
+            # Run the experiments with agent intervention
+            with Pool() as pool:
+                accuracy_with_intervention = pool.map(self.run_experiment, [(stream, True) for stream in concept_drift_streams])
+
+            # For each seed, calculate the reward and update the Q-table
+            for seed in range(self.num_seeds):
+                # Calculate the reward as the gain in accuracy with intervention
+                reward = accuracy_with_intervention[seed] - accuracy_without_intervention[seed]
+                if reward > 0:
+                    # Update the Q-table with the new reward
+                    state = ((accuracy_without_intervention[seed] - accuracy_with_intervention[seed]) / accuracy_with_intervention[seed])
+                    action = self.choose_action()
+                    Q_table[(state, action)] = reward
+
+        # # Find the best strategy based on the Q-table
+        # best_state, best_action = max(Q_table, key=Q_table.get)
+        # best_parameters = self.apply_action(self.config, best_action)
+
+        # return best_parameters
+
+    def run_experiment(self, args):
+        stream, intervention = args
+        experiment = Experiment(self.config, self.model, stream)
+        if intervention:
+            self.adjust_parameters(experiment)
+        return experiment.run()
 
     def choose_action(self):
         action = {param: np.random.choice([-step['coarse'], -step['fine'], step['fine'], step['coarse']])
@@ -232,6 +261,19 @@ class Agent:
         self.config[increase_param] += self.exploration_step_sizes[increase_param]['fine']
         self.config[decrease_param] -= self.exploration_step_sizes[decrease_param]['fine']
         self.config = experiment.ensure_bounds(self.config)
+
+    def create_policy(self):
+        # Initialize the policy
+        policy = {}
+
+        # Iterate over the states in the Q-table
+        for state, action in self.Q_table.keys():
+            # If the state is not in the policy or the reward for the current action is greater than the reward for the current best action
+            if state not in policy or self.Q_table[(state, action)] > self.Q_table[(state, policy[state])]:
+                # Update the policy with the current action
+                policy[state] = action
+
+        return policy
 
 def main():
 
@@ -253,7 +295,12 @@ def main():
         'update_delta_dropped_accuracy': {'coarse': 0.1, 'fine': 0.01},
     }
     agent = Agent(CONFIG, model, stream_factory, exploration_step_sizes, num_episodes=10, num_seeds=5)
-    best_parameters = agent.find_best_parameters()
+    best_parameters = agent.find_best_strategy()
+    policy = agent.create_policy()
+
+    # Now the policy created by the agent can be tested on a set of new streams using similarity measures for the states
+    # The policy can be used to adjust the parameters of the model in real time
+    # A comparison can be made between the performance of the model with and without the agent intervention
 
     # Print the best parameters found
     print(f"Best parameters found: {best_parameters}")
