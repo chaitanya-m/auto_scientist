@@ -53,8 +53,6 @@ CONFIG = {
 }
 
 # FUNCTIONS
-def calculate_average_accuracy(correct_predictions, total_predictions):
-    return correct_predictions / total_predictions if total_predictions else 0
 
 def prequential_evaluation(model, stream, config):
     for x, y in stream.take(config['max_examples']):
@@ -191,6 +189,61 @@ model_classes = {
         # Initialize the Q-table
 
 
+
+
+
+class Experiment:
+    def __init__(self, config, num_seeds):
+        self.config = config
+        self.num_seeds = num_seeds
+
+    def average_classification_accuracy(correct_predictions, total_predictions):
+        return correct_predictions / total_predictions if total_predictions else 0
+
+    def classification_accuracy(self, prediction, actual):
+        # Check if the prediction is correct
+        is_correct = prediction == actual
+
+        # Return the accuracy (1 if the prediction is correct, 0 otherwise)
+        return 1 if is_correct else 0
+
+    def run_one_epoch(self):
+        # Initialize the total accuracy for this epoch
+        total_accuracy = 0
+        total_samples = 0
+
+        # Iterate over the data in the stream
+        for x, y in self.stream.take(self.config['evaluation_interval']):
+            # Predict the output for the current input
+            prediction = self.model.predict_one(x)
+            
+            # Learn from the current input-output pair
+            self.model.learn_one(x, y)
+
+            # Calculate the accuracy of the prediction against the actual output
+            accuracy = calculate_accuracy(prediction, y)
+
+            # Add the accuracy to the total accuracy
+            total_accuracy += accuracy
+
+            # Increment the total number of samples
+            total_samples += 1
+
+        # Calculate the prequential accuracy for this epoch
+        prequential_accuracy = total_accuracy / total_samples
+
+        # Return the prequential accuracy
+        return prequential_accuracy
+
+    def ensure_bounds(self, config):
+        # Ensure the configuration values are within valid bounds
+        # Define the valid bounds for each parameter
+        config['delta_easy'] = np.clip(config['delta_easy'], 0, 1)
+        config['update_delta_dropped_accuracy'] = np.clip(config['update_delta_dropped_accuracy'], 0, 1)
+        # Repeat for other parameters
+        return config
+
+
 class Agent:
     def __init__(self, config, model, stream_factory, exploration_step_sizes, num_episodes, num_seeds):
         self.config = config
@@ -210,7 +263,7 @@ class Agent:
             accuracy_without_intervention = []
             accuracy_with_intervention = []
 
-            # Create a set of concept drift streams
+            # Create a set of seeded concept drift streams for each episode
             concept_drift_streams = [ConceptDriftStream(
                 stream=self.stream_factory.create(seed=seed), 
                 drift_stream=self.stream_factory.create(seed=seed), 
@@ -242,25 +295,63 @@ class Agent:
 
         # return best_parameters
 
+    # def run_experiment(self, args):
+    #     stream, intervention = args
+    #     experiment = Experiment(self.config, self.model, stream)
+    #     if intervention:
+    #         # The agent is allowed to adjust the parameters while running the experiment
+    #         # The agent can adjust the parameters in real time
+    #         # If the prequential accuracy for the last epoch is lower than the prequential accuracy * scalar for the last 10 epochs
+    #         # Then the agent will adjust the parameters scalar and delta_easy
+    #         # The agent can consult the Q-table for the best action to take, it can also consult the policy
+    #         # The agent can also choose to explore by taking a random action
+
+
+    #     else:
+    #         # The agent is not allowed to adjust the parameters while running the experiment
+    #         # The agent cannot adjust the parameters in real time
+            
+    #     # return the accuracy of the model on the stream
+
     def run_experiment(self, args):
         stream, intervention = args
         experiment = Experiment(self.config, self.model, stream)
+        accuracy = 0
+
         if intervention:
-            self.adjust_parameters(experiment)
-        return experiment.run()
+            # The agent is allowed to adjust the parameters while running the experiment
+            for epoch in range(self.config['num_epochs']):
+                # Run the model on the stream for one epoch
+                accuracy = experiment.run_one_epoch()
+
+                # If the prequential accuracy for the last epoch is lower than the prequential accuracy * scalar for the last 10 epochs
+                if accuracy < np.mean(experiment.preq_accuracy[-10:]) * self.config['scalar']:
+                    # Then the agent will adjust the parameters scalar and delta_easy
+                    action = self.choose_action()
+                    self.config = self.apply_action(self.config, action)
+
+        else:
+            # The agent is not allowed to adjust the parameters while running the experiment
+            for epoch in range(self.config['num_epochs']):
+                # Run the model on the stream for one epoch
+                accuracy = experiment.run_one_epoch()
+
+        # Return the accuracy of the model on the stream
+        return accuracy
+
 
     def choose_action(self):
         action = {param: np.random.choice([-step['coarse'], -step['fine'], step['fine'], step['coarse']])
                   for param, step in self.exploration_step_sizes.items()}
         return action
 
-    def adjust_parameters(self, experiment):
-        params = list(self.config.keys())
-        increase_param = random.choice(params)
-        decrease_param = random.choice([param for param in params if param != increase_param])
-        self.config[increase_param] += self.exploration_step_sizes[increase_param]['fine']
-        self.config[decrease_param] -= self.exploration_step_sizes[decrease_param]['fine']
-        self.config = experiment.ensure_bounds(self.config)
+    # def adjust_parameters(self, experiment):
+    #     params = list(self.config.keys())
+    #     increase_param = random.choice(params)
+    #     decrease_param = random.choice([param for param in params if param != increase_param])
+    #     self.config[increase_param] += self.exploration_step_sizes[increase_param]['fine']
+    #     self.config[decrease_param] -= self.exploration_step_sizes[decrease_param]['fine']
+    #     self.config = experiment.ensure_bounds(self.config)
 
     def create_policy(self):
         # Initialize the policy
@@ -307,11 +398,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
 
