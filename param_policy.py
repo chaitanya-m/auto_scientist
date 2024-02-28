@@ -13,10 +13,6 @@ import numpy as np
 
 from multiprocessing import Pool
 
-def run_experiment_wrapper(args):
-    agent, new_config, seed0, seed1, stream_type = args
-    return run_experiment(agent, new_config, seed0, seed1, stream_type)
-
 
 # CONSTANTS
 CONFIG = {
@@ -30,7 +26,7 @@ CONFIG = {
     'update_delta_dropped_accuracy': 0.8,
     'num_runs': 2,
     'model': 'UpdatableHoeffdingTreeClassifier',
-    'stream_type': 'RandomRBF',
+    'stream_type': 'RandomTree',
     'streams': {
         # 'RandomRBF': {
         #     'n_classes': 3,
@@ -50,24 +46,6 @@ CONFIG = {
     }
 }
 
-# FUNCTIONS
-
-def prequential_evaluation(model, stream, config):
-    for x, y in stream.take(config['max_examples']):
-        prediction = model.predict_one(x)
-        model.learn_one(x, y)
-        yield prediction, y
-
-def prequential_evaluation_with_queue(model, stream, config, accuracy_event_queue):
-
-    results = []
-    for prediction, y in prequential_evaluation(model, stream, config):
-        accuracy_event_queue.put((prediction, y)) 
-        results.append((prediction, y))
-    return results
-
-
-# CLASSES
 
 class StreamFactory:
     def __init__(self, stream_type, preinitialized_params):
@@ -162,13 +140,15 @@ class Experiment:
         return config
 
 class Agent:
-    def __init__(self, config, model, stream_factory, exploration_step_sizes, num_episodes, num_seeds):
+    def __init__(self, config, model, stream_factory, exploration, num_episodes, num_seeds):
         self.config = config
-        self.exploration_step_sizes = exploration_step_sizes
+        self.exploration = exploration
         self.num_episodes = num_episodes
         self.num_seeds = num_seeds
         self.model = model
         self.stream_factory = stream_factory
+        self.Q_table = {}
+
 
     def find_best_strategy(self):
         """
@@ -188,9 +168,6 @@ class Agent:
         Returns:
             dict: The updated Q-table.
         """
-
-        # Initialize the Q-table
-        Q_table = {}
 
         # Iterate over the number of episodes
         for episode in range(self.num_episodes):
@@ -229,7 +206,7 @@ class Agent:
                     state = ((accuracy_without_intervention_results[seed] - 
                               accuracy_with_intervention_results[seed]) / accuracy_with_intervention_results[seed])
                     action = self.choose_action()
-                    Q_table[(state, action)] = reward
+                    self.Q_table[(state, action)] = reward
 
         # # Find the best strategy based on the Q-table
         # best_state, best_action = max(Q_table, key=Q_table.get)
@@ -285,16 +262,37 @@ class Agent:
 
     def choose_action(self):
         action = {param: np.random.choice([-step['coarse'], -step['fine'], step['fine'], step['coarse']])
-                  for param, step in self.exploration_step_sizes.items()}
+                  for param, step in self.exploration.items()}
         return action
 
-    # def adjust_parameters(self, experiment):
-    #     params = list(self.config.keys())
-    #     increase_param = random.choice(params)
-    #     decrease_param = random.choice([param for param in params if param != increase_param])
-    #     self.config[increase_param] += self.exploration_step_sizes[increase_param]['fine']
-    #     self.config[decrease_param] -= self.exploration_step_sizes[decrease_param]['fine']
-    #     self.config = experiment.ensure_bounds(self.config)
+    def apply_action(self, action, experiment):
+        # Iterate over each parameter and step size in the action
+        for param, step in action.items():
+            # Get the adjustment type for the parameter
+            adjustment_type = self.exploration[param]['adjustment_type']
+
+            # Define the actions
+            actions = {
+                'multiplicative': {
+                    'positive': lambda x, y: x * y,
+                    'negative': lambda x, y: x / y
+                },
+                'additive': {
+                    'positive': lambda x, y: x + y,
+                    'negative': lambda x, y: x - y
+                }
+            }
+
+            # Determine the direction of the action (positive or negative)
+            direction = 'positive' if step > 0 else 'negative'
+
+            # Calculate the new parameter value by applying the appropriate lambda function in the actions dictionary
+            new_param_value = actions[adjustment_type][direction](self.config[param], abs(step))
+
+            # Ensure the new parameter value is within its valid range
+            if experiment.is_within_bounds(param, new_param_value):
+                # If it is, apply the action
+                self.config[param] = new_param_value
 
     def create_policy(self):
         # Initialize the policy
@@ -324,11 +322,11 @@ def main():
     model = ModelClass(delta=CONFIG['delta_hard'])
 
     # Setup and run Agent
-    exploration_step_sizes = {
-        'delta_easy': {'coarse': 100, 'fine': 10},
-        'update_delta_dropped_accuracy': {'coarse': 0.1, 'fine': 0.01},
+    exploration = {
+        'delta_easy': {'coarse': 100, 'fine': 10,  'adjustment_type': 'multiplicative'},
+        'update_delta_dropped_accuracy': {'coarse': 0.1, 'fine': 0.01, 'adjustment_type': 'additive'},
     }
-    agent = Agent(CONFIG, model, stream_factory, exploration_step_sizes, num_episodes=10, num_seeds=5)
+    agent = Agent(CONFIG, model, stream_factory, exploration, num_episodes=10, num_seeds=5)
     policy = agent.create_policy()
     print(policy)
 
