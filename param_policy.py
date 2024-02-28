@@ -16,9 +16,9 @@ from multiprocessing import Pool
 
 # CONSTANTS
 CONFIG = {
-    'change_point': 10000,
+    'change_point_epoch': 10,
     'evaluation_interval': 1000,
-    'max_examples': 20000,
+    'num_epochs': 20,
     'delta_easy': 1e-3,
     'delta_hard': 1e-7,
     'seed0': 0,
@@ -148,6 +148,7 @@ class Agent:
         self.model = model
         self.stream_factory = stream_factory
         self.Q_table = {}
+        self.Q_table_visits = {}
 
 
     def find_best_strategy(self):
@@ -179,7 +180,7 @@ class Agent:
             concept_drift_streams = [ConceptDriftStream(
                 stream=self.stream_factory.create(seed=self.config['seed0']+i), 
                 drift_stream=self.stream_factory.create(seed=self.config['seed1']+i), 
-                position=self.config['change_point'], 
+                position=self.config['change_point_epoch']*self.config['evaluation_interval'], 
                 seed=self.config['seed0']+1
             ) for i in range(self.num_seeds)]
 
@@ -201,18 +202,13 @@ class Agent:
             for seed in range(self.num_seeds):
                 # Calculate the reward as the gain in accuracy with intervention
                 reward = accuracy_with_intervention_results[seed] - accuracy_without_intervention_results[seed]
-                if reward > 0:
-                    # Update the Q-table with the new reward
-                    state = ((accuracy_without_intervention_results[seed] - 
-                              accuracy_with_intervention_results[seed]) / accuracy_with_intervention_results[seed])
-                    action = self.choose_action()
-                    self.Q_table[(state, action)] = reward
+                
 
         # # Find the best strategy based on the Q-table
         # best_state, best_action = max(Q_table, key=Q_table.get)
         # best_parameters = self.apply_action(self.config, best_action)
 
-        # return best_parameters
+        return self.Q_table
 
     def run_experiment(self, args):
         """
@@ -220,8 +216,8 @@ class Agent:
 
         If intervention is allowed, the agent can adjust the parameters in real time.
 
-        The agent will adjust the parameters scalar and delta_easy if the prequential accuracy 
-        for the last epoch is lower than the prequential accuracy * scalar for the last 10 epochs.
+        The agent will adjust the parameters update_delta_dropped_accuracy and delta_easy if the prequential accuracy 
+        for the last epoch is lower than the prequential accuracy * update_delta_dropped_accuracy for the last 10 epochs.
 
         The agent can consult the Q-table for the best action to take, it can also consult the policy.
         The agent can also choose to explore by taking a random action.
@@ -244,11 +240,40 @@ class Agent:
                 # Run the model on the stream for one epoch
                 accuracy = experiment.run_one_epoch()
 
-                # If the prequential accuracy for the last epoch is lower than the prequential accuracy * scalar for the last 10 epochs
-                if accuracy < np.mean(experiment.preq_accuracy[-10:]) * self.config['scalar']:
-                    # Then the agent will adjust the parameters scalar and delta_easy
+                # If the prequential accuracy for the last epoch is lower than the prequential accuracy * update_delta_dropped_accuracy for the last 10 epochs
+                if accuracy < np.mean(experiment.preq_accuracy[-10:]) * self.config['update_delta_dropped_accuracy']:
+                    # Then the agent will adjust the parameters update_delta_dropped_accuracy and delta_easy
                     action = self.choose_action()
                     self.config = self.apply_action(self.config, action)
+
+                    # Update the Q-table
+                    # First compute the state
+                    # The state is a binned version of (last epoch accuracy - average accuracy over the last 10 epochs)/average accuracy over the last 10 epochs
+                    # The action is the adjustment of the parameters
+                    # The reward is the difference in accuracy between the intervention and no intervention strategies
+                    # For the state, the bins are: (-1,-0.1), (-0.1, -0.01), (-0.01, 0.0)
+
+                    state = (accuracy - np.mean(experiment.preq_accuracy[-10:])) / np.mean(experiment.preq_accuracy[-10:])
+                    if state < -0.1:
+                        state = 'Drop > 0.1'
+                    elif state < -0.01:
+                        state = 'Drop 0.01 - 0.1'
+                    else:
+                        state = 'Drop 0.0 - 0.01'
+
+                    reward = accuracy - experiment.preq_accuracy[-10]                    
+
+                    # Update the Q-table so that it contains the average reward for the state-action pair
+                    # So the Q-table should know how many times each state-action pair has been visited
+                    
+                    if (state, action) in self.Q_table:
+                        # Get the number of times the state-action pair has been visited
+                        n = self.Q_table_visits[(state, action)]
+                        self.Q_table[(state, action)] = (self.Q_table[(state, action)] + reward) / (n + 1)
+
+                    elif (state, action) not in self.Q_table:
+                        self.Q_table[(state, action)] = reward
+                        self.Q_table_visits[(state, action)] = 1
 
         else:
             # The agent is not allowed to adjust the parameters while running the experiment
@@ -294,7 +319,7 @@ class Agent:
                 # If it is, apply the action
                 self.config[param] = new_param_value
 
-    def create_policy(self):
+    def update_policy(self):
         # Initialize the policy
         policy = {}
 
@@ -327,7 +352,7 @@ def main():
         'update_delta_dropped_accuracy': {'coarse': 0.1, 'fine': 0.01, 'adjustment_type': 'additive'},
     }
     agent = Agent(CONFIG, model, stream_factory, exploration, num_episodes=10, num_seeds=5)
-    policy = agent.create_policy()
+    policy = agent.find_best_strategy()
     print(policy)
 
     # Now the policy created by the agent can be tested on a set of new streams using similarity measures for the states
