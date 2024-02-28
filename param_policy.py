@@ -13,7 +13,6 @@ import numpy as np
 
 from multiprocessing import Pool
 
-
 def run_experiment_wrapper(args):
     agent, new_config, seed0, seed1, stream_type = args
     return run_experiment(agent, new_config, seed0, seed1, stream_type)
@@ -21,7 +20,6 @@ def run_experiment_wrapper(args):
 
 # CONSTANTS
 CONFIG = {
-    'random_seed': 0,
     'change_point': 10000,
     'evaluation_interval': 1000,
     'max_examples': 20000,
@@ -68,66 +66,6 @@ def prequential_evaluation_with_queue(model, stream, config, accuracy_event_queu
         results.append((prediction, y))
     return results
 
-def data_stream_template_factory(stream_type, preinitialized_params):
-    def constructor(seed):
-        if stream_type == 'RandomTree':
-            return RandomTree(seed_tree=seed, seed_sample=seed, **preinitialized_params)
-        elif stream_type == 'RandomRBF':
-            return RandomRBF(seed_model=seed, seed_sample=seed, **preinitialized_params)
-        else:
-            raise ValueError(f"Unknown stream type: {stream_type}")
-    return constructor
-
-def run_experiment(config, seed0, seed1, stream_type):
-    # Create queues for this experiment
-    accuracy_event_queue = queue.Queue()
-    state_update_queue = queue.Queue()
-
-    # Create a state and start the StateUpdater thread
-    state = State(config, state_update_queue)
-    state_updater = StateUpdater(state, accuracy_event_queue)
-    state_updater.start()
-
-    # Create an agent and start the AgentListener thread
-    agent = Agent(model, config)
-    agent_listener = AgentListener(agent, state_update_queue)
-    agent_listener.start()
-
-    # Convert generator to DataFrame before returning
-    results = list(prequential_evaluation_with_queue(model, concept_drift_stream, config, accuracy_event_queue))
-    results_df = pd.DataFrame(results, columns=['Prediction', 'Actual'])
-
-    # Calculate 'Correct_Classification' column
-    results_df['Correct_Classification'] = results_df['Prediction'] == results_df['Actual']
-
-    return results_df
-
-def run_seeded_experiments(config, stream_type):
-    seed0, seed1 = config['seed0'], config['seed1']
-    seeds0 = range(seed0, seed0 + config['num_runs'])
-    seeds1 = range(seed1, seed1 + config['num_runs'])
-
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        results = list(executor.map(run_experiment, [config]*config['num_runs'], seeds0, seeds1, [stream_type]*config['num_runs']))
-
-    # Create an OrderedDict where the keys are the thread numbers and the values are the results
-    results_dict = OrderedDict((i, result) for i, result in enumerate(results))
-
-    return results_dict
-
-def run_experiments_multiple_configurations(configurations, default_config):
-    all_results = {}
-
-    for config in configurations:
-        changed_features = {k: v for k, v in config.items() if v != default_config.get(k)}
-        results = {}
-
-        for stream_type in config['streams']:
-            results[stream_type] = run_seeded_experiments(config, stream_type)
-
-        all_results[str(changed_features)] = results
-
-    return all_results
 
 # CLASSES
 
@@ -165,27 +103,13 @@ model_classes = {
     # Add more classes as needed
 }
 
-        # let's write some pseudocode for the agent
-        # First create a Q-table. 
-        # In the Q table:
-        #   Each state is ((last_epoch_average_accuracy - last_10_epoch_average_accuracy) / last_10_epoch_average_accuracy)
-        #   Each action is an adjustment for the parameters
-        # For each episode
-        #   create a set of num_seeds concept drift streams... just increment the seed by 1 for each stream
-        #   for all seeds, run in parallel
-        #       the experiment without any agent intervention
-        #   then for all seeds, run in parallel
-        #       the experiment with agent intervention; the agent is allowed to adjust the parameters according to the step sizes
-        #   For each seed, if the strategy with agent intervention has a higher reward than the strategy without agent intervention
-        #       then update the Q-table with the new reward, which is the difference between the two stream prediction accuracies
-
-        # Initialize the Q-table
-
 class Experiment:
-    def __init__(self, config, num_seeds):
+    def __init__(self, config, model, stream, num_seeds):
         self.config = config
+        self.model = model
+        self.stream = stream
         self.num_seeds = num_seeds
-        self.preq_accuracy = []  # Add this line
+        self.preq_accuracy = []
 
 
     def average_classification_accuracy(correct_predictions, total_predictions):
@@ -247,38 +171,63 @@ class Agent:
         self.stream_factory = stream_factory
 
     def find_best_strategy(self):
+        """
+        Finds the best strategy for the agent by running experiments on a set of concept drift streams.
+
+        The agent first creates a Q-table where each state is the relative change in average accuracy over the last 10 epochs,
+        and each action is an adjustment for the parameters.
+
+        The agent then runs experiments on a set of concept drift streams. For each stream, the agent runs two experiments:
+        one without any intervention, and one with intervention where the agent is allowed to adjust the parameters.
+
+        After running the experiments, the agent updates the Q-table based on the difference in accuracy between the two strategies.
+
+        If the strategy with agent intervention has a higher accuracy than the strategy without intervention, the agent updates
+        the Q-table with the new reward, which is the difference between the two stream prediction accuracies.
+
+        Returns:
+            dict: The updated Q-table.
+        """
+
         # Initialize the Q-table
         Q_table = {}
 
         # Iterate over the number of episodes
         for episode in range(self.num_episodes):
             # Initialize the accuracies for the strategies with and without agent intervention
-            accuracy_without_intervention = []
-            accuracy_with_intervention = []
+            accuracy_without_intervention_results = []
+            accuracy_with_intervention_results = []
 
             # Create a set of seeded concept drift streams for each episode
             concept_drift_streams = [ConceptDriftStream(
-                stream=self.stream_factory.create(seed=seed), 
-                drift_stream=self.stream_factory.create(seed=seed), 
+                stream=self.stream_factory.create(seed=self.config['seed0']+i), 
+                drift_stream=self.stream_factory.create(seed=self.config['seed1']+i), 
                 position=self.config['change_point'], 
-                seed=seed
-            ) for seed in range(self.num_seeds)]
+                seed=self.config['seed0']+1
+            ) for i in range(self.num_seeds)]
 
-            # Run the experiments without any agent intervention
-            with Pool() as pool:
-                accuracy_without_intervention = pool.map(self.run_experiment, [(stream, False) for stream in concept_drift_streams])
+            # Prepare the arguments for the experiments without agent intervention
+            no_intervention_args = [(stream, False) for stream in concept_drift_streams]
 
-            # Run the experiments with agent intervention
+            # Prepare the arguments for the experiments with agent intervention
+            with_intervention_args = [(stream, True) for stream in concept_drift_streams]
+
+            # Create a multiprocessing pool
             with Pool() as pool:
-                accuracy_with_intervention = pool.map(self.run_experiment, [(stream, True) for stream in concept_drift_streams])
+                # Run the experiments without any agent intervention
+                accuracy_without_intervention_results = pool.map(self.run_experiment, no_intervention_args)
+
+                # Run the experiments with agent intervention
+                accuracy_with_intervention_results = pool.map(self.run_experiment, with_intervention_args)
 
             # For each seed, calculate the reward and update the Q-table
             for seed in range(self.num_seeds):
                 # Calculate the reward as the gain in accuracy with intervention
-                reward = accuracy_with_intervention[seed] - accuracy_without_intervention[seed]
+                reward = accuracy_with_intervention_results[seed] - accuracy_without_intervention_results[seed]
                 if reward > 0:
                     # Update the Q-table with the new reward
-                    state = ((accuracy_without_intervention[seed] - accuracy_with_intervention[seed]) / accuracy_with_intervention[seed])
+                    state = ((accuracy_without_intervention_results[seed] - 
+                              accuracy_with_intervention_results[seed]) / accuracy_with_intervention_results[seed])
                     action = self.choose_action()
                     Q_table[(state, action)] = reward
 
@@ -288,27 +237,28 @@ class Agent:
 
         # return best_parameters
 
-    # def run_experiment(self, args):
-    #     stream, intervention = args
-    #     experiment = Experiment(self.config, self.model, stream)
-    #     if intervention:
-    #         # The agent is allowed to adjust the parameters while running the experiment
-    #         # The agent can adjust the parameters in real time
-    #         # If the prequential accuracy for the last epoch is lower than the prequential accuracy * scalar for the last 10 epochs
-    #         # Then the agent will adjust the parameters scalar and delta_easy
-    #         # The agent can consult the Q-table for the best action to take, it can also consult the policy
-    #         # The agent can also choose to explore by taking a random action
-
-
-    #     else:
-    #         # The agent is not allowed to adjust the parameters while running the experiment
-    #         # The agent cannot adjust the parameters in real time
-            
-    #     # return the accuracy of the model on the stream
-
     def run_experiment(self, args):
+        """
+        Runs an experiment on a given stream with or without agent intervention.
+
+        If intervention is allowed, the agent can adjust the parameters in real time.
+
+        The agent will adjust the parameters scalar and delta_easy if the prequential accuracy 
+        for the last epoch is lower than the prequential accuracy * scalar for the last 10 epochs.
+
+        The agent can consult the Q-table for the best action to take, it can also consult the policy.
+        The agent can also choose to explore by taking a random action.
+
+        If intervention is not allowed, the agent cannot adjust the parameters in real time.
+
+        Args:
+            args (tuple): A tuple containing the stream and a boolean indicating whether or not the agent should intervene.
+
+        Returns:
+            float: The accuracy of the model on the stream.
+        """
         stream, intervention = args
-        experiment = Experiment(self.config, self.model, stream)
+        experiment = Experiment(self.config, self.model, stream, self.num_seeds)
         accuracy = 0
 
         if intervention:
@@ -360,11 +310,11 @@ class Agent:
         return policy
 
 def main():
+    
+    random.seed(CONFIG['seed0'])
+    np.random.seed(CONFIG['seed0'])
 
     # Setup stream factory
-    random.seed(CONFIG['random_seed'])
-    np.random.seed(CONFIG['random_seed'])
-
     stream_type = CONFIG['stream_type']
     stream_factory = StreamFactory(stream_type, CONFIG['streams'][stream_type])
 
@@ -379,15 +329,12 @@ def main():
         'update_delta_dropped_accuracy': {'coarse': 0.1, 'fine': 0.01},
     }
     agent = Agent(CONFIG, model, stream_factory, exploration_step_sizes, num_episodes=10, num_seeds=5)
-    best_parameters = agent.find_best_strategy()
     policy = agent.create_policy()
+    print(policy)
 
     # Now the policy created by the agent can be tested on a set of new streams using similarity measures for the states
     # The policy can be used to adjust the parameters of the model in real time
     # A comparison can be made between the performance of the model with and without the agent intervention
-
-    # Print the best parameters found
-    print(f"Best parameters found: {best_parameters}")
 
 if __name__ == "__main__":
     main()
