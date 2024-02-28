@@ -23,7 +23,7 @@ CONFIG = {
     'delta_hard': 1e-7,
     'seed0': 0,
     'seed1': 100,
-    'update_delta_dropped_accuracy': 0.8,
+    'update_delta_dropped_accuracy': 1.0,
     'num_runs': 2,
     'model': 'UpdatableHoeffdingTreeClassifier',
     'stream_type': 'RandomTree',
@@ -132,16 +132,15 @@ class Experiment:
         return epoch_prequential_accuracy
 
     def ensure_bounds(self, config):
-        # Ensure the configuration values are within valid bounds
+        # Check if the configuration values are within valid bounds
         # Define the valid bounds for each parameter
-        config['delta_easy'] = np.clip(config['delta_easy'], 0, 1)
-        config['update_delta_dropped_accuracy'] = np.clip(config['update_delta_dropped_accuracy'], 0, 1)
-        # Repeat for other parameters
-        return config
+        is_within_bounds = 0 <= config['delta_easy'] <= 1 and 0 <= config['update_delta_dropped_accuracy'] <= 1
+        # Return whether both parameters are within their valid bounds
+        return is_within_bounds
 
 class Agent:
     def __init__(self, config, model, stream_factory, exploration, num_episodes, num_seeds):
-        self.config = config
+        self.config = CONFIG
         self.exploration = exploration
         self.num_episodes = num_episodes
         self.num_seeds = num_seeds
@@ -172,9 +171,10 @@ class Agent:
 
         # Iterate over the number of episodes
         for episode in range(self.num_episodes):
-            # Initialize the accuracies for the strategies with and without agent intervention
-            accuracy_without_intervention_results = []
-            accuracy_with_intervention_results = []
+
+            # Initialize lists to store epoch-wise accuracies
+            epochwise_accuracy_without_intervention = []
+            epochwise_accuracy_with_intervention = []
 
             # Create a set of seeded concept drift streams for each episode
             concept_drift_streams = [ConceptDriftStream(
@@ -184,29 +184,46 @@ class Agent:
                 seed=self.config['seed0']+1
             ) for i in range(self.num_seeds)]
 
-            # Prepare the arguments for the experiments without agent intervention
+            # Prepare the arguments for run_experiment without agent intervention
             no_intervention_args = [(stream, False) for stream in concept_drift_streams]
 
-            # Prepare the arguments for the experiments with agent intervention
+            # Prepare the arguments for run_experiment with agent intervention
             with_intervention_args = [(stream, True) for stream in concept_drift_streams]
 
-            # Create a multiprocessing pool
+            # Create a multiprocessing pool for the experiments without intervention
             with Pool() as pool:
                 # Run the experiments without any agent intervention
-                accuracy_without_intervention_results = pool.map(self.run_experiment, no_intervention_args)
+                epochwise_accuracy_without_intervention = pool.map(self.run_experiment, no_intervention_args)
+                # Close the pool and wait for all tasks to finish
+                pool.close()
+                pool.join()
 
+            # Create a separate multiprocessing pool for the experiments with intervention
+            with Pool() as pool:
                 # Run the experiments with agent intervention
-                accuracy_with_intervention_results = pool.map(self.run_experiment, with_intervention_args)
+                epochwise_accuracy_with_intervention = pool.map(self.run_experiment, with_intervention_args)
+                # Close the pool and wait for all tasks to finish
+                pool.close()
+                pool.join()
 
-            # For each seed, calculate the reward and update the Q-table
-            for seed in range(self.num_seeds):
-                # Calculate the reward as the gain in accuracy with intervention
-                reward = accuracy_with_intervention_results[seed] - accuracy_without_intervention_results[seed]
-                
+            # Compute rewards for each seed for this episode
+            for i in range(self.num_seeds):
+                for epoch in range(self.config['num_epochs']):
+                    accuracy = epochwise_accuracy_with_intervention[i][epoch]
+                    if accuracy > epochwise_accuracy_without_intervention[i][epoch]:
+                        reward = accuracy - epochwise_accuracy_without_intervention[i][epoch]
 
-        # # Find the best strategy based on the Q-table
-        # best_state, best_action = max(Q_table, key=Q_table.get)
-        # best_parameters = self.apply_action(self.config, best_action)
+                        # Compute the state
+                        state = (accuracy - np.mean(epochwise_accuracy_with_intervention[i][-10:])) / np.mean(epochwise_accuracy_with_intervention[i][-10:])
+                        if state < -0.1:
+                            state = 'Drop > 0.1'
+                        elif state < -0.01:
+                            state = 'Drop 0.01 - 0.1'
+                        else:
+                            state = 'Drop 0.0 - 0.01'
+
+                        # Update the Q-table based on the state
+                        self.Q_table[state] = reward
 
         return self.Q_table
 
@@ -233,56 +250,36 @@ class Agent:
         stream, intervention = args
         experiment = Experiment(self.config, self.model, stream, self.num_seeds)
         accuracy = 0
+        accuracies = []
 
         if intervention:
             # The agent is allowed to adjust the parameters while running the experiment
             for epoch in range(self.config['num_epochs']):
                 # Run the model on the stream for one epoch
                 accuracy = experiment.run_one_epoch()
+                accuracies.append(accuracy)
+
+                # last_10_epoch_accuracy = experiment.preq_accuracy[-10:] if it exists
+                # if it hasn't been 10 epochs yet, use as many epochs as are available
+                # The code is:
+
+                mean_historical_accuracy = np.mean(experiment.preq_accuracy[-10:] if experiment.preq_accuracy else [0])
 
                 # If the prequential accuracy for the last epoch is lower than the prequential accuracy * update_delta_dropped_accuracy for the last 10 epochs
-                if accuracy < np.mean(experiment.preq_accuracy[-10:]) * self.config['update_delta_dropped_accuracy']:
+                if accuracy < mean_historical_accuracy * self.config['update_delta_dropped_accuracy']:
                     # Then the agent will adjust the parameters update_delta_dropped_accuracy and delta_easy
                     action = self.choose_action()
-                    self.config = self.apply_action(self.config, action)
-
-                    # Update the Q-table
-                    # First compute the state
-                    # The state is a binned version of (last epoch accuracy - average accuracy over the last 10 epochs)/average accuracy over the last 10 epochs
-                    # The action is the adjustment of the parameters
-                    # The reward is the difference in accuracy between the intervention and no intervention strategies
-                    # For the state, the bins are: (-1,-0.1), (-0.1, -0.01), (-0.01, 0.0)
-
-                    state = (accuracy - np.mean(experiment.preq_accuracy[-10:])) / np.mean(experiment.preq_accuracy[-10:])
-                    if state < -0.1:
-                        state = 'Drop > 0.1'
-                    elif state < -0.01:
-                        state = 'Drop 0.01 - 0.1'
-                    else:
-                        state = 'Drop 0.0 - 0.01'
-
-                    reward = accuracy - experiment.preq_accuracy[-10]                    
-
-                    # Update the Q-table so that it contains the average reward for the state-action pair
-                    # So the Q-table should know how many times each state-action pair has been visited
-                    
-                    if (state, action) in self.Q_table:
-                        # Get the number of times the state-action pair has been visited
-                        n = self.Q_table_visits[(state, action)]
-                        self.Q_table[(state, action)] = (self.Q_table[(state, action)] + reward) / (n + 1)
-
-                    elif (state, action) not in self.Q_table:
-                        self.Q_table[(state, action)] = reward
-                        self.Q_table_visits[(state, action)] = 1
+                    self.config = self.apply_action(action, experiment)
 
         else:
             # The agent is not allowed to adjust the parameters while running the experiment
             for epoch in range(self.config['num_epochs']):
                 # Run the model on the stream for one epoch
                 accuracy = experiment.run_one_epoch()
+                accuracies.append(accuracy)
 
         # Return the accuracy of the model on the stream
-        return accuracy
+        return accuracies
 
 
     def choose_action(self):
@@ -315,9 +312,12 @@ class Agent:
             new_param_value = actions[adjustment_type][direction](self.config[param], abs(step))
 
             # Ensure the new parameter value is within its valid range
-            if experiment.is_within_bounds(param, new_param_value):
+            if experiment.ensure_bounds(self.config): # this is terrible interface design, change this
                 # If it is, apply the action
                 self.config[param] = new_param_value
+
+        # Return the updated configuration
+        return self.config
 
     def update_policy(self):
         # Initialize the policy
