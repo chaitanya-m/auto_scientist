@@ -28,71 +28,106 @@ CONFIG = {
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
         },
+    },
+    'actions': {
+        # Actions to change delta_hard are a multiplier list from 1/100 to 100, with 1 meaning no change
+        'delta_move':  [1/100, 1/10, 1, 10, 100],
     }
 }
 
-
-class Agent:
-    def __init__(self, exploration):
-        self.exploration = exploration
-        self.Q_table = {}
-
-    def choose_action(self, state):
-        # Here, you would typically use the state to decide on the action
-        # For now, let's choose a random action
-        action = {param: np.random.choice([-step['coarse'], -step['fine'], step['fine'], step['coarse']])
-                  for param, step in self.exploration.items()}
-        return action
-
-    def update_q_table(self, state, action, accuracy):
-        # Update the Q-table based on the state, action, and accuracy
-        # For now, let's update the Q-table with a random value
-        self.Q_table[(state, tuple(action))] = np.random.random()
-
-
 class Environment:
-    def __init__(self, config, model, stream, agent):
-        self.config = config
+    def __init__(self, model, stream, actions, num_samples_per_epoch, num_epochs_per_episode):
         self.model = model
         self.stream = stream
-        self.agent = agent
-        self.stream = None
         self.current_epoch = 0
+        self.num_epochs = num_epochs_per_episode
+        self.num_samples_per_epoch = num_samples_per_epoch
+        self.actions = actions
+        self.last_accuracy = None
+        self.last_5_epoch_accuracies = []
+        self.state = 0  # Initialize state - 0 indicates no change in accuracy
 
     def reset(self):
         # Reset the environment
-        pass
+        self.last_accuracy = None
+        self.last_5_epoch_accuracies = []
+        self.current_epoch = 0
+        self.state = 0 # Initialize state - 0 indicates no change in accuracy
 
-    def step(self):
+        # Return the initial state
+        return self.state
+
+    def step(self, action_idx):
         # Run one epoch of the experiment
         accuracy = self.run_one_epoch()
 
         # Increment the epoch counter
         self.current_epoch += 1
 
-        # Update the state with the new accuracy
-        state = {'accuracy': accuracy}
+        # Compute accuracy change of current epoch from the last epoch
+        epoch_accuracy_change = 0
+        if self.last_accuracy is not None:
+            epoch_accuracy_change = ((accuracy - self.last_accuracy) / self.last_accuracy) * 100
 
-        # Let the agent choose an action based on the state
-        action = self.agent.choose_action(state)
+        # Update the last accuracy
+        self.last_accuracy = accuracy
 
-        # Update the Q table
-        self.agent.update_q_table(state, action, accuracy)
+        # Update the list of last 5 epoch accuracies
+        self.last_5_epoch_accuracies.append(accuracy)
+        if len(self.last_5_epoch_accuracies) > 5:
+            self.last_5_epoch_accuracies.pop(0)
+
+        # Compute accuracy change of current epoch over the last 5 epochs
+        epoch_5_accuracy_change = 0
+        if len(self.last_5_epoch_accuracies) == 5:
+            epoch_5_accuracy_change = ((accuracy - self.last_5_epoch_accuracies[0]) / self.last_5_epoch_accuracies[0]) * 100
+
+        # Bin the accuracy changes
+        epoch_accuracy_change_bin = self.bin_accuracy_change(epoch_accuracy_change)
+        epoch_5_accuracy_change_bin = self.bin_accuracy_change(epoch_5_accuracy_change)
+
+        # Update the state with the accuracy changes
+        self.state = self.index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin)
 
         # Compute the reward
         reward = self.compute_reward(accuracy)
 
         # When the experiment is done, return the Q table
-        done = self.current_epoch == self.config['num_epochs']
-        return state, reward, done
+        done = self.current_epoch == self.num_epochs
 
+        return self.state, reward, done
+
+    @staticmethod
+    def bin_accuracy_change(accuracy_change):
+        if accuracy_change < 5:
+            return 1
+        elif 5 <= accuracy_change < 10:
+            return 2
+        elif 10 <= accuracy_change < 25:
+            return 3
+        elif 25 <= accuracy_change < 50:
+            return 4
+        else:
+            return 5
+
+    @staticmethod
+    def index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin):
+        # We take epoch_accuracy_change_bin and epoch_5_accuracy_change_bin and return a state index in the range [0, 24]
+        return (epoch_accuracy_change_bin - 1) * 5 + (epoch_5_accuracy_change_bin - 1)
+
+    def update_delta_hard(self, action_idx):
+        # Adjust delta_hard based on the chosen action index
+        action = self.actions[action_idx]
+        return max(0, self.model.delta ** (-action))
+
+    
     def run_one_epoch(self):
         # Initialize the total accuracy for this epoch
         total_correctly_classified = 0
         total_samples = 0
 
         # Iterate over the data in the stream
-        for x, y in self.stream.take(self.config['evaluation_interval']):
+        for x, y in self.stream.take(self.num_samples_per_epoch):
             # Predict the output for the current input
             prediction = self.model.predict_one(x)
 
@@ -127,8 +162,12 @@ class Environment:
         return 1 if is_correct else 0
 
     def compute_reward(self, accuracy):
-        # Example reward function: higher accuracy leads to higher reward
-        return accuracy
+        # Compute the change in accuracy from the last epoch
+        reward = 0
+        if self.last_accuracy is not None:
+            reward = accuracy - self.last_accuracy
+        self.last_accuracy = accuracy
+        return reward
 
 
 class StreamFactory:
@@ -165,8 +204,86 @@ class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
 model_classes = {
     'UpdatableHoeffdingTreeClassifier': UpdatableHoeffdingTreeClassifier,
     'UpdatableEFDTClassifier': UpdatableEFDTClassifier,
-    # Add more classes as needed
 }
+
+class QLearningAgent:
+    def __init__(self, num_states, num_actions, alpha=0.1, gamma=0.9, epsilon=0.1):
+        self.num_states = num_states
+        self.num_actions = num_actions
+        self.alpha = alpha  # Learning rate
+        self.gamma = gamma  # Discount factor
+        self.epsilon = epsilon  # Epsilon for epsilon-greedy policy
+        self.Q_table = np.zeros((num_states, num_actions))  # Initialize Q-values to zeros
+
+    def select_action(self, state):
+        if state is None or np.random.rand() < self.epsilon:
+            # If state is None or with probability epsilon, return a random action
+            return np.random.randint(self.num_actions)
+        else:
+            # Select action greedily based on current Q-values for the given state
+            return np.argmax(self.Q_table[state])
+
+    def update_Q_values(self, state, action, reward, next_state):
+        # Q-learning update rule
+        best_next_action = np.argmax(self.Q_table[next_state])
+        td_target = reward + self.gamma * self.Q_table[next_state][best_next_action]
+        td_error = td_target - self.Q_table[state][action]
+        self.Q_table[state][action] += self.alpha * td_error
+
+    def train(self, env, num_episodes):
+        for _ in range(num_episodes):
+            state = env.reset()
+            done = False
+            while not done:
+                action = self.select_action(state)
+                next_state, reward, done = env.step(action)
+                self.update_Q_values(state, action, reward, next_state)
+                state = next_state
+
+
+class MonteCarloAgent:
+    def __init__(self, num_states, num_actions, gamma=0.9, epsilon=0.1):
+        # Initialize Monte Carlo agent with the number of states, number of actions, and discount factor gamma
+        self.num_states = num_states
+        self.num_actions = num_actions
+        self.gamma = gamma
+        self.epsilon = epsilon
+        # Initialize Q-table and visit counts for each state-action pair
+        self.Q_table = np.zeros((num_states, num_actions))  # Initialize Q-values to zero
+        self.visits = np.zeros((num_states, num_actions))   # Track number of visits for each state-action pair
+
+    def select_action(self, state):
+        if state is None or np.random.rand() < self.epsilon:
+            # If state is None or with probability epsilon, return a random action
+            return np.random.randint(self.num_actions)
+        else:
+            # Select action greedily based on current Q-values for the given state
+            return np.argmax(self.Q_table[state])
+
+    def update_Q_values(self, episode):
+        # Update Q-values based on observed episode returns
+        returns = 0
+        for i in reversed(range(len(episode))):  # Iterate over the episode in reverse order to calculate returns
+            state, action, reward = episode[i]
+            returns = reward + self.gamma * returns  # Calculate discounted return
+            print (state, action, reward, returns)
+            self.visits[state][action] += 1  # Increment visit count for the state-action pair
+            alpha = 1 / self.visits[state][action]  # Step size (adaptive)
+            self.Q_table[state][action] += alpha * (returns - self.Q_table[state][action])  # Update Q-value
+
+    def train(self, env, num_episodes):
+        # Train the agent by interacting with the environment for a specified number of episodes
+        for _ in range(num_episodes):
+            episode = []  # Initialize an empty list to store episode transitions
+            state = env.reset()  # Reset the environment and get initial state
+            done = False  # Flag to indicate whether the episode has terminated
+            while not done:
+                action = self.select_action(state)  # Select action using the current policy
+                next_state, reward, done = env.step(action)  # Take action and observe next state and reward
+                episode.append((state, action, reward))  # Store state-action-reward tuple
+                state = next_state  # Update current state
+            self.update_Q_values(episode)  # Update Q-values based on the observed episode
+
 
 
 def main():
@@ -176,38 +293,43 @@ def main():
     # Setup stream factory
     stream_type = CONFIG['stream_type']
     stream_factory = StreamFactory(stream_type, CONFIG['streams'][stream_type])
-    stream = stream_factory.create(CONFIG['seed0'])
+    stream = stream_factory.create(seed=CONFIG['seed0'])
 
     # Setup model
-    # Use the dictionary to get the class object
     ModelClass = model_classes[CONFIG['model']]
     model = ModelClass(delta=CONFIG['delta_hard'])
 
-    # Setup Agent
-    exploration = {
-        'delta_easy': {'coarse': 100, 'fine': 10, 'adjustment_type': 'multiplicative'},
-        'update_delta_dropped_accuracy': {'coarse': 0.1, 'fine': 0.01, 'adjustment_type': 'additive'},
-    }
-    agent = Agent(exploration)
+    # Setup Actions
+    actions = CONFIG['actions']['delta_move']
 
     # Setup Environment
-    env = Environment(CONFIG, model, stream, agent, num_seeds=5)
+    num_samples_per_epoch = CONFIG['evaluation_interval']
+    num_epochs = CONFIG['num_epochs']
+    env = Environment(model, stream, actions, num_samples_per_epoch, num_epochs)
 
-    # Reset the environment to start a new experiment
-    env.reset()
+    num_states = 25  # Number of possible state combinations
 
-    # Main loop
-    done = False
-    while not done:
-        state, reward, done = env.step()
-        print(f"Epoch: {env.current_epoch}, Accuracy: {state['accuracy']}, Reward: {reward}")
+    # Train Monte Carlo agent
+    agent_mc = MonteCarloAgent(num_states=num_states, num_actions=len(actions))
+    agent_mc.train(env, num_episodes=10)
+
+    print("Q-table (Monte Carlo):")
+    print(agent_mc.Q_table)
+
+    # Train Q-learning agent
+    env = Environment(model, stream, actions, num_samples_per_epoch, num_epochs)
+    agent_q_learning = QLearningAgent(num_states=num_states, num_actions=len(actions))
+    agent_q_learning.train(env, num_episodes=10)
+
+    print("Q-table (Q-learning):")
+    print(agent_q_learning.Q_table)
+
+    # Compare Q tables
+    print("\nQ-table (Q-learning):")
+    print(agent_q_learning.Q_table)
+    print("\nQ-table (Monte Carlo):")
+    print(agent_mc.Q_table)
 
 
 if __name__ == "__main__":
     main()
-
-
-
-# all the agent is returning is an action
-    
-# step function: all the env is returning is the next state and reward
