@@ -32,7 +32,8 @@ CONFIG = {
     'actions': {
         # Actions to change delta_hard are a multiplier list from 1/100 to 100, with 1 meaning no change
         'delta_move':  [1/100, 1/10, 1, 10, 100],
-    }
+    },
+    'num_episodes': 10
 }
 
 class Environment:
@@ -246,16 +247,6 @@ class QLearningAgent:
             # Select action greedily based on current Q-values for the given state
             return np.argmax(self.Q_table[state])
 
-    def update_Q_values(self, state, action, reward, next_state):
-        # Q-learning update rule
-        if state is None:  # Skip the iteration if state is None
-            return
-        best_next_action = np.argmax(self.Q_table[next_state])
-        td_target = reward + self.gamma * self.Q_table[next_state][best_next_action]
-        td_error = td_target - self.Q_table[state][action]
-        self.Q_table[state][action] += self.alpha * td_error
-        print (state, action, reward)
-
 
 class MonteCarloAgent:
     def __init__(self, num_states, num_actions, gamma=0.9, epsilon=0.1):
@@ -276,52 +267,50 @@ class MonteCarloAgent:
             # Select action greedily based on current Q-values for the given state
             return np.argmax(self.Q_table[state])
 
-    def update_Q_values(self, episode):
-        # Update Q-values based on observed episode returns
-        returns = 0
-        # Iterate over the episode in reverse order to calculate returns
-        # Iterate until the first state-action pair is reached where state is None
-        # Ensure that the first state-action pair is not included in the iteration
-
-        for i in reversed(range(len(episode))):  
-            state, action, reward = episode[i]
-            if state is None:  # Skip the iteration if state is None
-                continue
-            returns = reward + self.gamma * returns  # Calculate discounted return
-            print (state, action, reward, returns)
-            self.visits[state][action] += 1  # Increment visit count for the state-action pair
-            alpha = 1 / self.visits[state][action]  # Step size (adaptive)
-            self.Q_table[state][action] += alpha * (returns - self.Q_table[state][action])  # Update Q-value
-
 
 ###################
-
 
 def train_agent(agent, env, num_episodes):
     for _ in range(num_episodes):
         state = env.reset()
         done = False
+        episodes = []  # Store the episode for Monte Carlo updates
+
         while not done:
             action = agent.select_action(state)
             next_state, reward, done = env.step(action)
             
-            # QLearningAgent requires the next state to update Q-values
-            if isinstance(agent, QLearningAgent):
-                agent.update_Q_values(state, action, reward, next_state)
-            # MonteCarloAgent requires the entire episode to update Q-values
-            elif isinstance(agent, MonteCarloAgent):
-                agent.episode.append((state, action, reward))
+            # Store the transition information for later update (used by both Q-learning and Monte Carlo)
+            episodes.append((state, action, reward))
+
+            # Move to the next state
             state = next_state
         
-        # If the agent is a MonteCarloAgent, update Q-values after the episode is complete
-        if isinstance(agent, MonteCarloAgent):
-            agent.update_Q_values(agent.episode)
-            agent.episode = []  # Clear the episode for the next run
+        # Now perform the update outside the Agent classes
+        if isinstance(agent, QLearningAgent):
+            for episode_index, (state, action, reward) in enumerate(episodes[:-1]):  # Skip the last state since it has no next_state
+                if state is None:
+                    continue
+                next_state = episodes[episode_index + 1][0]  # The state of the next transition
+                best_next_action = np.argmax(agent.Q_table[next_state])
+                td_target = reward + agent.gamma * agent.Q_table[next_state][best_next_action]
+                td_error = td_target - agent.Q_table[state][action]
+                agent.Q_table[state][action] += agent.alpha * td_error
+
+        elif isinstance(agent, MonteCarloAgent):
+            returns = 0
+            for (state, action, reward) in reversed(episodes):
+                if state is None:
+                    continue
+                returns = reward + agent.gamma * returns
+                agent.visits[state][action] += 1
+                alpha = 1 / agent.visits[state][action]
+                agent.Q_table[state][action] += alpha * (returns - agent.Q_table[state][action])
 
 
 #####################
 
-def setup_environment_and_train(agent_class, agent_name):
+def setup_environment_and_train(agent_class, agent_name, num_states, num_actions, num_episodes):
     # Since CONFIG and other required variables are not defined in this snippet, 
     # they should be defined elsewhere in the code or passed as arguments to the function.
 
@@ -340,17 +329,13 @@ def setup_environment_and_train(agent_class, agent_name):
     # Setup Environment
     num_samples_per_epoch = CONFIG['evaluation_interval']
     num_epochs = CONFIG['num_epochs']
-    num_states = 25  # Number of possible state combinations
+
 
     # Train agent
     env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
-    agent = agent_class(num_states=num_states, num_actions=len(actions))
+    agent = agent_class(num_states=num_states, num_actions=num_actions)
 
-    # Add an empty list for episodes if the agent is MonteCarloAgent
-    if isinstance(agent, MonteCarloAgent):
-        agent.episode = []
-    
-    train_agent(agent, env, num_episodes=10)
+    train_agent(agent, env, num_episodes)
 
     print(f"Q-table ({agent_name}):")
     # print only 4 significant digits
@@ -361,12 +346,19 @@ def main():
     random.seed(CONFIG['seed0'])
     np.random.seed(CONFIG['seed0'])
 
+    # Define the environment's state and action space sizes and number of episodes
+    num_states = 25  # Example: 25
+    num_actions = len(CONFIG['actions']['delta_move'])  # Example: 4
+    num_episodes = CONFIG['num_episodes']  # Example: 1000
+
     # Train Monte Carlo agent
-    setup_environment_and_train(MonteCarloAgent, "Monte Carlo")
+    setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_states, num_actions, num_episodes)
 
     # Train Q-learning agent
-    setup_environment_and_train(QLearningAgent, "Q-learning")
+    setup_environment_and_train(QLearningAgent, "Q-learning", num_states, num_actions, num_episodes)
 
 
 if __name__ == "__main__":
     main()
+
+
