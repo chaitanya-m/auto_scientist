@@ -63,7 +63,7 @@ class Environment:
         self.current_epoch = 0
         self.state = None # Initialize state - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode)
-    
+
         # Return the initial state
         return self.state
 
@@ -317,66 +317,44 @@ class MonteCarloAgent:
             self.update_Q_values(episode)  # Update Q-values based on the observed episode
 
 
+def setup_environment_and_train(agent_class, agent_name):
+    # Since CONFIG and other required variables are not defined in this snippet, 
+    # they should be defined elsewhere in the code or passed as arguments to the function.
+
+    # Setup stream factory
+    stream_type = CONFIG['stream_type']
+    stream_factory = StreamFactory(stream_type, CONFIG['streams'][stream_type])
+
+    # Setup model
+    ModelClass = model_classes[CONFIG['model']]
+    model = ModelClass(delta=CONFIG['delta_hard'])
+    model_baseline = ModelClass(delta=CONFIG['delta_hard'])
+
+    # Setup Actions
+    actions = CONFIG['actions']['delta_move']
+
+    # Setup Environment
+    num_samples_per_epoch = CONFIG['evaluation_interval']
+    num_epochs = CONFIG['num_epochs']
+    num_states = 25  # Number of possible state combinations
+
+    # Train agent
+    env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
+    agent = agent_class(num_states=num_states, num_actions=len(actions))
+    agent.train(env, num_episodes=10)
+
+    print(f"Q-table ({agent_name}):")
+    print(agent.Q_table)
+
 def main():
     random.seed(CONFIG['seed0'])
     np.random.seed(CONFIG['seed0'])
-    init_seed = CONFIG['seed0']
-
-    # Setup stream factory
-
-    stream_type = CONFIG['stream_type']
-    stream_factory = StreamFactory(stream_type, CONFIG['streams'][stream_type])
-    stream = stream_factory.create(seed=init_seed)
-
-    # Setup model
-    ModelClass = model_classes[CONFIG['model']]
-    model = ModelClass(delta=CONFIG['delta_hard'])
-    model_baseline = ModelClass(delta=CONFIG['delta_hard'])
-
-    # Setup Actions
-    actions = CONFIG['actions']['delta_move']
-
-    # Setup Environment
-    num_samples_per_epoch = CONFIG['evaluation_interval']
-    num_epochs = CONFIG['num_epochs']
-    num_states = 25  # Number of possible state combinations
 
     # Train Monte Carlo agent
-    # env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
-    # agent_mc = MonteCarloAgent(num_states=num_states, num_actions=len(actions))
-    # agent_mc.train(env, num_episodes=10)
-
-    # print("Q-table (Monte Carlo):")
-    # print(agent_mc.Q_table)
-
-#################################################
-
-    # Setup stream factory
-    stream_type = CONFIG['stream_type']
-    stream_factory = StreamFactory(stream_type, CONFIG['streams'][stream_type])
-    stream = stream_factory.create(seed=init_seed)
-
-    # Setup model
-    ModelClass = model_classes[CONFIG['model']]
-    model = ModelClass(delta=CONFIG['delta_hard'])
-    model_baseline = ModelClass(delta=CONFIG['delta_hard'])
-
-    # Setup Actions
-    actions = CONFIG['actions']['delta_move']
-
-    # Setup Environment
-    num_samples_per_epoch = CONFIG['evaluation_interval']
-    num_epochs = CONFIG['num_epochs']
-    num_states = 25  # Number of possible state combinations
-
+    setup_environment_and_train(MonteCarloAgent, "Monte Carlo")
 
     # Train Q-learning agent
-    env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
-    agent_q_learning = QLearningAgent(num_states=num_states, num_actions=len(actions))
-    agent_q_learning.train(env, num_episodes=10)
-
-    print("Q-table (Q-learning):")
-    print(agent_q_learning.Q_table)
+    setup_environment_and_train(QLearningAgent, "Q-learning")
 
 
 if __name__ == "__main__":
