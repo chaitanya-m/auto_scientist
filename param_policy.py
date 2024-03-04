@@ -256,16 +256,6 @@ class QLearningAgent:
         self.Q_table[state][action] += self.alpha * td_error
         print (state, action, reward)
 
-    def train(self, env, num_episodes):
-        for _ in range(num_episodes):
-            state = env.reset()
-            done = False
-            while not done:
-                action = self.select_action(state)
-                next_state, reward, done = env.step(action)
-                self.update_Q_values(state, action, reward, next_state)
-                state = next_state
-
 
 class MonteCarloAgent:
     def __init__(self, num_states, num_actions, gamma=0.9, epsilon=0.1):
@@ -303,19 +293,33 @@ class MonteCarloAgent:
             alpha = 1 / self.visits[state][action]  # Step size (adaptive)
             self.Q_table[state][action] += alpha * (returns - self.Q_table[state][action])  # Update Q-value
 
-    def train(self, env, num_episodes):
-        # Train the agent by interacting with the environment for a specified number of episodes
-        for _ in range(num_episodes):
-            episode = []  # Initialize an empty list to store episode transitions
-            state = env.reset()  # Reset the environment and get initial state
-            done = False  # Flag to indicate whether the episode has terminated
-            while not done:
-                action = self.select_action(state)  # Select action using the current policy
-                next_state, reward, done = env.step(action)  # Take action and observe next state and reward
-                episode.append((state, action, reward))  # Store state-action-reward tuple
-                state = next_state  # Update current state
-            self.update_Q_values(episode)  # Update Q-values based on the observed episode
 
+###################
+
+
+def train_agent(agent, env, num_episodes):
+    for _ in range(num_episodes):
+        state = env.reset()
+        done = False
+        while not done:
+            action = agent.select_action(state)
+            next_state, reward, done = env.step(action)
+            
+            # QLearningAgent requires the next state to update Q-values
+            if isinstance(agent, QLearningAgent):
+                agent.update_Q_values(state, action, reward, next_state)
+            # MonteCarloAgent requires the entire episode to update Q-values
+            elif isinstance(agent, MonteCarloAgent):
+                agent.episode.append((state, action, reward))
+            state = next_state
+        
+        # If the agent is a MonteCarloAgent, update Q-values after the episode is complete
+        if isinstance(agent, MonteCarloAgent):
+            agent.update_Q_values(agent.episode)
+            agent.episode = []  # Clear the episode for the next run
+
+
+#####################
 
 def setup_environment_and_train(agent_class, agent_name):
     # Since CONFIG and other required variables are not defined in this snippet, 
@@ -341,9 +345,16 @@ def setup_environment_and_train(agent_class, agent_name):
     # Train agent
     env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
     agent = agent_class(num_states=num_states, num_actions=len(actions))
-    agent.train(env, num_episodes=10)
+
+    # Add an empty list for episodes if the agent is MonteCarloAgent
+    if isinstance(agent, MonteCarloAgent):
+        agent.episode = []
+    
+    train_agent(agent, env, num_episodes=10)
 
     print(f"Q-table ({agent_name}):")
+    # print only 4 significant digits
+    np.set_printoptions(precision=4)
     print(agent.Q_table)
 
 def main():
