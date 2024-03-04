@@ -36,8 +36,9 @@ CONFIG = {
 }
 
 class Environment:
-    def __init__(self, model, stream, actions, num_samples_per_epoch, num_epochs_per_episode):
+    def __init__(self, model, model_baseline, stream, actions, num_samples_per_epoch, num_epochs_per_episode):
         self.model = model
+        self.model_baseline = model_baseline
         self.stream = stream
         self.current_epoch = 0
         self.num_epochs = num_epochs_per_episode
@@ -45,21 +46,24 @@ class Environment:
         self.actions = actions
         self.last_accuracy = None
         self.last_5_epoch_accuracies = []
-        self.state = 0  # Initialize state - 0 indicates no change in accuracy
+        self.state = None  # Initialize state - 0 indicates no change in accuracy
 
     def reset(self):
         # Reset the environment
         self.last_accuracy = None
         self.last_5_epoch_accuracies = []
         self.current_epoch = 0
-        self.state = 0 # Initialize state - 0 indicates no change in accuracy
+        self.state = None # Initialize state - 0 indicates no change in accuracy
 
         # Return the initial state
         return self.state
 
-    def step(self, action_idx):
+    def step(self, action):
+        # Update delta_hard based on the chosen action
+        self.model.delta = self.update_delta_hard(action)
+
         # Run one epoch of the experiment
-        accuracy = self.run_one_epoch()
+        accuracy, reward = self.run_one_epoch()
 
         # Increment the epoch counter
         self.current_epoch += 1
@@ -67,7 +71,7 @@ class Environment:
         # Compute accuracy change of current epoch from the last epoch
         epoch_accuracy_change = 0
         if self.last_accuracy is not None:
-            epoch_accuracy_change = ((accuracy - self.last_accuracy) / self.last_accuracy) * 100
+            epoch_accuracy_change = ((accuracy - self.last_accuracy) / self.last_accuracy)
 
         # Update the last accuracy
         self.last_accuracy = accuracy
@@ -77,10 +81,11 @@ class Environment:
         if len(self.last_5_epoch_accuracies) > 5:
             self.last_5_epoch_accuracies.pop(0)
 
-        # Compute accuracy change of current epoch over the last 5 epochs
+        # Compute accuracy change of current epoch over the average of last 5 epochs
         epoch_5_accuracy_change = 0
         if len(self.last_5_epoch_accuracies) == 5:
-            epoch_5_accuracy_change = ((accuracy - self.last_5_epoch_accuracies[0]) / self.last_5_epoch_accuracies[0]) * 100
+            #epoch_5_accuracy_change = ((accuracy - self.last_5_epoch_accuracies[0]) / self.last_5_epoch_accuracies[0]) * 100
+            epoch_5_accuracy_change = ((accuracy - np.mean(self.last_5_epoch_accuracies)) / np.mean(self.last_5_epoch_accuracies))
 
         # Bin the accuracy changes
         epoch_accuracy_change_bin = self.bin_accuracy_change(epoch_accuracy_change)
@@ -89,23 +94,20 @@ class Environment:
         # Update the state with the accuracy changes
         self.state = self.index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin)
 
-        # Compute the reward
-        reward = self.compute_reward(accuracy)
-
-        # When the experiment is done, return the Q table
+        # Signal if the episode is done
         done = self.current_epoch == self.num_epochs
 
         return self.state, reward, done
 
     @staticmethod
     def bin_accuracy_change(accuracy_change):
-        if accuracy_change < 5:
+        if accuracy_change <= (5.0/100.0):
             return 1
-        elif 5 <= accuracy_change < 10:
+        elif accuracy_change <= (10.0/100.0):
             return 2
-        elif 10 <= accuracy_change < 25:
+        elif accuracy_change <= (25.0/100.0):
             return 3
-        elif 25 <= accuracy_change < 50:
+        elif accuracy_change <= (50.0/100.0):
             return 4
         else:
             return 5
@@ -118,36 +120,55 @@ class Environment:
     def update_delta_hard(self, action_idx):
         # Adjust delta_hard based on the chosen action index
         action = self.actions[action_idx]
-        return max(0, self.model.delta ** (-action))
+
+        delta = self.model.delta * (action)
+
+        # Ensure delta_hard is within the range [1e-10, 1]
+        if delta < 1e-10:
+            return 1e-10
+        elif delta > 1:
+            return 1
+
+        return delta
 
     
     def run_one_epoch(self):
         # Initialize the total accuracy for this epoch
         total_correctly_classified = 0
+        total_baseline_correctly_classified = 0
         total_samples = 0
 
         # Iterate over the data in the stream
         for x, y in self.stream.take(self.num_samples_per_epoch):
+
             # Predict the output for the current input
             prediction = self.model.predict_one(x)
+            baseline_prediction = self.model_baseline.predict_one(x)
 
             # Learn from the current input-output pair
             self.model.learn_one(x, y)
+            self.model_baseline.learn_one(x, y)
 
             # Calculate the accuracy of the prediction against the actual output
             is_correctly_classified = self.correctly_classified(prediction, y)
+            is_baseline_correctly_classified = self.correctly_classified(baseline_prediction, y)
 
             # Add the accuracy to the total accuracy
             total_correctly_classified += is_correctly_classified
+            total_baseline_correctly_classified += is_baseline_correctly_classified
 
             # Increment the total number of samples
             total_samples += 1
 
         # Calculate the prequential accuracy for this epoch
         epoch_prequential_accuracy = self.average_classification_accuracy(total_correctly_classified, total_samples)
+        baseline_epoch_prequential_accuracy = self.average_classification_accuracy(total_baseline_correctly_classified, total_samples)
 
-        # Return the prequential accuracy
-        return epoch_prequential_accuracy
+        # Calculate the reward
+        reward = epoch_prequential_accuracy - baseline_epoch_prequential_accuracy
+
+        # Return the prequential accuracy and reward
+        return epoch_prequential_accuracy, reward
 
     @staticmethod
     def average_classification_accuracy(correct_predictions, total_predictions):
@@ -160,14 +181,6 @@ class Environment:
 
         # Return 1 if the prediction is correct, 0 otherwise
         return 1 if is_correct else 0
-
-    def compute_reward(self, accuracy):
-        # Compute the change in accuracy from the last epoch
-        reward = 0
-        if self.last_accuracy is not None:
-            reward = accuracy - self.last_accuracy
-        self.last_accuracy = accuracy
-        return reward
 
 
 class StreamFactory:
@@ -206,6 +219,7 @@ model_classes = {
     'UpdatableEFDTClassifier': UpdatableEFDTClassifier,
 }
 
+
 class QLearningAgent:
     def __init__(self, num_states, num_actions, alpha=0.1, gamma=0.9, epsilon=0.1):
         self.num_states = num_states
@@ -225,10 +239,13 @@ class QLearningAgent:
 
     def update_Q_values(self, state, action, reward, next_state):
         # Q-learning update rule
+        if state is None:  # Skip the iteration if state is None
+            return
         best_next_action = np.argmax(self.Q_table[next_state])
         td_target = reward + self.gamma * self.Q_table[next_state][best_next_action]
         td_error = td_target - self.Q_table[state][action]
         self.Q_table[state][action] += self.alpha * td_error
+        print (state, action, reward)
 
     def train(self, env, num_episodes):
         for _ in range(num_episodes):
@@ -253,7 +270,7 @@ class MonteCarloAgent:
         self.visits = np.zeros((num_states, num_actions))   # Track number of visits for each state-action pair
 
     def select_action(self, state):
-        if state is None or np.random.rand() < self.epsilon:
+        if state == None or np.random.rand() < self.epsilon:
             # If state is None or with probability epsilon, return a random action
             return np.random.randint(self.num_actions)
         else:
@@ -263,8 +280,14 @@ class MonteCarloAgent:
     def update_Q_values(self, episode):
         # Update Q-values based on observed episode returns
         returns = 0
-        for i in reversed(range(len(episode))):  # Iterate over the episode in reverse order to calculate returns
+        # Iterate over the episode in reverse order to calculate returns
+        # Iterate until the first state-action pair is reached where state is None
+        # Ensure that the first state-action pair is not included in the iteration
+
+        for i in reversed(range(len(episode))):  
             state, action, reward = episode[i]
+            if state is None:  # Skip the iteration if state is None
+                continue
             returns = reward + self.gamma * returns  # Calculate discounted return
             print (state, action, reward, returns)
             self.visits[state][action] += 1  # Increment visit count for the state-action pair
@@ -285,7 +308,6 @@ class MonteCarloAgent:
             self.update_Q_values(episode)  # Update Q-values based on the observed episode
 
 
-
 def main():
     random.seed(CONFIG['seed0'])
     np.random.seed(CONFIG['seed0'])
@@ -298,6 +320,7 @@ def main():
     # Setup model
     ModelClass = model_classes[CONFIG['model']]
     model = ModelClass(delta=CONFIG['delta_hard'])
+    model_baseline = ModelClass(delta=CONFIG['delta_hard'])
 
     # Setup Actions
     actions = CONFIG['actions']['delta_move']
@@ -305,30 +328,44 @@ def main():
     # Setup Environment
     num_samples_per_epoch = CONFIG['evaluation_interval']
     num_epochs = CONFIG['num_epochs']
-    env = Environment(model, stream, actions, num_samples_per_epoch, num_epochs)
-
     num_states = 25  # Number of possible state combinations
 
     # Train Monte Carlo agent
-    agent_mc = MonteCarloAgent(num_states=num_states, num_actions=len(actions))
-    agent_mc.train(env, num_episodes=10)
+    # env = Environment(model, model_baseline, stream, actions, num_samples_per_epoch, num_epochs)
+    # agent_mc = MonteCarloAgent(num_states=num_states, num_actions=len(actions))
+    # agent_mc.train(env, num_episodes=10)
 
-    print("Q-table (Monte Carlo):")
-    print(agent_mc.Q_table)
+    # print("Q-table (Monte Carlo):")
+    # print(agent_mc.Q_table)
+
+#################################################
+
+    # Setup stream factory
+    stream_type = CONFIG['stream_type']
+    stream_factory = StreamFactory(stream_type, CONFIG['streams'][stream_type])
+    stream = stream_factory.create(seed=CONFIG['seed0'])
+
+    # Setup model
+    ModelClass = model_classes[CONFIG['model']]
+    model = ModelClass(delta=CONFIG['delta_hard'])
+    model_baseline = ModelClass(delta=CONFIG['delta_hard'])
+
+    # Setup Actions
+    actions = CONFIG['actions']['delta_move']
+
+    # Setup Environment
+    num_samples_per_epoch = CONFIG['evaluation_interval']
+    num_epochs = CONFIG['num_epochs']
+    num_states = 25  # Number of possible state combinations
+
 
     # Train Q-learning agent
-    env = Environment(model, stream, actions, num_samples_per_epoch, num_epochs)
+    env = Environment(model, model_baseline, stream, actions, num_samples_per_epoch, num_epochs)
     agent_q_learning = QLearningAgent(num_states=num_states, num_actions=len(actions))
     agent_q_learning.train(env, num_episodes=10)
 
     print("Q-table (Q-learning):")
     print(agent_q_learning.Q_table)
-
-    # Compare Q tables
-    print("\nQ-table (Q-learning):")
-    print(agent_q_learning.Q_table)
-    print("\nQ-table (Monte Carlo):")
-    print(agent_mc.Q_table)
 
 
 if __name__ == "__main__":
