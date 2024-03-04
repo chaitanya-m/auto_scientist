@@ -36,25 +36,34 @@ CONFIG = {
 }
 
 class Environment:
-    def __init__(self, model, model_baseline, stream, actions, num_samples_per_epoch, num_epochs_per_episode):
+    def __init__(self, model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs_per_episode):
         self.model = model
         self.model_baseline = model_baseline
-        self.stream = stream
+
+        self.current_episode = 0
+        self.stream_factory = stream_factory
+        self.stream = stream_factory.create(self.current_episode)
+
+        self.state = None  # Initialize state - 0 indicates no change in accuracy
+
+        self.actions = actions
+
         self.current_epoch = 0
         self.num_epochs = num_epochs_per_episode
         self.num_samples_per_epoch = num_samples_per_epoch
-        self.actions = actions
         self.last_accuracy = None
         self.last_5_epoch_accuracies = []
-        self.state = None  # Initialize state - 0 indicates no change in accuracy
+
 
     def reset(self):
         # Reset the environment
+        self.current_episode += 1
         self.last_accuracy = None
         self.last_5_epoch_accuracies = []
         self.current_epoch = 0
         self.state = None # Initialize state - 0 indicates no change in accuracy
-
+        self.stream = self.stream_factory.create(seed=self.current_episode)
+    
         # Return the initial state
         return self.state
 
@@ -311,11 +320,13 @@ class MonteCarloAgent:
 def main():
     random.seed(CONFIG['seed0'])
     np.random.seed(CONFIG['seed0'])
+    init_seed = CONFIG['seed0']
 
     # Setup stream factory
+
     stream_type = CONFIG['stream_type']
     stream_factory = StreamFactory(stream_type, CONFIG['streams'][stream_type])
-    stream = stream_factory.create(seed=CONFIG['seed0'])
+    stream = stream_factory.create(seed=init_seed)
 
     # Setup model
     ModelClass = model_classes[CONFIG['model']]
@@ -331,7 +342,7 @@ def main():
     num_states = 25  # Number of possible state combinations
 
     # Train Monte Carlo agent
-    # env = Environment(model, model_baseline, stream, actions, num_samples_per_epoch, num_epochs)
+    # env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
     # agent_mc = MonteCarloAgent(num_states=num_states, num_actions=len(actions))
     # agent_mc.train(env, num_episodes=10)
 
@@ -343,7 +354,7 @@ def main():
     # Setup stream factory
     stream_type = CONFIG['stream_type']
     stream_factory = StreamFactory(stream_type, CONFIG['streams'][stream_type])
-    stream = stream_factory.create(seed=CONFIG['seed0'])
+    stream = stream_factory.create(seed=init_seed)
 
     # Setup model
     ModelClass = model_classes[CONFIG['model']]
@@ -360,7 +371,7 @@ def main():
 
 
     # Train Q-learning agent
-    env = Environment(model, model_baseline, stream, actions, num_samples_per_epoch, num_epochs)
+    env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
     agent_q_learning = QLearningAgent(num_states=num_states, num_actions=len(actions))
     agent_q_learning.train(env, num_episodes=10)
 
