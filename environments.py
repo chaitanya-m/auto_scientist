@@ -54,7 +54,7 @@ class Environment:
         self.last_5_epoch_accuracies = []
         self.current_epoch = 0
         self.state = None # Initialize state - 0 indicates no change in accuracy
-        self.stream = self.stream_factory.create(seed=self.current_episode)
+        self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
 
         # Return the initial state
         return self.state
@@ -116,7 +116,9 @@ class Environment:
     @staticmethod
     def index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin):
         # We take epoch_accuracy_change_bin and epoch_5_accuracy_change_bin and return a state index in the range [0, 24]
-        return (epoch_accuracy_change_bin - 1) * 5 + (epoch_5_accuracy_change_bin - 1)
+        # The state index is calculated as below:
+        state_index = (epoch_accuracy_change_bin - 1) * 5 + (epoch_5_accuracy_change_bin - 1) # 0, 5, 10, 15, 20 correspond to increasingly large 
+        return state_index
 
     def update_delta_hard(self, action_idx):
         # Adjust delta_hard based on the chosen action index
@@ -134,6 +136,19 @@ class Environment:
 
     
     def run_one_epoch(self):
+        '''
+        Run one epoch of the experiment for both the model and the baseline model (without reinforcement learning) and return the prequential accuracy and reward
+
+        The reward is calculated as the difference between the prequential accuracy of the model and the prequential accuracy of the baseline model.
+
+        The prequential accuracy is calculated as the number of correctly classified samples divided by the total number of samples in the epoch.
+        
+        Returns:
+        - epoch_prequential_accuracy (float): The prequential accuracy for this epoch
+        - reward (float): The reward for this epoch
+
+        '''
+
         # Initialize the total accuracy for this epoch
         total_correctly_classified = 0
         total_baseline_correctly_classified = 0
@@ -165,7 +180,8 @@ class Environment:
         epoch_prequential_accuracy = self.average_classification_accuracy(total_correctly_classified, total_samples)
         baseline_epoch_prequential_accuracy = self.average_classification_accuracy(total_baseline_correctly_classified, total_samples)
 
-        # Calculate the reward
+        # Calculate the reward as the difference between the prequential accuracy of the model obtained from reinforcement learning 
+        # and that of the baseline model
         reward = epoch_prequential_accuracy - baseline_epoch_prequential_accuracy
 
         # Return the prequential accuracy and reward
