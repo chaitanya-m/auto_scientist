@@ -4,6 +4,8 @@ from river import tree
 from river.datasets.synth import RandomRBF, RandomTree, ConceptDriftStream
 from collections import OrderedDict
 
+BINS = [1, 2, 3, 4]
+NUM_STATES = len(BINS) * len(BINS)
 
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
     def __init__(self, delta):
@@ -103,21 +105,19 @@ class Environment:
     @staticmethod
     def bin_accuracy_change(accuracy_change):
         if accuracy_change <= (5.0/100.0):
-            return 1
-        elif accuracy_change <= (10.0/100.0):
-            return 2
-        elif accuracy_change <= (25.0/100.0):
-            return 3
+            return BINS[0]
+        elif accuracy_change <= (20.0/100.0):
+            return BINS[1]
         elif accuracy_change <= (50.0/100.0):
-            return 4
+            return BINS[2]
         else:
-            return 5
+            return BINS[3]
 
     @staticmethod
     def index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin):
         # We take epoch_accuracy_change_bin and epoch_5_accuracy_change_bin and return a state index in the range [0, 24]
         # The state index is calculated as below:
-        state_index = (epoch_accuracy_change_bin - 1) * 5 + (epoch_5_accuracy_change_bin - 1) # 0, 5, 10, 15, 20 correspond to increasingly large 
+        state_index = (epoch_accuracy_change_bin - 1) * len(BINS) + (epoch_5_accuracy_change_bin - 1) # 0, 5, 10, 15, 20 correspond to increasingly large 
         return state_index
 
     def update_delta_hard(self, action_idx):

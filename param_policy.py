@@ -116,7 +116,7 @@ def main():
         np.random.seed(config['seed0'])
 
         # Define the environment's state and action space sizes and number of episodes
-        num_states = 25
+        num_states = NUM_STATES
         num_actions = len(config['actions']['delta_move']) 
         num_episodes = config['num_episodes']
 
