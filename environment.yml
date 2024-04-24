@@ -5,7 +5,7 @@ dependencies:
   - python>=3.10.13
   - numpy>=1.22.3
   - pandas>=1.4.2
-  - scikit-learn>=1.4.2
+  - scikit-learn=1.3
   - pip
   - pip:
       - river>=0.21.0  
