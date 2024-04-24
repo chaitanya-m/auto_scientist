@@ -2,13 +2,12 @@ name: myenv
 channels:
   - defaults
 dependencies:
-  - python=3.10.13
-  - numpy=1.22.3
-  - pandas=1.4.2
-  - scikit-learn=1.0.2
+  - python>=3.10.13
+  - numpy>=1.22.3
+  - pandas>=1.4.2
+  - scikit-learn>=1.4.2
   - pip
   - pip:
-      - scikit-multiflow==0.5.3
       - river>=0.21.0  
-  - matplotlib=3.5.1
+  - matplotlib>=3.5.1
 
