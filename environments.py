@@ -1,7 +1,7 @@
 import numpy as np
 
 from river import tree
-from river.datasets.synth import RandomRBF, RandomTree, ConceptDriftStream
+from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, ConceptDriftStream, 
 from collections import OrderedDict
 
 BINS = [1, 2, 3, 4]
@@ -210,6 +210,10 @@ class StreamFactory:
             return RandomTree(seed_tree=seed, seed_sample=seed, **self.preinitialized_params)
         elif self.stream_type == 'RandomRBF':
             return RandomRBF(seed_model=seed, seed_sample=seed, **self.preinitialized_params)
+        elif self.stream_type == 'Sine':
+            return Sine(seed = seed, **self.preinitialized_params)
+        elif self.stream_type == 'Hyperplane':
+            return Hyperplane(seed = seed, **self.preinitialized_params)
         else:
             raise ValueError(f"Unknown stream type: {self.stream_type}")
 
