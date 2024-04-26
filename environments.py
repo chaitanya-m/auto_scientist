@@ -1,7 +1,7 @@
 import numpy as np
 
 from river import tree
-from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, ConceptDriftStream, 
+from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, ConceptDriftStream 
 from collections import OrderedDict
 
 BINS = [1, 2, 3, 4]

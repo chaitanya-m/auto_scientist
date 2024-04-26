@@ -90,7 +90,7 @@ STREAMS = [
         'n_features': 5,
         'n_centroids': 10,
         }
-    }
+    },
 
     {
     'stream_type': 'RandomRBF',
@@ -109,7 +109,7 @@ STREAMS = [
         'n_features': 20,
         'n_centroids': 100,
         }
-    }
+    },
 
     {
     'stream_type': 'Hyperplane',
@@ -118,7 +118,7 @@ STREAMS = [
          'noise_percentage': 0.05,
          'sigma': 0.1,
         }
-    }
+    },
 
 ]
 
