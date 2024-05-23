@@ -15,50 +15,45 @@ def train_agent(agent, env, num_episodes):
         transitions = []  # Store the episode trajectory for Monte Carlo updates
 
 
-        while not done: # as long as the episode is not done, i.e. as long as the stream has examples
+        while not done:  # As long as the episode is not done
             action = agent.select_action(state)
             next_state, reward, done = env.step(action) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
-            transitions.append((state, action, reward))
 
-            # Move to the next state
-            state = next_state
-        
-        # Now perform the update outside the Agent classes
-        # Look back at previous transitions --- comprising states, actions, and rewards --- to update 
-        # understanding of how valuable different actions are when taken in different states
-        if isinstance(agent, QLearningAgent):
-            # Loop over each transition in the list of transitions, excluding the last one
-            for transition_index, (state, action, reward) in enumerate(transitions[:-1]):  # Skip the last state since it has no next_state                
-                if state is None: # If the state is None, skip the current iteration
-                    continue
-
-                next_state = transitions[transition_index + 1][0] 
-                # Get the state of the next transition, as per the trajectory taken  
-
-                best_next_action = np.argmax(agent.Q_table[next_state]) 
-                # From the Q_table, lookup the action that has the maximum Q-value for that next state. That is, the best action to have taken in 
-                # the next_state in retrospect is selected as the one with the highest Q-value in the Q-table for that state.
-                # Note that when multiple actions have the same Q-value, the first one is selected, so there may be a bias in the selection towards
-                # earlier actions as the table starts all zeroed.
-
-                td_target = reward + agent.gamma * agent.Q_table[next_state][best_next_action] 
-                # Calculate the target Q-value using the reward and the discounted Q-value of the best next action
-                # The temporal difference (TD) target is calculated using the (retrospective) reward received for the 
-                # "current" action plus the discounted value of the best possible action in the next state. This forms the basis of the 
-                # Q-learning update rule and reflects the expected long-term return.
+            if isinstance(agent, QLearningAgent):    
+                # Perform the Q-learning update immediately after the step
+                best_next_action = np.argmax(agent.Q_table[next_state])
+                    # From the Q_table, lookup the action that has the maximum Q-value for that next state. That is, the best action to have taken in 
+                    # the next_state in retrospect is selected as the one with the highest Q-value in the Q-table for that state.
+                    # Note that when multiple actions have the same Q-value, the first one is selected, so there may be a bias in the selection towards
+                    # earlier actions as the table starts all zeroed.
+                td_target = reward + agent.gamma * agent.Q_table[next_state][best_next_action]
+                    # Calculate the target Q-value using the reward and the discounted Q-value of the best next action
+                    # The temporal difference (TD) target is calculated using the (retrospective) reward received for the 
+                    # "current" action plus the discounted value of the best possible action in the next state. This forms the basis of the 
+                    # Q-learning update rule and reflects the expected long-term return.
 
                 td_error = td_target - agent.Q_table[state][action] 
-                # Calculate the difference between the target and the current Q-value
-                # The TD error (or difference) is the difference between the calculated TD target and the 
-                # "currently" estimated Q-value for the state-action pair.
+                    # Calculate the difference between the target and the current Q-value
+                    # The TD error (or difference) is the difference between the calculated TD target and the 
+                    # "currently" estimated Q-value for the state-action pair.
 
                 agent.Q_table[state][action] += agent.alpha * td_error 
-                # Update the Q-value for the current state and action
-                # The Q-value for the current state and action is updated by moving it towards the TD target. 
-                # The learning rate alpha determines how much the new information overrides the old information.
+                    # Update the Q-value for the current state and action
+                    # The Q-value for the current state and action is updated by moving it towards the TD target. 
+                    # The learning rate alpha determines how much the new information overrides the old information.
 
-        elif isinstance(agent, MonteCarloAgent):
+            # Store transition for Monte Carlo updates if necessary
+            transitions.append((state, action, reward))
+            # Move to next state
+            state = next_state
+
+        # Get the accuracy and baseline accuracy for this env run
+        accuracy = env.cumulative_accuracy / env.current_epoch
+        baseline_accuracy = env.cumulative_baseline_accuracy / env.current_epoch
+
+        # Update the agent's Q-table using Monte Carlo updates
+        if isinstance(agent, MonteCarloAgent):
             returns = 0
             for (state, action, reward) in reversed(transitions):
                 if state is None:

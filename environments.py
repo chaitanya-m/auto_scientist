@@ -49,6 +49,8 @@ class Environment:
         self.last_accuracy = None
         self.last_5_epoch_accuracies = []
 
+        self.cumulative_accuracy = 0.0
+        self.cumulative_baseline_accuracy = 0.0
 
     def reset(self):
         # Reset the environment
@@ -59,6 +61,9 @@ class Environment:
         self.state = None # Initialize state - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
 
+        self.cumulative_accuracy = 0.0
+        self.cumulative_baseline_accuracy = 0.0
+
         # Return the initial state
         return self.state
 
@@ -67,7 +72,15 @@ class Environment:
         self.model.delta = self.update_delta_hard(action)
 
         # Run one epoch of the experiment
-        accuracy, reward = self.run_one_epoch()
+        accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()
+
+        # Update cumulative prequential accuracy and cumulative baseline prequential accuracy
+        self.cumulative_accuracy += accuracy
+        self.cumulative_baseline_accuracy += baseline_epoch_prequential_accuracy
+
+        # Calculate the reward as the difference between the prequential accuracy of the model obtained from reinforcement learning 
+        # and that of the baseline model
+        reward = accuracy - baseline_epoch_prequential_accuracy
 
         # Increment the epoch counter
         self.current_epoch += 1
@@ -146,7 +159,7 @@ class Environment:
         
         Returns:
         - epoch_prequential_accuracy (float): The prequential accuracy for this epoch
-        - reward (float): The reward for this epoch
+        - baseline_epoch_prequential_accuracy(float): Prequential accuracy without agent
 
         '''
 
@@ -181,12 +194,8 @@ class Environment:
         epoch_prequential_accuracy = self.average_classification_accuracy(total_correctly_classified, total_samples)
         baseline_epoch_prequential_accuracy = self.average_classification_accuracy(total_baseline_correctly_classified, total_samples)
 
-        # Calculate the reward as the difference between the prequential accuracy of the model obtained from reinforcement learning 
-        # and that of the baseline model
-        reward = epoch_prequential_accuracy - baseline_epoch_prequential_accuracy
-
-        # Return the prequential accuracy and reward
-        return epoch_prequential_accuracy, reward
+        # Return the prequential accuracy and baseline_epoch_prequential_accuracy
+        return epoch_prequential_accuracy, baseline_epoch_prequential_accuracy
 
     @staticmethod
     def average_classification_accuracy(correct_predictions, total_predictions):
@@ -217,5 +226,3 @@ class StreamFactory:
             return Hyperplane(seed = seed, **self.preinitialized_params)
         else:
             raise ValueError(f"Unknown stream type: {self.stream_type}")
-
-
