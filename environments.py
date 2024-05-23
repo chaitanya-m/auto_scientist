@@ -29,6 +29,7 @@ model_classes = {
     'UpdatableEFDTClassifier': UpdatableEFDTClassifier,
 }
 
+
 class Environment:
     def __init__(self, model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs_per_episode):
         self.model = model

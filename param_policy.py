@@ -14,6 +14,7 @@ def train_agent(agent, env, num_episodes):
         done = False
         transitions = []  # Store the episode trajectory for Monte Carlo updates
 
+
         while not done: # as long as the episode is not done, i.e. as long as the stream has examples
             action = agent.select_action(state)
             next_state, reward, done = env.step(action) # A step runs a single stream learning epoch of say 1000 examples
@@ -98,7 +99,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_actions
 
 
 # Top-level function to be used by ProcessPoolExecutor
-def process_config(config):
+def run_RL_agents(config):
     try:
         random.seed(config['seed0'])
         np.random.seed(config['seed0'])
@@ -144,7 +145,7 @@ def main():
     # Using ProcessPoolExecutor to run tasks in parallel
     with concurrent.futures.ProcessPoolExecutor() as executor:
         # Submit all configurations as separate tasks
-        futures = [executor.submit(process_config, config) for config in configs]
+        futures = [executor.submit(run_RL_agents, config) for config in configs]
         
         # Collect results in the order they were submitted
         for future in concurrent.futures.as_completed(futures):
