@@ -6,7 +6,40 @@ from environments import *
 from agents import *
 
 
+
+'''
+
+'''
+
+
+
 def train_agent(agent, env, num_episodes):
+    '''
+    Train the agent using the given environment for the specified number of episodes.
+    Either Q-learning or Monte Carlo updates are used based on the agent type.
+
+    Q-learning:
+
+    From the Q_table, lookup the action that has the maximum Q-value for that next state. That is, the best action to have taken in 
+    the next_state in retrospect is selected as the one with the highest Q-value in the Q-table for that state.
+    Note that when multiple actions have the same Q-value, the first one is selected, so there may be a bias in the selection towards
+    earlier actions as the table starts all zeroed.
+
+    # Calculate the target Q-value using the reward and the discounted Q-value of the best next action
+    # The temporal difference (TD) target is calculated using the (retrospective) reward received for the 
+    # "current" action plus the discounted value of the best possible action in the next state. This forms the basis of the 
+    # Q-learning update rule and reflects the expected long-term return.
+
+    # Calculate the difference between the target and the current Q-value
+    # The TD error (or difference) is the difference between the calculated TD target and the 
+    # "currently" estimated Q-value for the state-action pair.
+
+    # Update the Q-value for the current state and action
+    # The Q-value for the current state and action is updated by moving it towards the TD target. 
+    # The learning rate alpha determines how much the new information overrides the old information.
+
+
+    '''
 
     # The agent is trained on multiple episodes in sequence, each episode corresponding to the stream initialized differently. The Q-table is persistent.
     for _ in range(num_episodes):
@@ -20,31 +53,17 @@ def train_agent(agent, env, num_episodes):
             next_state, reward, done = env.step(action) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
-            if isinstance(agent, QLearningAgent):    
-                # Perform the Q-learning update immediately after the step
-                best_next_action = np.argmax(agent.Q_table[next_state])
-                    # From the Q_table, lookup the action that has the maximum Q-value for that next state. That is, the best action to have taken in 
-                    # the next_state in retrospect is selected as the one with the highest Q-value in the Q-table for that state.
-                    # Note that when multiple actions have the same Q-value, the first one is selected, so there may be a bias in the selection towards
-                    # earlier actions as the table starts all zeroed.
-                td_target = reward + agent.gamma * agent.Q_table[next_state][best_next_action]
-                    # Calculate the target Q-value using the reward and the discounted Q-value of the best next action
-                    # The temporal difference (TD) target is calculated using the (retrospective) reward received for the 
-                    # "current" action plus the discounted value of the best possible action in the next state. This forms the basis of the 
-                    # Q-learning update rule and reflects the expected long-term return.
-
-                td_error = td_target - agent.Q_table[state][action] 
-                    # Calculate the difference between the target and the current Q-value
-                    # The TD error (or difference) is the difference between the calculated TD target and the 
-                    # "currently" estimated Q-value for the state-action pair.
-
-                agent.Q_table[state][action] += agent.alpha * td_error 
-                    # Update the Q-value for the current state and action
-                    # The Q-value for the current state and action is updated by moving it towards the TD target. 
-                    # The learning rate alpha determines how much the new information overrides the old information.
-
             # Store transition for Monte Carlo updates if necessary
             transitions.append((state, action, reward))
+
+            if isinstance(agent, QLearningAgent):
+                # Perform the Q-learning update immediately after the step
+                if state is not None and next_state is not None:
+                    best_next_action = np.argmax(agent.Q_table[next_state])
+                    td_target = reward + agent.gamma * agent.Q_table[next_state][best_next_action] if not done else reward
+                    td_error = td_target - agent.Q_table[state][action]
+                    agent.Q_table[state][action] += agent.alpha * td_error
+
             # Move to next state
             state = next_state
 
