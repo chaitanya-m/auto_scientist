@@ -120,5 +120,26 @@ STREAMS = [
         }
     },
 
+    {
+    'stream_type': 'Hyperplane',
+     'stream' : {
+         'n_features': 20,
+         'noise_percentage': 0.1,
+         'sigma': 0.2,
+        }
+    },
+
+    # {
+    # 'stream_type': 'Friedman',
+    #  'stream' : {
+    #     }
+    # },
+
+    # {
+    # 'stream_type': 'Mv',
+    #  'stream' : {
+    #     }
+    # },
+
 ]
 
