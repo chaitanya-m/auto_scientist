@@ -7,6 +7,7 @@ from collections import OrderedDict
 BINS = [1, 2, 3, 4]
 NUM_STATES = len(BINS) * len(BINS)
 
+
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)

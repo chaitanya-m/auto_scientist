@@ -1,15 +1,11 @@
 import random
 import concurrent.futures
 import numpy as np
+import pandas as pd
 from configs import BASE_CONFIG, STREAMS
 from environments import *
 from agents import *
 
-
-
-'''
-
-'''
 
 
 
@@ -38,8 +34,10 @@ def train_agent(agent, env, num_episodes):
     # The Q-value for the current state and action is updated by moving it towards the TD target. 
     # The learning rate alpha determines how much the new information overrides the old information.
 
-
     '''
+
+    episode_accuracies = []
+    episode_baseline_accuracies = []
 
     # The agent is trained on multiple episodes in sequence, each episode corresponding to the stream initialized differently. The Q-table is persistent.
     for _ in range(num_episodes):
@@ -67,11 +65,7 @@ def train_agent(agent, env, num_episodes):
             # Move to next state
             state = next_state
 
-        # Get the accuracy and baseline accuracy for this env run
-        accuracy = env.cumulative_accuracy / env.current_epoch
-        baseline_accuracy = env.cumulative_baseline_accuracy / env.current_epoch
-
-        # Update the agent's Q-table using Monte Carlo updates
+        # Update the agent's Q-table using Monte Carlo updates at the end of an episode
         if isinstance(agent, MonteCarloAgent):
             returns = 0
             for (state, action, reward) in reversed(transitions):
@@ -82,6 +76,12 @@ def train_agent(agent, env, num_episodes):
                 alpha = 1 / agent.visits[state][action]
                 agent.Q_table[state][action] += alpha * (returns - agent.Q_table[state][action])
 
+        # Get the accuracy and baseline accuracy for this episode
+        accuracy = env.cumulative_accuracy / env.current_epoch
+        baseline_accuracy = env.cumulative_baseline_accuracy / env.current_epoch
+        episode_accuracies.append(accuracy)
+        episode_baseline_accuracies.append(baseline_accuracy)
+    return episode_accuracies, episode_baseline_accuracies
 
 def setup_environment_and_train(agent_class, agent_name, num_states, num_actions, num_episodes, config):
     # Since CONFIG and other required variables are not defined in this snippet, 
@@ -107,9 +107,11 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_actions
     env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
     agent = agent_class(num_states=num_states, num_actions=num_actions)
 
-    train_agent(agent, env, num_episodes)
+    accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)
 
-    return agent
+    # Now create a dataframe with the results if it already doesn't exist
+
+    return accuracies, baseline_accuracies, agent.Q_table
 
 
 # Top-level function to be used by ProcessPoolExecutor
@@ -123,22 +125,63 @@ def run_RL_agents(config):
         num_actions = len(config['actions']['delta_move'])
         num_episodes = config['num_episodes']
 
-        results = []
-        results.append(f"config: {config['stream_type']} with params: {config['stream']}")
+        result_qtables = []
+        result_qtables.append(f"config: {config['stream_type']} with params: {config['stream']}")
+
+        # The dataframe has columns for the episode number, config['stream_type'], config['stream'], accuracy, and baseline accuracy
+        mc_result_accuracies_df = pd.DataFrame(columns=['episode', 'agent_type','stream_type', 'stream', 'accuracy', 'baseline_accuracy'])
+        ql_result_accuracies_df = pd.DataFrame(columns=['episode', 'agent_type','stream_type', 'stream', 'accuracy', 'baseline_accuracy'])
 
         # Train Monte Carlo agent
-        mc_agent = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_states, num_actions, num_episodes, config)
-        np.set_printoptions(precision=2)
-        results.append(str(mc_agent.Q_table))
+        mc_accuracies, mc_baseline_accuracies, mc_qtable = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_states, num_actions, num_episodes, config)
 
         # Train Q-learning agent
-        ql_agent = setup_environment_and_train(QLearningAgent, "Q-learning", num_states, num_actions, num_episodes, config)
+        ql_accuracies, ql_baseline_accuracies, ql_qtable = setup_environment_and_train(QLearningAgent, "Q-learning", num_states, num_actions, num_episodes, config)
+
+        # Add accuracies to the dataframe. 
+        mc_temp_data = []
+        ql_temp_data = []
+
+        for episode, (accuracy, baseline_accuracy) in enumerate(zip(ql_accuracies, ql_baseline_accuracies)):
+            # Create a dictionary for each iteration and add to list
+            ql_temp_data.append({
+                'episode': episode,
+                'agent_type': 'Q-learning',
+                'stream_type': config['stream_type'],
+                'stream': config['stream'],
+                'accuracy': accuracy,
+                'baseline_accuracy': baseline_accuracy
+            })
+
+        for episode, (accuracy, baseline_accuracy) in enumerate(zip(mc_accuracies, mc_baseline_accuracies)):
+            # Create a dictionary for each iteration and add to list
+            mc_temp_data.append({
+                'episode': episode,
+                'agent_type': 'Monte Carlo',
+                'stream_type': config['stream_type'],
+                'stream': config['stream'],
+                'accuracy': accuracy,
+                'baseline_accuracy': baseline_accuracy
+            })
+
+        # Convert list of dictionaries to DataFrame
+        #new_entries_df 
+        mc_result_accuracies_df = pd.DataFrame(mc_temp_data)
+        ql_result_accuracies_df = pd.DataFrame(ql_temp_data)
+
+        # Concatenate the new entries to the existing DataFrame
+        #result_accuracies_df = pd.concat([result_accuracies_df, new_entries_df], ignore_index=True)
+
+        # Add Q-tables to the results
         np.set_printoptions(precision=2)
-        results.append(str(ql_agent.Q_table))
+        result_qtables.append(str(mc_qtable))
+        np.set_printoptions(precision=2)
+        result_qtables.append(str(ql_qtable))
+        result_qtables.append(f"==========")
 
-        results.append(f"==========")
+        #print(mc_result_accuracies_df)
 
-        return results
+        return result_qtables, mc_result_accuracies_df, ql_result_accuracies_df
 
     except Exception as e:
         return [f"An error occurred while processing config {config['stream_type']}: {e}"]
@@ -163,9 +206,8 @@ def main():
         
         # Collect results in the order they were submitted
         for future in concurrent.futures.as_completed(futures):
-            results = future.result()
-            for result in results:
-                print(result)
+            result_q_tables, result_mc_accuracies_df, result_ql_accuracies_df = future.result()
+            print(result_q_tables[0], result_mc_accuracies_df)
 
 
 if __name__ == "__main__":
