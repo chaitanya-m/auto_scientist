@@ -83,6 +83,7 @@ def train_agent(agent, env, num_episodes):
         episode_baseline_accuracies.append(baseline_accuracy)
     return episode_accuracies, episode_baseline_accuracies
 
+
 def setup_environment_and_train(agent_class, agent_name, num_states, num_actions, num_episodes, config):
     # Since CONFIG and other required variables are not defined in this snippet, 
     # they should be defined elsewhere in the code or passed as arguments to the function.
@@ -192,6 +193,12 @@ def main():
     configs = []
     config = BASE_CONFIG
 
+    # Initialize dataframes for concatenating results
+    all_result_mc_df = pd.DataFrame()
+    all_result_ql_df = pd.DataFrame()
+
+    all_result_qtables = []
+
     # Loop through the STREAMS dictionaries in the configs and replace the BASE_CONFIG with the STREAMS one at a time
     for stream_config in STREAMS:
         new_config = config.copy()
@@ -207,7 +214,20 @@ def main():
         # Collect results in the order they were submitted
         for future in concurrent.futures.as_completed(futures):
             result_q_tables, result_mc_accuracies_df, result_ql_accuracies_df = future.result()
-            print(result_q_tables[0], result_mc_accuracies_df)
+
+            # Concatenate the results into the respective dataframes
+            all_result_mc_df = pd.concat([all_result_mc_df, result_mc_accuracies_df])
+            all_result_ql_df = pd.concat([all_result_ql_df, result_ql_accuracies_df])
+            all_result_qtables.extend(result_q_tables)
+
+    # Write the concatenated dataframes to CSV files
+    all_result_mc_df.to_csv('all_result_mc_df.csv', index=False)
+    all_result_ql_df.to_csv('all_result_ql_df.csv', index=False)
+
+    # Write the concatenated list of result_q_tables to a text file
+    with open('all_result_q_tables.txt', 'w') as f:
+        for q_table in all_result_qtables:
+            f.write(q_table + '\n')
 
 
 if __name__ == "__main__":
