@@ -225,9 +225,9 @@ class StreamFactory:
             return Sine(seed = seed, **self.preinitialized_params)
         elif self.stream_type == 'Hyperplane':
             return Hyperplane(seed = seed, **self.preinitialized_params)
-        elif self.stream_type == 'Friedman':
-            return Friedman(seed = seed, **self.preinitialized_params)
-        elif self.stream_type == 'Mv':
-            return Mv(seed = seed, **self.preinitialized_params)
+        # elif self.stream_type == 'Friedman':
+        #     return Friedman(seed = seed)
+        # elif self.stream_type == 'Mv':
+        #     return Mv(seed = seed)
         else:
             raise ValueError(f"Unknown stream type: {self.stream_type}")
