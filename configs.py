@@ -129,17 +129,55 @@ STREAMS = [
         }
     },
 
+    {
+    'stream_type': 'SEA',
+     'stream' : {
+        'variant': 0, 
+        'noise': 0.0
+        }
+    },
+
+    # {
+    # 'stream_type': 'Sine',
+    #  'stream' : {
+    #     'classification_function': 0,
+    #     'balance_classes': False,
+    #     'has_noise': True
+    #     }
+    # },
+    # This is recurring concept drift rather than an early learning curve on a stationary stream, so not very useful for this experiment
+
+    # {
+    # 'stream_type': 'Waveform',
+    #  'stream' : {
+    #     'has_noise': True
+    #     }
+    # },
+    # This is recurring concept drift rather than an early learning curve on a stationary stream, so not very useful for this experiment
+
     # {
     # 'stream_type': 'Friedman',
     #  'stream' : {
     #     }
     # },
+    # This stream is regression not classification
 
     # {
     # 'stream_type': 'Mv',
     #  'stream' : {
     #     }
     # },
+    # This stream is regression not classification (plus freezes in a loop)
+
+    # {
+    # 'stream_type': 'STAGGER',
+    #  'stream' : {
+    #     'classification_function': 0,
+    #     'balance_classes': False,
+    #     }
+    # },
+    ## Most results (9/10) are 1.0, too trivial a data stream to learn 
+
 
 ]
 
