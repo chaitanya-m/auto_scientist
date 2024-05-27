@@ -1,7 +1,8 @@
 import numpy as np
 
 from river import tree
-from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, Waveform, SEA, STAGGER, Friedman, Mv
+from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, Waveform, SEA, STAGGER, Friedman, Mv, Planes2D
+from river.datasets import ImageSegments
 from collections import OrderedDict
 
 BINS = [1, 2, 3, 4]
@@ -226,6 +227,9 @@ class StreamFactory:
         elif self.stream_type == 'Hyperplane':
             return Hyperplane(seed = seed, **self.preinitialized_params)
         
+        elif self.stream_type == 'Planes2D':
+            return Planes2D()
+
         elif self.stream_type == 'Waveform':
             return Waveform(seed = seed, **self.preinitialized_params)
         elif self.stream_type == 'Sine':
