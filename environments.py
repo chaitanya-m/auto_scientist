@@ -185,7 +185,7 @@ class Environment:
             is_correctly_classified = self.correctly_classified(prediction, y)
             is_baseline_correctly_classified = self.correctly_classified(baseline_prediction, y)
 
-            # Add the accuracy to the total accuracy
+            # Add the correctly classified to the total correctly classified
             total_correctly_classified += is_correctly_classified
             total_baseline_correctly_classified += is_baseline_correctly_classified
 
@@ -226,9 +226,6 @@ class StreamFactory:
             return Sine(seed = seed, **self.preinitialized_params)
         elif self.stream_type == 'Hyperplane':
             return Hyperplane(seed = seed, **self.preinitialized_params)
-        
-        elif self.stream_type == 'Planes2D':
-            return Planes2D()
 
         elif self.stream_type == 'Waveform':
             return Waveform(seed = seed, **self.preinitialized_params)
