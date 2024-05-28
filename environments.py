@@ -24,6 +24,12 @@ class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
     def update_delta(self, new_delta):
         self.delta = new_delta
 
+class cutEFDTClassifier(UpdatableEFDTClassifier):
+    def __init__(self, delta):
+        super().__init__(delta=delta)
+
+    # Remove the update mechanism and compare with second best instead of current best
+
 
 # Create a dictionary mapping class names to class objects
 model_classes = {
