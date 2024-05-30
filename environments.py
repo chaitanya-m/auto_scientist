@@ -24,11 +24,39 @@ class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
     def update_delta(self, new_delta):
         self.delta = new_delta
 
-class cutEFDTClassifier(UpdatableEFDTClassifier):
+class CutEFDTClassifier(UpdatableEFDTClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
 
     # Remove the update mechanism and compare with second best instead of current best
+
+    # Let's begin by removing the update mechanism
+    # The superclass tree.ExtremelyFastDecisionTreeClassifier has a method called    def _reevaluate_best_split(self, node, parent, branch_index, **kwargs):
+    # It reevaluates the best split for the node.
+    # We can override this method to remove the update mechanism
+    # For the RL agent, the action is to choose whether to use the overriden update mechanism or the original one... strategy superposition (rather than alternatives)
+
+    def _reevaluate_best_split(self, node, parent, branch_index, **kwargs):
+        ''' 
+            Overridden from superclass to do nothing
+            This method is called when a split is reevaluated
+            We can override this method to remove the update mechanism
+            This method should now do nothing
+            If the split revision is to be used, the method should be called from the superclass
+        '''
+        pass
+
+    # Now, we need to compare with the second best split instead of the best split
+    # In order to do this, we will use the def _attempt_to_split(self, node, parent, branch_index, **kwargs) from EFDT's superclass, HoeffdingTreeClassifier
+
+    def _attempt_to_split(self, node, parent, branch_index, **kwargs):
+        ''' 
+            Call HoeffdingTreeClassifier's _attempt_to_split method to compare with the second best split
+            HoeffdingTreeClassifier is cutEFDT's superclass EFDT's superclass
+        '''
+
+        # Call the superclass' superclass' method, i.e. two superclass' up
+        super(tree.HoeffdingTreeClassifier, self)._attempt_to_split(node, parent, branch_index, **kwargs)
 
 
 # Create a dictionary mapping class names to class objects
