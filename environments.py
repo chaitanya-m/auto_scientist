@@ -28,6 +28,9 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
 
+    def update_delta(self, new_delta):
+        self.delta = new_delta
+
     # Remove the update mechanism and compare with second best instead of current best
 
     # Let's begin by removing the update mechanism
@@ -46,23 +49,26 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
         '''
         pass
 
-    # Now, we need to compare with the second best split instead of the best split
-    # In order to do this, we will use the def _attempt_to_split(self, node, parent, branch_index, **kwargs) from EFDT's superclass, HoeffdingTreeClassifier
+    # # Now, we need to compare with the second best split instead of the best split
+    # # In order to do this, we will use the def _attempt_to_split(self, node, parent, branch_index, **kwargs) from EFDT's superclass, HoeffdingTreeClassifier
 
-    def _attempt_to_split(self, node, parent, branch_index, **kwargs):
-        ''' 
-            Call HoeffdingTreeClassifier's _attempt_to_split method to compare with the second best split
-            HoeffdingTreeClassifier is cutEFDT's superclass EFDT's superclass
-        '''
+    # def _attempt_to_split(self, node, parent, branch_index, **kwargs):
+    #     ''' 
+    #         Call HoeffdingTreeClassifier's _attempt_to_split method to compare with the second best split
+    #         HoeffdingTreeClassifier is cutEFDT's superclass EFDT's superclass
+    #     '''
 
-        # Call the superclass' superclass' method, i.e. two superclass' up
-        super(tree.HoeffdingTreeClassifier, self)._attempt_to_split(node, parent, branch_index, **kwargs)
+    #     # Call the superclass' superclass' method, i.e. two superclass' up
+    #     super(tree.HoeffdingTreeClassifier, self)._attempt_to_split(node, parent, branch_index, **kwargs)
+
+
 
 
 # Create a dictionary mapping class names to class objects
 model_classes = {
     'UpdatableHoeffdingTreeClassifier': UpdatableHoeffdingTreeClassifier,
     'UpdatableEFDTClassifier': UpdatableEFDTClassifier,
+    'CutEFDTClassifier': CutEFDTClassifier
 }
 
 
