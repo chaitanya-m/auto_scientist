@@ -41,7 +41,7 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
 
     def _reevaluate_best_split(self, node, parent, branch_index, **kwargs):
         ''' 
-            Overridden from superclass to do nothing
+            Overridden from superclass(EFDT) to do nothing, to not reevaluate and update splits
             This method is called when a split is reevaluated
             We can override this method to remove the update mechanism
             This method should now do nothing
@@ -52,16 +52,14 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
     # # Now, we need to compare with the second best split instead of the best split
     # # In order to do this, we will use the def _attempt_to_split(self, node, parent, branch_index, **kwargs) from EFDT's superclass, HoeffdingTreeClassifier
 
-    # def _attempt_to_split(self, node, parent, branch_index, **kwargs):
-    #     ''' 
-    #         Call HoeffdingTreeClassifier's _attempt_to_split method to compare with the second best split
-    #         HoeffdingTreeClassifier is cutEFDT's superclass EFDT's superclass
-    #     '''
+    def _attempt_to_split(self, node, parent, branch_index, **kwargs):
+        ''' 
+            Override EFDT split Call HoeffdingTreeClassifier's _attempt_to_split method, in order to compare only with the second best split
+            HoeffdingTreeClassifier is cutEFDT's superclass EFDT's superclass
+        '''
 
-    #     # Call the superclass' superclass' method, i.e. two superclass' up
-    #     super(tree.HoeffdingTreeClassifier, self)._attempt_to_split(node, parent, branch_index, **kwargs)
-
-
+        # Explicitly call the grandparent class method, because using Python's super didn't seem to work
+        tree.HoeffdingTreeClassifier._attempt_to_split(self, node, parent, branch_index, **kwargs)
 
 
 # Create a dictionary mapping class names to class objects
