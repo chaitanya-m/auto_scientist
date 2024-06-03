@@ -107,9 +107,9 @@ class Environment:
         # Return the initial state
         return self.state
 
-    def step(self, action):
+    def step(self, delta_multiplier_idx):
         # Update delta_hard based on the chosen action
-        self.model.delta = self.update_delta_hard(action)
+        self.model.delta = self.update_delta_hard(delta_multiplier_idx)
 
         # Run one epoch of the experiment
         accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()
