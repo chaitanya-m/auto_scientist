@@ -174,9 +174,9 @@ class Environment:
         state_index = (epoch_accuracy_change_bin - 1) * len(BINS) + (epoch_5_accuracy_change_bin - 1) # 0, 5, 10, 15, 20 correspond to increasingly large 
         return state_index
 
-    def update_delta_hard(self, action_idx):
+    def update_delta_hard(self, multiplier_idx):
         # Adjust delta_hard based on the chosen action index
-        multiplier = self.actions[action_idx]
+        multiplier = self.actions[multiplier_idx]
 
         delta = self.model.delta * (multiplier)
 
