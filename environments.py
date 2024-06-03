@@ -176,9 +176,9 @@ class Environment:
 
     def update_delta_hard(self, action_idx):
         # Adjust delta_hard based on the chosen action index
-        action = self.actions[action_idx]
+        multiplier = self.actions[action_idx]
 
-        delta = self.model.delta * (action)
+        delta = self.model.delta * (multiplier)
 
         # Ensure delta_hard is within the range [1e-10, 1]
         if delta < 1e-10:
