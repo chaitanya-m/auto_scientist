@@ -71,7 +71,7 @@ model_classes = {
 
 
 class Environment:
-    def __init__(self, model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs_per_episode):
+    def __init__(self, model, model_baseline, stream_factory, delta_multipliers, num_samples_per_epoch, num_epochs_per_episode):
         self.model = model
         self.model_baseline = model_baseline
 
@@ -81,7 +81,7 @@ class Environment:
 
         self.state = None  # Initialize state - 0 indicates no change in accuracy
 
-        self.actions = actions
+        self.delta_multipliers = delta_multipliers
 
         self.current_epoch = 0
         self.num_epochs = num_epochs_per_episode
@@ -176,7 +176,7 @@ class Environment:
 
     def update_delta_hard(self, multiplier_idx):
         # Adjust delta_hard based on the chosen action index
-        multiplier = self.actions[multiplier_idx]
+        multiplier = self.delta_multipliers[multiplier_idx]
 
         delta = self.model.delta * (multiplier)
 
