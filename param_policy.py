@@ -96,6 +96,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_actions
     model = ModelClass(delta=config['delta_hard'])
     model_baseline = ModelClass(delta=config['delta_hard'])
 
+    # TODO: Update this to allow for multiple action types (START HERE)
     # Setup Actions
     actions = config['actions']['delta_move']
 

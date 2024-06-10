@@ -20,6 +20,7 @@ BASE_CONFIG = {
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
     },
+    # TODO: This way of doing actions should be updated to allow for multiple action types
     'actions': {
         # Actions to change delta_hard are a multiplier list from 1/100 to 100, with 1 meaning no change
         'delta_move':  [1/100, 1/10, 1, 10, 100],

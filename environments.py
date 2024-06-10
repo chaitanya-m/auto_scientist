@@ -4,6 +4,7 @@ from river import tree
 from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, Waveform, SEA, STAGGER, Friedman, Mv, Planes2D
 from river.datasets import ImageSegments
 from collections import OrderedDict
+from actions import MultiplyAction
 
 BINS = [1, 2, 3, 4]
 NUM_STATES = len(BINS) * len(BINS)
@@ -71,9 +72,9 @@ model_classes = {
 # Create a dictionary mapping class names to their respective action space
 # The action space is a method name within the class
 action_spaces = {
-    'UpdatableHoeffdingTreeClassifier': ['action_update_delta_hard'],
-    'UpdatableEFDTClassifier': ['action_update_delta_hard'],
-    'CutEFDTClassifier': ['action_update_delta_hard', '_reevaluate_best_split', '_attempt_to_split']
+    'UpdatableHoeffdingTreeClassifier': [MultiplyAction],
+    'UpdatableEFDTClassifier': [MultiplyAction],
+    'CutEFDTClassifier': ['MultiplyAction', '_reevaluate_best_split', '_attempt_to_split'] # TODO Fix this
 }
 
 class Environment:
@@ -295,3 +296,6 @@ class StreamFactory:
               return Mv(seed = seed)
         else:
             raise ValueError(f"Unknown stream type: {self.stream_type}")
+        
+# Create a class to abstract away the actions. It should enable each ActionType to be parameterized
+# An ActionType comprises a method to be called and the parameters to be passed to the method

@@ -11,7 +11,8 @@ class BaseAgent:
     def select_action(self, state):
         # Select action using epsilon-greedy policy
         if state is None or np.random.rand() < self.epsilon:
-            # If state is None or with probability epsilon, return a random action
+            # If state is None, or with probability epsilon, return a random action
+            # return np.random.choice(self.num_actions) # Try this instead later
             return np.random.randint(self.num_actions)
         else:
             # Otherwise, select action greedily based on current Q-values for the given state
