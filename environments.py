@@ -31,8 +31,7 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
     def update_delta(self, new_delta):
         self.delta = new_delta
 
-    # Remove the update mechanism and compare with second best instead of current best
-
+    # Now remove the split update mechanism and compare with second best instead of current best
     # Let's begin by removing the update mechanism
     # The superclass tree.ExtremelyFastDecisionTreeClassifier has a method called    def _reevaluate_best_split(self, node, parent, branch_index, **kwargs):
     # It reevaluates the best split for the node.
@@ -58,7 +57,7 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
             HoeffdingTreeClassifier is cutEFDT's superclass EFDT's superclass
         '''
 
-        # Explicitly call the grandparent class method, because using Python's super didn't seem to work
+        # Explicitly call the great-grandparent class method, because using Python's super in series didn't seem to work
         tree.HoeffdingTreeClassifier._attempt_to_split(self, node, parent, branch_index, **kwargs)
 
 
@@ -69,6 +68,13 @@ model_classes = {
     'CutEFDTClassifier': CutEFDTClassifier
 }
 
+# Create a dictionary mapping class names to their respective action space
+# The action space is a method name within the class
+action_spaces = {
+    'UpdatableHoeffdingTreeClassifier': ['action_update_delta_hard'],
+    'UpdatableEFDTClassifier': ['action_update_delta_hard'],
+    'CutEFDTClassifier': ['action_update_delta_hard', '_reevaluate_best_split', '_attempt_to_split']
+}
 
 class Environment:
     def __init__(self, model, model_baseline, stream_factory, delta_multipliers, num_samples_per_epoch, num_epochs_per_episode):
@@ -108,8 +114,9 @@ class Environment:
         return self.state
 
     def step(self, delta_multiplier_idx):
-        # Update delta_hard based on the chosen action
-        self.model.delta = self.update_delta_hard(delta_multiplier_idx)
+        ############################ TODO: Update this to allow for multiple action types ############################
+        # Update delta_hard based on the chosen delta_multiplier
+        self.model.delta = self.action_update_delta_hard(delta_multiplier_idx)
 
         # Run one epoch of the experiment
         accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()
@@ -174,8 +181,8 @@ class Environment:
         state_index = (epoch_accuracy_change_bin - 1) * len(BINS) + (epoch_5_accuracy_change_bin - 1) # 0, 5, 10, 15, 20 correspond to increasingly large 
         return state_index
 
-    def update_delta_hard(self, multiplier_idx):
-        # Adjust delta_hard based on the chosen action index
+    def action_update_delta_hard(self, multiplier_idx):
+        # Adjust delta_hard based on the chosen multiplier index
         multiplier = self.delta_multipliers[multiplier_idx]
 
         delta = self.model.delta * (multiplier)
@@ -187,6 +194,15 @@ class Environment:
             return 1
 
         return delta
+
+    def action_reintroduce_comparison_with_other_splits(self):
+        # If the model is CutEFDTClassifier, reintroduce the comparison with other splits
+        if isinstance(self.model, CutEFDTClassifier):
+            # Call the _attempt_to_split method from the parent class instead of the current class, which uses the great-grandparent class' method
+            # The parent class is UpdatableEFDTClassifier and the great-grandparent class is HoeffdingTreeClassifier
+            tree.UpdatableEFDTClassifier._attempt_to_split
+
+
 
     
     def run_one_epoch(self):

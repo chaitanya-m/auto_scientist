@@ -7,6 +7,7 @@ class BaseAgent:
         self.epsilon = epsilon  # Epsilon for epsilon-greedy policy
         self.Q_table = np.zeros((num_states, num_actions))  # Initialize Q-values to zeros
 
+    ############################ TODO: Update this to allow for multiple action types ############################
     def select_action(self, state):
         # Select action using epsilon-greedy policy
         if state is None or np.random.rand() < self.epsilon:
