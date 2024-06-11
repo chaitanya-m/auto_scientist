@@ -76,7 +76,7 @@ model_classes = {
 action_spaces = {
     UpdatableHoeffdingTreeClassifier: [MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1)],
     UpdatableEFDTClassifier: [MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1)],
-    CutEFDTClassifier: ['MultiplyAction', '_reevaluate_best_split', '_attempt_to_split'] # TODO Fix this
+    CutEFDTClassifier: [MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1)] # TODO Fix this
 }
 
 class Environment:

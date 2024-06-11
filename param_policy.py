@@ -82,7 +82,7 @@ def train_agent(agent, env, num_episodes):
     return episode_accuracies, episode_baseline_accuracies
 
 
-def setup_environment_and_train(agent_class, agent_name, num_states, num_actions, num_episodes, config):
+def setup_environment_and_train(agent_class, agent_name, num_states, num_episodes, config):
     # Since CONFIG and other required variables are not defined in this snippet, 
     # they should be defined elsewhere in the code or passed as arguments to the function.
 
@@ -106,7 +106,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_actions
 
     # Train agent
     env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
-    agent = agent_class(num_states=num_states, num_actions=num_actions)
+    agent = agent_class(num_states=num_states, num_actions=len(actions))
 
     accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)
 
@@ -121,9 +121,8 @@ def run_RL_agents(config):
         random.seed(config['seed0'])
         np.random.seed(config['seed0'])
 
-        # Define the environment's state and action space sizes and number of episodes
+        # Define the environment's state space size and number of episodes
         num_states = NUM_STATES
-        num_actions = len(config['actions']['delta_move'])
         num_episodes = config['num_episodes']
 
         result_qtables = []
@@ -134,10 +133,10 @@ def run_RL_agents(config):
         ql_result_accuracies_df = pd.DataFrame(columns=['episode', 'agent_type','stream_type', 'stream', 'accuracy', 'baseline_accuracy'])
 
         # Train Monte Carlo agent
-        mc_accuracies, mc_baseline_accuracies, mc_qtable = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_states, num_actions, num_episodes, config)
+        mc_accuracies, mc_baseline_accuracies, mc_qtable = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_states, num_episodes, config)
 
         # Train Q-learning agent
-        ql_accuracies, ql_baseline_accuracies, ql_qtable = setup_environment_and_train(QLearningAgent, "Q-learning", num_states, num_actions, num_episodes, config)
+        ql_accuracies, ql_baseline_accuracies, ql_qtable = setup_environment_and_train(QLearningAgent, "Q-learning", num_states, num_episodes, config)
 
         # Add accuracies to the dataframe. 
         mc_temp_data = []

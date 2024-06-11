@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from environments import Environment, action_spaces
 # Actions have access to the environment and can change the environment's state
 
 # Base Action Class
