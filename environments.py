@@ -72,8 +72,8 @@ model_classes = {
 # Create a dictionary mapping class names to their respective action space
 # The action space is a method name within the class
 action_spaces = {
-    'UpdatableHoeffdingTreeClassifier': set([MultiplyAction(100), MultiplyAction(1/10)]),
-    'UpdatableEFDTClassifier': set([MultiplyAction(100), MultiplyAction(1/10)]),
+    'UpdatableHoeffdingTreeClassifier': set([MultiplyAction(1, 1e-10, 1), MultiplyAction(100, 1e-10, 1), MultiplyAction(1/10, 1e-10, 1)]),
+    'UpdatableEFDTClassifier': set([MultiplyAction(1, 1e-10, 1), MultiplyAction(100, 1e-10, 1), MultiplyAction(1/10, 1e-10, 1)]),
     'CutEFDTClassifier': ['MultiplyAction', '_reevaluate_best_split', '_attempt_to_split'] # TODO Fix this
 }
 
@@ -116,6 +116,8 @@ class Environment:
 
     def step(self, delta_multiplier_idx):
         ############################ TODO: Update this to allow for multiple action types ############################
+
+
         # Update delta_hard based on the chosen delta_multiplier
         self.model.delta = self.action_update_delta_hard(delta_multiplier_idx)
 
