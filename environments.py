@@ -10,6 +10,8 @@ BINS = [1, 2, 3, 4]
 NUM_STATES = len(BINS) * len(BINS)
 
 
+
+
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
@@ -78,7 +80,11 @@ action_spaces = {
 }
 
 class Environment:
-    def __init__(self, model, model_baseline, stream_factory, delta_multipliers, num_samples_per_epoch, num_epochs_per_episode):
+    '''
+    Note: Each Environment instance is associated with a single model and a single baseline model and a single stream factory and a single stream and a single set of actions
+    '''
+
+    def __init__(self, model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs_per_episode):
         self.model = model
         self.model_baseline = model_baseline
 
@@ -88,7 +94,7 @@ class Environment:
 
         self.state = None  # Initialize state - 0 indicates no change in accuracy
 
-        self.delta_multipliers = delta_multipliers
+        self.actions = actions
 
         self.current_epoch = 0
         self.num_epochs = num_epochs_per_episode
@@ -114,11 +120,11 @@ class Environment:
         # Return the initial state
         return self.state
 
-    def step(self, delta_multiplier_idx):
+    def step(self, action):
         ############################ TODO: Update this to allow for multiple action types ############################
 
         # Update delta_hard based on the chosen delta_multiplier
-        self.model.delta = self.action_update_delta_hard(delta_multiplier_idx)
+        self.model.delta = action.execute(self.model.delta)
 
         # Run one epoch of the experiment
         accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()

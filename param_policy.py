@@ -45,23 +45,22 @@ def train_agent(agent, env, num_episodes):
 
 
         while not done:  # As long as the episode is not done
-            ############################ TODO: Update this to allow for multiple action types. The action must be changed from a simple multiplier to an action object ############################
-            action = agent.select_action(state)
+            action_index = agent.select_action(state)
             # Get the action object corresponding to the selected action index
-            action_obj = env.
+            action = env.actions[action_index]
             next_state, reward, done = env.step(action) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
             # Store transition for Monte Carlo updates if necessary
-            transitions.append((state, action, reward))
+            transitions.append((state, action_index, reward))
 
             if isinstance(agent, QLearningAgent):
                 # Perform the Q-learning update immediately after the step
                 if state is not None and next_state is not None:
                     best_next_action = np.argmax(agent.Q_table[next_state])
                     td_target = reward + agent.gamma * agent.Q_table[next_state][best_next_action] if not done else reward
-                    td_error = td_target - agent.Q_table[state][action]
-                    agent.Q_table[state][action] += agent.alpha * td_error
+                    td_error = td_target - agent.Q_table[state][action_index]
+                    agent.Q_table[state][action_index] += agent.alpha * td_error
 
             # Move to next state
             state = next_state
@@ -69,13 +68,13 @@ def train_agent(agent, env, num_episodes):
         # Update the agent's Q-table using Monte Carlo updates at the end of an episode
         if isinstance(agent, MonteCarloAgent):
             returns = 0
-            for (state, action, reward) in reversed(transitions):
+            for (state, action_index, reward) in reversed(transitions):
                 if state is None:
                     continue
                 returns = reward + agent.gamma * returns
-                agent.visits[state][action] += 1
-                alpha = 1 / agent.visits[state][action]
-                agent.Q_table[state][action] += alpha * (returns - agent.Q_table[state][action])
+                agent.visits[state][action_index] += 1
+                alpha = 1 / agent.visits[state][action_index]
+                agent.Q_table[state][action_index] += alpha * (returns - agent.Q_table[state][action_index])
 
         # Get the accuracy and baseline accuracy for this episode
         accuracy = env.cumulative_accuracy / env.current_epoch
@@ -102,9 +101,6 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_actions
     # actions is now taken from the action_spaces dictionary in environments.py
     # the action_spaces dictionary maps a ModelClass to a list of actions
     actions = env.action_spaces[ModelClass]
-
-
-
 
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']
