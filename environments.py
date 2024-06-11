@@ -120,10 +120,11 @@ class Environment:
         # Return the initial state
         return self.state
 
-    def step(self, action):
+    def step(self, action_index):
         ############################ TODO: Update this to allow for multiple action types ############################
 
         # Update delta_hard based on the chosen delta_multiplier
+        action = self.actions[action_index]
         self.model.delta = action.execute(self.model.delta)
 
         # Run one epoch of the experiment

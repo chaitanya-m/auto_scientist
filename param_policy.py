@@ -46,9 +46,7 @@ def train_agent(agent, env, num_episodes):
 
         while not done:  # As long as the episode is not done
             action_index = agent.select_action(state)
-            # Get the action object corresponding to the selected action index
-            action = env.actions[action_index]
-            next_state, reward, done = env.step(action) # A step runs a single stream learning epoch of say 1000 examples
+            next_state, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
             # Store transition for Monte Carlo updates if necessary
