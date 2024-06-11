@@ -121,7 +121,6 @@ class Environment:
         return self.state
 
     def step(self, action_index):
-        ############################ TODO: Update this to allow for multiple action types ############################
 
         action = self.actions[action_index]
 
