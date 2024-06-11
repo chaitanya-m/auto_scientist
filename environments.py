@@ -72,8 +72,8 @@ model_classes = {
 # Create a dictionary mapping class names to their respective action space
 # The action space is a method name within the class
 action_spaces = {
-    'UpdatableHoeffdingTreeClassifier': [MultiplyAction],
-    'UpdatableEFDTClassifier': [MultiplyAction],
+    'UpdatableHoeffdingTreeClassifier': set([MultiplyAction(100), MultiplyAction(1/10)]),
+    'UpdatableEFDTClassifier': set([MultiplyAction(100), MultiplyAction(1/10)]),
     'CutEFDTClassifier': ['MultiplyAction', '_reevaluate_best_split', '_attempt_to_split'] # TODO Fix this
 }
 
@@ -203,9 +203,6 @@ class Environment:
             # The parent class is UpdatableEFDTClassifier and the great-grandparent class is HoeffdingTreeClassifier
             tree.UpdatableEFDTClassifier._attempt_to_split
 
-
-
-    
     def run_one_epoch(self):
         '''
         Run one epoch of the experiment for both the model and the baseline model (without reinforcement learning) and return the prequential accuracy and reward
