@@ -4,7 +4,7 @@ from river import tree
 from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, Waveform, SEA, STAGGER, Friedman, Mv, Planes2D
 from river.datasets import ImageSegments
 from collections import OrderedDict
-from actions import MultiplyAction
+from actions import MultiplyDeltaAction
 
 BINS = [1, 2, 3, 4]
 NUM_STATES = len(BINS) * len(BINS)
@@ -74,8 +74,8 @@ model_classes = {
 # Create a dictionary mapping class names to their respective action space
 
 action_spaces = {
-    UpdatableHoeffdingTreeClassifier: [MultiplyAction(1, 1e-10, 1), MultiplyAction(100, 1e-10, 1), MultiplyAction(1/10, 1e-10, 1)],
-    UpdatableEFDTClassifier: [MultiplyAction(1, 1e-10, 1), MultiplyAction(100, 1e-10, 1), MultiplyAction(1/10, 1e-10, 1)],
+    UpdatableHoeffdingTreeClassifier: [MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1)],
+    UpdatableEFDTClassifier: [MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1)],
     CutEFDTClassifier: ['MultiplyAction', '_reevaluate_best_split', '_attempt_to_split'] # TODO Fix this
 }
 
@@ -126,8 +126,7 @@ class Environment:
         # Update delta_hard based on the chosen delta_multiplier
         action = self.actions[action_index]
 
-        # TODO This should change. We shouldn't be manually running the action, it should run itself with whatever parameters it needs
-        self.model.delta = action.execute(self.model.delta)
+        action.execute()
 
         # Run one epoch of the experiment
         accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()

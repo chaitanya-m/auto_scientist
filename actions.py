@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from environments import *
+# Actions have access to the environment and can change the environment's state
 
 # Base Action Class
 class BaseAction(ABC):
@@ -42,6 +44,23 @@ class MultiplyAction(BaseAction):
 
     def get_params(self):
         return {"multiplier": self.multiplier}
+
+# Multiply delta_hard class
+class MultiplyDeltaAction(MultiplyAction, Environment):
+    '''
+    Multiplies the environments delta_hard by a multiplier
+    '''
+
+    def __init__(self, multiplier, cutoff_low = None, cutoff_high = None):
+        MultiplyAction.__init__(self, multiplier, cutoff_low, cutoff_high)
+
+    # The execute method will multiply the environment's delta_hard by the multiplier
+    # Effectively, it uses the environment's delta_hard as the input value and preserves the cutoffs
+    def execute(self):
+        return MultiplyAction.execute(self, self.delta)
+    
+    def get_params(self):
+        return MultiplyAction.get_params(self)
 
 
 # Example usage
