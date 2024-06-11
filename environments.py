@@ -125,6 +125,8 @@ class Environment:
 
         # Update delta_hard based on the chosen delta_multiplier
         action = self.actions[action_index]
+
+        # TODO This should change. We shouldn't be manually running the action, it should run itself with whatever parameters it needs
         self.model.delta = action.execute(self.model.delta)
 
         # Run one epoch of the experiment
