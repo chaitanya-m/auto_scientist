@@ -72,9 +72,9 @@ model_classes = {
 # Create a dictionary mapping class names to their respective action space
 
 action_spaces = {
-    'UpdatableHoeffdingTreeClassifier': [MultiplyAction(1, 1e-10, 1), MultiplyAction(100, 1e-10, 1), MultiplyAction(1/10, 1e-10, 1)],
-    'UpdatableEFDTClassifier': [MultiplyAction(1, 1e-10, 1), MultiplyAction(100, 1e-10, 1), MultiplyAction(1/10, 1e-10, 1)],
-    'CutEFDTClassifier': ['MultiplyAction', '_reevaluate_best_split', '_attempt_to_split'] # TODO Fix this
+    UpdatableHoeffdingTreeClassifier: [MultiplyAction(1, 1e-10, 1), MultiplyAction(100, 1e-10, 1), MultiplyAction(1/10, 1e-10, 1)],
+    UpdatableEFDTClassifier: [MultiplyAction(1, 1e-10, 1), MultiplyAction(100, 1e-10, 1), MultiplyAction(1/10, 1e-10, 1)],
+    CutEFDTClassifier: ['MultiplyAction', '_reevaluate_best_split', '_attempt_to_split'] # TODO Fix this
 }
 
 class Environment:

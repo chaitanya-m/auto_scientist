@@ -45,8 +45,10 @@ def train_agent(agent, env, num_episodes):
 
 
         while not done:  # As long as the episode is not done
-            ############################ TODO: Update this to allow for multiple action types ############################
+            ############################ TODO: Update this to allow for multiple action types. The action must be changed from a simple multiplier to an action object ############################
             action = agent.select_action(state)
+            # Get the action object corresponding to the selected action index
+            action_obj = env.
             next_state, reward, done = env.step(action) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
@@ -96,9 +98,13 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_actions
     model = ModelClass(delta=config['delta_hard'])
     model_baseline = ModelClass(delta=config['delta_hard'])
 
-    # TODO: Update this to allow for multiple action types (START HERE)
     # Setup Actions
-    actions = config['actions']['delta_move']
+    # actions is now taken from the action_spaces dictionary in environments.py
+    # the action_spaces dictionary maps a ModelClass to a list of actions
+    actions = env.action_spaces[ModelClass]
+
+
+
 
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']
