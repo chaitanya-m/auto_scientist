@@ -123,7 +123,6 @@ class Environment:
     def step(self, action_index):
         ############################ TODO: Update this to allow for multiple action types ############################
 
-        # Update delta_hard based on the chosen delta_multiplier
         action = self.actions[action_index]
 
         action.execute()
@@ -190,20 +189,6 @@ class Environment:
         # The state index is calculated as below:
         state_index = (epoch_accuracy_change_bin - 1) * len(BINS) + (epoch_5_accuracy_change_bin - 1) # 0, 5, 10, 15, 20 correspond to increasingly large 
         return state_index
-
-    def action_update_delta_hard(self, multiplier_idx):
-        # Adjust delta_hard based on the chosen multiplier index
-        multiplier = self.delta_multipliers[multiplier_idx]
-
-        delta = self.model.delta * (multiplier)
-
-        # Ensure delta_hard is within the range [1e-10, 1]
-        if delta < 1e-10:
-            return 1e-10
-        elif delta > 1:
-            return 1
-
-        return delta
 
     def action_reintroduce_comparison_with_other_splits(self):
         # If the model is CutEFDTClassifier, reintroduce the comparison with other splits
