@@ -30,113 +30,113 @@ BASE_CONFIG = {
 
 STREAMS = [
 
-    # {
-    # 'stream_type': 'RandomTree',
-    #  'stream' : {
-    #     'n_classes': 2,
-    #     'n_num_features': 2,
-    #     'n_cat_features': 2,
-    #     'n_categories_per_feature': 2,
-    #     'max_tree_depth': 5,
-    #     'first_leaf_level': 2,
-    #     'fraction_leaves_per_level': 0.15,
-    #     }
-    # },
-
-
-    # {
-    # 'stream_type': 'RandomTree',
-    #  'stream' : {
-    #     'n_classes': 3,
-    #     'n_num_features': 3,
-    #     'n_cat_features': 3,
-    #     'n_categories_per_feature': 3,
-    #     'max_tree_depth': 5,
-    #     'first_leaf_level': 2,
-    #     'fraction_leaves_per_level': 0.15,
-    #     }
-    # },
-
-    # {
-    # 'stream_type': 'RandomTree',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_num_features': 4,
-    #     'n_cat_features': 4,
-    #     'n_categories_per_feature': 4,
-    #     'max_tree_depth': 5,
-    #     'first_leaf_level': 2,
-    #     'fraction_leaves_per_level': 0.15,
-    #     }
-    # },
-
-    # {
-    # 'stream_type': 'RandomTree',
-    #  'stream' : {
-    #     'n_classes': 5,
-    #     'n_num_features': 5,
-    #     'n_cat_features': 5,
-    #     'n_categories_per_feature': 5,
-    #     'max_tree_depth': 5,
-    #     'first_leaf_level': 2,
-    #     'fraction_leaves_per_level': 0.15,
-    #     }
-    # },
-
-
-    # {
-    # 'stream_type': 'RandomRBF',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_features': 5,
-    #     'n_centroids': 10,
-    #     }
-    # },
-
-    # {
-    # 'stream_type': 'RandomRBF',
-    #  'stream' : {
-    #     'n_classes': 2,
-    #     'n_features': 10,
-    #     'n_centroids': 50,
-    #     }
-    # },
-
-
-    # {
-    # 'stream_type': 'RandomRBF',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_features': 20,
-    #     'n_centroids': 100,
-    #     }
-    # },
-
-    # {
-    # 'stream_type': 'Hyperplane',
-    #  'stream' : {
-    #      'n_features': 10,
-    #      'noise_percentage': 0.05,
-    #      'sigma': 0.1,
-    #     }
-    # },
-
-    # {
-    # 'stream_type': 'Hyperplane',
-    #  'stream' : {
-    #      'n_features': 20,
-    #      'noise_percentage': 0.1,
-    #      'sigma': 0.2,
-    #     }
-    # },
-
     {
-    'stream_type': 'SEA',
+    'stream_type': 'RandomTree',
      'stream' : {
-        'variant': 0, 
-        'noise': 0.0
+        'n_classes': 2,
+        'n_num_features': 2,
+        'n_cat_features': 2,
+        'n_categories_per_feature': 2,
+        'max_tree_depth': 5,
+        'first_leaf_level': 2,
+        'fraction_leaves_per_level': 0.15,
         }
     },
+
+
+    {
+    'stream_type': 'RandomTree',
+     'stream' : {
+        'n_classes': 3,
+        'n_num_features': 3,
+        'n_cat_features': 3,
+        'n_categories_per_feature': 3,
+        'max_tree_depth': 5,
+        'first_leaf_level': 2,
+        'fraction_leaves_per_level': 0.15,
+        }
+    },
+
+    {
+    'stream_type': 'RandomTree',
+     'stream' : {
+        'n_classes': 4,
+        'n_num_features': 4,
+        'n_cat_features': 4,
+        'n_categories_per_feature': 4,
+        'max_tree_depth': 5,
+        'first_leaf_level': 2,
+        'fraction_leaves_per_level': 0.15,
+        }
+    },
+
+    {
+    'stream_type': 'RandomTree',
+     'stream' : {
+        'n_classes': 5,
+        'n_num_features': 5,
+        'n_cat_features': 5,
+        'n_categories_per_feature': 5,
+        'max_tree_depth': 5,
+        'first_leaf_level': 2,
+        'fraction_leaves_per_level': 0.15,
+        }
+    },
+
+
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 4,
+        'n_features': 5,
+        'n_centroids': 10,
+        }
+    },
+
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 2,
+        'n_features': 10,
+        'n_centroids': 50,
+        }
+    },
+
+
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 4,
+        'n_features': 20,
+        'n_centroids': 100,
+        }
+    },
+
+    {
+    'stream_type': 'Hyperplane',
+     'stream' : {
+         'n_features': 10,
+         'noise_percentage': 0.05,
+         'sigma': 0.1,
+        }
+    },
+
+    {
+    'stream_type': 'Hyperplane',
+     'stream' : {
+         'n_features': 20,
+         'noise_percentage': 0.1,
+         'sigma': 0.2,
+        }
+    },
+
+    # {
+    # 'stream_type': 'SEA',
+    #  'stream' : {
+    #     'variant': 0, 
+    #     'noise': 0.0
+    #     }
+    # },
 
 
 

@@ -99,10 +99,10 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     # actions is now taken from the action_spaces dictionary in environments.py
     # the action_spaces dictionary maps a ModelClass to a list of actions
 
-    print("Checkpoint 1.1")
+
 
     actions = action_spaces[ModelClass]
-    print("Checkpoint 1.2")
+
     print(actions)
 
     # Setup Environment
@@ -137,11 +137,9 @@ def run_RL_agents(config):
         mc_result_accuracies_df = pd.DataFrame(columns=['episode', 'agent_type','stream_type', 'stream', 'accuracy', 'baseline_accuracy'])
         ql_result_accuracies_df = pd.DataFrame(columns=['episode', 'agent_type','stream_type', 'stream', 'accuracy', 'baseline_accuracy'])
 
-        print("Checkpoint 1")
-
         # Train Monte Carlo agent
         mc_accuracies, mc_baseline_accuracies, mc_qtable = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_states, num_episodes, config)
-        print("Checkpoint 2")
+
         # Train Q-learning agent
         ql_accuracies, ql_baseline_accuracies, ql_qtable = setup_environment_and_train(QLearningAgent, "Q-learning", num_states, num_episodes, config)
 

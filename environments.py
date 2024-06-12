@@ -74,9 +74,9 @@ model_classes = {
 # Create a dictionary mapping class names to their respective action space
 
 action_spaces = {
-    UpdatableHoeffdingTreeClassifier: [MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1)],
-    UpdatableEFDTClassifier: [MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1)],
-    CutEFDTClassifier: [MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1)] # TODO Fix this
+    UpdatableHoeffdingTreeClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
+    UpdatableEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
+    CutEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)]# TODO Fix this
 }
 
 class Environment:
