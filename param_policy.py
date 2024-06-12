@@ -99,11 +99,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     # actions is now taken from the action_spaces dictionary in environments.py
     # the action_spaces dictionary maps a ModelClass to a list of actions
 
-
-
     actions = action_spaces[ModelClass]
-
-    print(actions)
 
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']

@@ -11,6 +11,10 @@ class BaseAction(ABC):
     def get_params(self):
         pass
 
+    # Now add a method that adds an env
+    def set_env(self, env):
+        self.env = env
+
 # Multiply Action Class
 class MultiplyAction(BaseAction):
     '''
@@ -24,7 +28,7 @@ class MultiplyAction(BaseAction):
     Returns:
         float: The result of the multiplication
 
-    Note: If cutoff_low and cutoff_high are provided, the result will be clipped to the range [cutoff_low, cutoff_high]  
+    Note: If cutoff_low and cutoff_high are provided, the result will be clipped to the range [cutoff_low, cutoff_high] 
     '''
 
     def __init__(self, multiplier, cutoff_low = None, cutoff_high = None):
@@ -48,23 +52,21 @@ class MultiplyAction(BaseAction):
 class MultiplyDeltaAction(MultiplyAction):
     '''
     Multiplies the environment's delta_hard by a multiplier
+    Note: env must be passed in when the action is created. Because of circular dependency, the action is not initialised with env.
     '''
 
-    def __init__(self, environment, multiplier, cutoff_low=None, cutoff_high=None):
+    def __init__(self, multiplier, cutoff_low=None, cutoff_high=None):
         super().__init__(multiplier, cutoff_low, cutoff_high)
-        self.environment = environment
 
     def execute(self):
-        if self.environment:
-            print("Old delta:" + str(self.environment.model.delta))
-            self.environment.model.delta = super().execute(self.environment.model.delta)
-            print("New delta:" + str(self.environment.model.delta))
+        if self.env:
+            self.env.model.delta = super().execute(self.env.model.delta)
         else:
-            raise ValueError("Environment not set")
+            raise ValueError("Environment not set for action. Cannot execute action.")
 
     def get_params(self):
         params = super().get_params()
-        params["environment_delta"] = self.environment.model.delta if self.environment else None
+        params["env_delta"] = self.env.model.delta if self.env else None
         return params
 
 # Example usage

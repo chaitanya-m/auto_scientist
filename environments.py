@@ -95,6 +95,8 @@ class Environment:
         self.state = None  # Initialize state - 0 indicates no change in accuracy
 
         self.actions = actions
+        for action in self.actions:
+            action.set_env(self)
 
         self.current_epoch = 0
         self.num_epochs = num_epochs_per_episode
