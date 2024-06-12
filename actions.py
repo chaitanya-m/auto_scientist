@@ -50,17 +50,21 @@ class MultiplyDeltaAction(MultiplyAction):
     Multiplies the environment's delta_hard by a multiplier
     '''
 
-    def __init__(self, multiplier, cutoff_low=None, cutoff_high=None, environment=None):
+    def __init__(self, environment, multiplier, cutoff_low=None, cutoff_high=None):
         super().__init__(multiplier, cutoff_low, cutoff_high)
         self.environment = environment
 
     def execute(self):
         if self.environment:
-            self.environment.delta = super().execute(self.environment.delta)
+            print("Old delta:" + str(self.environment.model.delta))
+            self.environment.model.delta = super().execute(self.environment.model.delta)
+            print("New delta:" + str(self.environment.model.delta))
+        else:
+            raise ValueError("Environment not set")
 
     def get_params(self):
         params = super().get_params()
-        params["environment_delta"] = self.environment.delta if self.environment else None
+        params["environment_delta"] = self.environment.model.delta if self.environment else None
         return params
 
 # Example usage
