@@ -76,33 +76,43 @@ class MultiplyDeltaAction(MultiplyAction):
 
 # MethodSwitchAction Class
 class MethodSwitchAction(BaseAction):
-    def __init__(self):
+    def __init__(self, method, current_alternative, other_alternative):
         '''
         None: Environment is not set
         As env may not yet be set when the action is created, it should be set later by the environment using set_env
         The attribute named method will be replaced by current_alternative or other_alternative
         '''
         self.env = None 
+        self.method = method
+        self.current_alternative = current_alternative
+        self.other_alternative = other_alternative
 
-    def execute(self, method, current_alternative, other_alternative):
+    def execute(self):
         if self.env is None or self.env.model is None:
-            raise ValueError("Environment or model is not set. Cannot switch strategies.")
+            raise ValueError("Environment or model is not set.")
         
         # Swap the methods
-        if getattr(self.env.model, method) == current_alternative:
-            setattr(self.env.model, method, other_alternative)
+        if getattr(self.env.model, self.method) == self.current_alternative:
+            setattr(self.env.model, self.method, self.other_alternative)
+            self.current_alternative, self.other_alternative = self.other_alternative, self.current_alternative
         else:
-            setattr(self.env.model, method, current_alternative)
+            setattr(self.env.model, self.method, self.current_alternative)
+            self.current_alternative, self.other_alternative = self.other_alternative, self.current_alternative
 
     def get_params(self):
-        return {"action": "method_switch"}
+        return {
+            "action": "method_switch",
+            "method": self.method,
+            "current_alternative": self.current_alternative,
+            "other_alternative": self.other_alternative
+        }
 
 class CutEFDTStrategySwitchAction(MethodSwitchAction):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, method, current_alternative, other_alternative):
+        super().__init__(method, current_alternative, other_alternative)
 
-    def execute(self, method, current_alternative, other_alternative):
-        super().execute(method, current_alternative, other_alternative)
+    def execute(self):
+        super().execute()
 
     def get_params(self):
         params = super().get_params()
