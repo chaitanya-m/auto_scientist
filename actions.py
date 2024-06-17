@@ -74,21 +74,25 @@ class MultiplyDeltaAction(MultiplyAction):
         return params
 
 
+# MethodSwitchAction Class
 class MethodSwitchAction(BaseAction):
     def __init__(self):
         '''
         None: Environment is not set
         As env may not yet be set when the action is created, it should be set later by the environment using set_env
-        The attribute named current_method will be replaced by alternative_method
+        The attribute named method will be replaced by current_alternative or other_alternative
         '''
         self.env = None 
 
-    def execute(self, current_method, alternative_method):
+    def execute(self, method, current_alternative, other_alternative):
         if self.env is None or self.env.model is None:
             raise ValueError("Environment or model is not set. Cannot switch strategies.")
         
         # Swap the methods
-        setattr(self.env.model, current_method, alternative_method) 
+        if getattr(self.env.model, method) == current_alternative:
+            setattr(self.env.model, method, other_alternative)
+        else:
+            setattr(self.env.model, method, current_alternative)
 
     def get_params(self):
         return {"action": "method_switch"}
@@ -97,8 +101,8 @@ class CutEFDTStrategySwitchAction(MethodSwitchAction):
     def __init__(self):
         super().__init__()
 
-    def execute(self, current_method, alternative_method):
-        super().execute(current_method, alternative_method)
+    def execute(self, method, current_alternative, other_alternative):
+        super().execute(method, current_alternative, other_alternative)
 
     def get_params(self):
         params = super().get_params()
