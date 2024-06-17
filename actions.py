@@ -107,6 +107,7 @@ class MethodSwitchAction(BaseAction):
             "other_alternative": self.other_alternative
         }
 
+
 class CutEFDTStrategySwitchAction(MethodSwitchAction):
     def __init__(self, method, current_alternative, other_alternative):
         super().__init__(method, current_alternative, other_alternative)
@@ -118,6 +119,37 @@ class CutEFDTStrategySwitchAction(MethodSwitchAction):
         params = super().get_params()
         params["strategy"] = "CutEFDT_strategy_enable_disable"
         return params
+
+
+class MethodSetAction(BaseAction):
+    def __init__(self, method, method_to_use):
+        '''
+        None: Environment is not set
+        As env may not yet be set when the action is created, it should be set later by the environment using set_env
+        The attribute named method will be replaced by method_to_use
+        '''
+        self.env = None
+        self.method = method
+        self.method_to_use = method_to_use
+
+    def execute(self):
+        if self.env is None or self.env.model is None:
+            raise ValueError("Environment or model is not set.")
+        else:
+            # Set the method
+            setattr(self.env.model, self.method, self.method_to_use)
+
+    def get_params(self):
+        return {
+            "action": "method_switch",
+            "method": self.method,
+            "method_set_to": self.method_to_use,
+        }
+
+
+
+
+
 
 
 # Example usage
