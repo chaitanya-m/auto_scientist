@@ -102,7 +102,7 @@ class CutEFDTStrategySwitchAction(MethodSwitchAction):
 
     def get_params(self):
         params = super().get_params()
-        params["action"] = "CutEFDT_strategy_switch"}
+        params["strategy"] = "CutEFDT_strategy_enable_disable"
         return params
 
 
