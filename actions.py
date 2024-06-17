@@ -13,6 +13,9 @@ class BaseAction(ABC):
 
     # Now add a method that adds an env
     def set_env(self, env):
+        '''
+        Should be set by the environment when the action is added to the environment
+        '''
         self.env = env
 
 # Multiply Action Class
@@ -35,6 +38,7 @@ class MultiplyAction(BaseAction):
         self.multiplier = multiplier
         self.cutoff_low = cutoff_low
         self.cutoff_high = cutoff_high
+        self.env = None
 
     def execute(self, value):
         result = value * self.multiplier
@@ -68,6 +72,39 @@ class MultiplyDeltaAction(MultiplyAction):
         params = super().get_params()
         params["env_delta"] = self.env.model.delta if self.env else None
         return params
+
+
+class MethodSwitchAction(BaseAction):
+    def __init__(self):
+        '''
+        None: Environment is not set
+        As env may not yet be set when the action is created, it should be set later by the environment using set_env
+        The attribute named current_method will be replaced by alternative_method
+        '''
+        self.env = None 
+
+    def execute(self, current_method, alternative_method):
+        if self.env is None or self.env.model is None:
+            raise ValueError("Environment or model is not set. Cannot switch strategies.")
+        
+        # Swap the methods
+        setattr(self.env.model, current_method, alternative_method) 
+
+    def get_params(self):
+        return {"action": "method_switch"}
+
+class CutEFDTStrategySwitchAction(MethodSwitchAction):
+    def __init__(self):
+        super().__init__()
+
+    def execute(self, current_method, alternative_method):
+        super().execute(current_method, alternative_method)
+
+    def get_params(self):
+        params = super().get_params()
+        params["action"] = "CutEFDT_strategy_switch"}
+        return params
+
 
 # Example usage
 if __name__ == "__main__":
