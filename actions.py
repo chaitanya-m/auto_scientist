@@ -136,8 +136,8 @@ class SetMethodAction(BaseAction):
         if self.env is None or self.env.model is None:
             raise ValueError("Environment or model is not set.")
         else:
-            # Set the method
-            setattr(self.env.model, self.method, self.method_to_use)
+            new_method = getattr(self.env.model, self.method_to_use)
+            setattr(self.env.model, self.method, new_method)
 
     def get_params(self):
         return {
