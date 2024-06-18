@@ -150,8 +150,8 @@ class SetMethodAction(BaseAction):
 
 
 class SetEFDTStrategyAction(SetMethodAction):
-    def __init__(self, strategy, strategy_to_use):
-        super().__init__(strategy, strategy_to_use)
+    def __init__(self, strategies):
+        super().__init__(strategies)
 
     def execute(self):
         super().execute()
