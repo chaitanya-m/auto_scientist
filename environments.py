@@ -4,7 +4,7 @@ from river import tree
 from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, Waveform, SEA, STAGGER, Friedman, Mv, Planes2D
 from river.datasets import ImageSegments
 from collections import OrderedDict
-from actions import MultiplyDeltaAction
+from actions import MultiplyDeltaAction, SetEFDTStrategyAction
 
 BINS = [1, 2, 3, 4]
 NUM_STATES = len(BINS) * len(BINS)
@@ -30,6 +30,11 @@ class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
 class CutEFDTClassifier(UpdatableEFDTClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
+        self._original_reevaluate_best_split = super()._reevaluate_best_split
+        self._original_attempt_to_split = super()._attempt_to_split
+
+        self._reevaluate_best_split = self.reevaluate_best_split_removed
+        self._attempt_to_split = self.attempt_to_split_removed
 
     def update_delta(self, new_delta):
         self.delta = new_delta
@@ -41,7 +46,7 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
     # We can override this method to remove the update mechanism
     # For the RL agent, the action is to choose whether to use the overriden update mechanism or the original one... strategy superposition (rather than alternatives)
 
-    def _reevaluate_best_split(self, node, parent, branch_index, **kwargs):
+    def reevaluate_best_split_removed(self, node, parent, branch_index, **kwargs):
         ''' 
             Overridden from superclass(EFDT) to do nothing, to not reevaluate and update splits
             This method is called when a split is reevaluated
@@ -54,13 +59,13 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
     # # Now, we need to compare with the second best split instead of the best split
     # # In order to do this, we will use the def _attempt_to_split(self, node, parent, branch_index, **kwargs) from EFDT's superclass, HoeffdingTreeClassifier
 
-    def _attempt_to_split(self, node, parent, branch_index, **kwargs):
+    def attempt_to_split_removed(self, node, parent, branch_index, **kwargs):
         ''' 
             Override EFDT split Call HoeffdingTreeClassifier's _attempt_to_split method, in order to compare only with the second best split
             HoeffdingTreeClassifier is cutEFDT's superclass EFDT's superclass
         '''
 
-        # Explicitly call the great-grandparent class method, because using Python's super in series didn't seem to work
+        # Explicitly call the great-grandparent class method, because using Python's super in series didn't seem to work (or I had the number of super's wrong?)
         tree.HoeffdingTreeClassifier._attempt_to_split(self, node, parent, branch_index, **kwargs)
 
 
@@ -76,7 +81,12 @@ model_classes = {
 action_spaces = {
     UpdatableHoeffdingTreeClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
     UpdatableEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
-    CutEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)]
+    CutEFDTClassifier: [MultiplyDeltaAction(1/10, 1e-10, 1), 
+                        MultiplyDeltaAction(1, 1e-10, 1), 
+                        MultiplyDeltaAction(10, 1e-10, 1), 
+                        SetEFDTStrategyAction({"_reevaluate_best_split": "_original_reevaluate_best_split", "_attempt_to_split": "_original_attempt_to_split"}),
+                        SetEFDTStrategyAction({"_reevaluate_best_split": "_reevaluate_best_split_removed", "_attempt_to_split": "_attempt_to_split_removed"})
+                        ]
 }
 
 class Environment:

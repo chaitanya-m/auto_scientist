@@ -162,8 +162,6 @@ class SetEFDTStrategyAction(SetMethodAction):
         return params
 
 
-
-
 # Example usage
 if __name__ == "__main__":
     multiply_action = MultiplyAction(2)
