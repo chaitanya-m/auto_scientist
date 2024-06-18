@@ -121,12 +121,12 @@ class CutEFDTStrategySwitchAction(MethodSwitchAction):
         return params
 
 
-class MethodSetAction(BaseAction):
+class SetMethodAction(BaseAction):
     def __init__(self, method, method_to_use):
         '''
         None: Environment is not set
         As env may not yet be set when the action is created, it should be set later by the environment using set_env
-        The attribute named method will be replaced by method_to_use
+        The attribute named method will be set to method_to_use
         '''
         self.env = None
         self.method = method
@@ -147,7 +147,17 @@ class MethodSetAction(BaseAction):
         }
 
 
+class SetEFDTStrategyAction(SetMethodAction):
+    def __init__(self, strategy, strategy_to_use):
+        super().__init__(strategy, strategy_to_use)
 
+    def execute(self):
+        super().execute()
+
+    def get_params(self):
+        params = super().get_params()
+        params["strategy"] = "EFDT_strategy_enable_disable"
+        return params
 
 
 
