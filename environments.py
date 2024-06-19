@@ -36,6 +36,9 @@ class CutEFDTClassifier(UpdatableEFDTClassifier):
         self._reevaluate_best_split = self.reevaluate_best_split_removed
         self._attempt_to_split = self.attempt_to_split_removed
 
+        self._reevaluate_best_split = self._original_reevaluate_best_split
+        self._attempt_to_split = self._original_attempt_to_split
+
     def update_delta(self, new_delta):
         self.delta = new_delta
 
