@@ -30,14 +30,11 @@ class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
 class CutEFDTClassifier(UpdatableEFDTClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
-        self._original_reevaluate_best_split = super()._reevaluate_best_split
-        self._original_attempt_to_split = super()._attempt_to_split
+        self.original_reevaluate_best_split = super()._reevaluate_best_split
+        self.original_attempt_to_split = super()._attempt_to_split
 
         self._reevaluate_best_split = self.reevaluate_best_split_removed
         self._attempt_to_split = self.attempt_to_split_removed
-
-        self._reevaluate_best_split = self._original_reevaluate_best_split
-        self._attempt_to_split = self._original_attempt_to_split
 
     def update_delta(self, new_delta):
         self.delta = new_delta
@@ -87,8 +84,8 @@ action_spaces = {
     CutEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), 
                         MultiplyDeltaAction(1, 1e-10, 1), 
                         MultiplyDeltaAction(100, 1e-10, 1),
-                        #SetEFDTStrategyAction({"_reevaluate_best_split": "_original_reevaluate_best_split", "_attempt_to_split": "_original_attempt_to_split"}),
-                        SetEFDTStrategyAction({"_reevaluate_best_split": "_reevaluate_best_split_removed", "_attempt_to_split": "_attempt_to_split_removed"})
+                        SetEFDTStrategyAction({"_reevaluate_best_split": "original_reevaluate_best_split", "_attempt_to_split": "original_attempt_to_split"}),
+                        SetEFDTStrategyAction({"_reevaluate_best_split": "reevaluate_best_split_removed", "_attempt_to_split": "attempt_to_split_removed"})
                         ]
 }
 
