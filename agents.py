@@ -15,11 +15,16 @@ class BaseAgent:
             # return np.random.choice(self.num_actions) # Try this instead later
             # return np.random.randint(self.num_actions)
             action_no = self.rng.integers(self.num_actions)
-            print("Initial or exploratory action " + str(action_no))
+            # print("Initial or exploratory action " + str(action_no))
+
+        elif np.amax(self.Q_table[state]) == np.amin(self.Q_table[state]):
+            action_no = self.rng.integers(self.num_actions)
+            # print("Actions all still equal " + str(action_no))
+
         else:
             # Otherwise, select action greedily based on current Q-values for the given state
             action_no = np.argmax(self.Q_table[state])
-            print("Best Q-table action" + str(action_no))
+            # print("Best Q-table action " + str(action_no))
         return action_no
 
 class QLearningAgent(BaseAgent):
