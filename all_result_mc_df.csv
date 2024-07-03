@@ -1,91 +1,91 @@
 episode,agent_type,stream_type,stream,accuracy,baseline_accuracy
-0,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.9233499999999999,0.9021000000000001
-1,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8235000000000001,0.77805
-2,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.9079999999999998,0.7333000000000001
-3,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8900499999999999,0.6839
-4,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.9348500000000002,0.78845
-5,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8334000000000001,0.7123999999999998
-6,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.7766,0.6951000000000003
-7,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.7851999999999999,0.6139
-8,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.9612500000000003,0.7121
-9,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8592999999999998,0.5880000000000001
-0,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8114999999999999,0.8148500000000001
-1,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.7987,0.8218500000000001
-2,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.7358499999999999,0.8442999999999999
-3,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8356999999999999,0.8989499999999999
-4,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.9145,0.8787500000000001
-5,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8992999999999999,0.8895499999999998
-6,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8511500000000002,0.8525500000000001
-7,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.9007000000000002,0.8703000000000001
-8,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8580499999999999,0.8409500000000001
-9,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.80995,0.8546000000000001
-0,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8765999999999998,0.8879999999999999
-1,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8417499999999999,0.8527000000000001
-2,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8916999999999999,0.8505499999999999
-3,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8161000000000002,0.8338000000000003
-4,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8233500000000001,0.8244
-5,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8596999999999999,0.86255
-6,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8931500000000001,0.8322499999999999
-7,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.7541000000000001,0.8074
-8,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8351000000000001,0.8312999999999999
-9,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.85875,0.8563500000000002
-0,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.6982,0.65275
-1,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.7958000000000001,0.6805999999999999
-2,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.76915,0.6205499999999999
-3,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.6604500000000001,0.64165
-4,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8941999999999999,0.53025
-5,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.7323000000000001,0.5185
-6,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.7478499999999999,0.5816000000000001
-7,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.6491,0.5485
-8,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.6248,0.5666000000000001
-9,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.56185,0.584
-0,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.8843,0.8714000000000001
-1,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.7446499999999999,0.6161
-2,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.70245,0.64025
-3,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.7875500000000001,0.7306
-4,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.75885,0.7379499999999999
-5,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.8998499999999998,0.7487499999999999
-6,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.9049000000000001,0.842
-7,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.82365,0.6395000000000001
-8,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.6963999999999999,0.6262999999999999
-9,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.8608999999999998,0.80105
-0,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8281499999999997,0.8429500000000001
-1,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.7965000000000001,0.81745
-2,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8395000000000001,0.8384
-3,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.7876500000000001,0.83295
-4,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8051499999999999,0.8104999999999999
-5,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8379499999999999,0.82035
-6,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8303,0.8103999999999999
-7,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8102499999999997,0.8145500000000002
-8,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.83565,0.8199
-9,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8257,0.8029
-0,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.45135000000000003,0.4194499999999999
-1,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.72345,0.7608999999999999
-2,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.45705,0.31894999999999996
-3,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.26270000000000004,0.26680000000000004
-4,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.43499999999999994,0.27999999999999997
-5,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.52465,0.33205
-6,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.38345,0.35209999999999997
-7,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.49855,0.33759999999999996
-8,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.37499999999999994,0.34090000000000004
-9,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.37085,0.32720000000000005
-0,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.516,0.4586500000000001
-1,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.58995,0.51065
-2,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.6718,0.5738000000000001
-3,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.5928000000000002,0.4269
-4,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.56125,0.38259999999999994
-5,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.5326000000000001,0.32235
-6,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.5828,0.35429999999999995
-7,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.53735,0.34904999999999997
-8,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.52185,0.40964999999999996
-9,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.5349,0.3731
-0,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.7480500000000001,0.6773499999999999
-1,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.69345,0.7028999999999999
-2,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.8529500000000001,0.6103999999999999
-3,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.83765,0.65995
-4,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.7859499999999999,0.6984
-5,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.8580499999999999,0.6865499999999998
-6,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.77385,0.66725
-7,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.8017999999999998,0.6865
-8,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.8694499999999998,0.7493000000000001
-9,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.7542500000000001,0.75215
+0,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.9198999999999999,0.9021000000000001
+1,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.80725,0.77805
+2,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8946499999999998,0.7333000000000001
+3,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8515500000000001,0.6839
+4,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8163500000000001,0.78845
+5,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.90195,0.7123999999999998
+6,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.6706500000000002,0.6951000000000003
+7,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8233500000000002,0.6139
+8,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.9011499999999998,0.7121
+9,Monte Carlo,RandomTree,"{'n_classes': 2, 'n_num_features': 2, 'n_cat_features': 2, 'n_categories_per_feature': 2, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.77555,0.5880000000000001
+0,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8764000000000003,0.8879999999999999
+1,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8406999999999998,0.8527000000000001
+2,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8827000000000002,0.8505499999999999
+3,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8348999999999999,0.8338000000000003
+4,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8166500000000001,0.8244
+5,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8376999999999999,0.86255
+6,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8728,0.8322499999999999
+7,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8187999999999999,0.8074
+8,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.8454499999999999,0.8312999999999999
+9,Monte Carlo,Hyperplane,"{'n_features': 10, 'noise_percentage': 0.05, 'sigma': 0.1}",0.84925,0.8563500000000002
+0,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.7649999999999999,0.8148500000000001
+1,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.79395,0.8218500000000001
+2,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.7329,0.8442999999999999
+3,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.83245,0.8989499999999999
+4,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8221999999999999,0.8787500000000001
+5,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.9206,0.8895499999999998
+6,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8430500000000001,0.8525500000000001
+7,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8650500000000001,0.8703000000000001
+8,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.84655,0.8409500000000001
+9,Monte Carlo,RandomRBF,"{'n_classes': 2, 'n_features': 10, 'n_centroids': 50}",0.8804000000000001,0.8546000000000001
+0,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.82685,0.8429500000000001
+1,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.74735,0.81745
+2,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8378500000000001,0.8384
+3,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8321000000000002,0.83295
+4,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.76505,0.8104999999999999
+5,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8398,0.82035
+6,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.85305,0.8103999999999999
+7,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.86385,0.8145500000000002
+8,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8413499999999999,0.8199
+9,Monte Carlo,Hyperplane,"{'n_features': 20, 'noise_percentage': 0.1, 'sigma': 0.2}",0.8638,0.8029
+0,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.8778,0.8714000000000001
+1,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.781,0.6161
+2,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.6445000000000002,0.64025
+3,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.78885,0.7306
+4,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.7401,0.7379499999999999
+5,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.79815,0.7487499999999999
+6,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.81565,0.842
+7,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.8177999999999999,0.6395000000000001
+8,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.7248499999999999,0.6262999999999999
+9,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 5, 'n_centroids': 10}",0.85655,0.80105
+0,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.71535,0.65275
+1,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.7337,0.6805999999999999
+2,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.7352000000000001,0.6205499999999999
+3,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.64795,0.64165
+4,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.8910500000000001,0.53025
+5,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.7081499999999998,0.5185
+6,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.68935,0.5816000000000001
+7,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.6054,0.5485
+8,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.9017,0.5666000000000001
+9,Monte Carlo,RandomTree,"{'n_classes': 3, 'n_num_features': 3, 'n_cat_features': 3, 'n_categories_per_feature': 3, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.65335,0.584
+0,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.4734,0.4586500000000001
+1,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.50295,0.51065
+2,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.74905,0.5738000000000001
+3,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.53165,0.4269
+4,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.5670999999999999,0.38259999999999994
+5,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.54145,0.32235
+6,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.5824499999999999,0.35429999999999995
+7,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.4835999999999999,0.34904999999999997
+8,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.46900000000000003,0.40964999999999996
+9,Monte Carlo,RandomTree,"{'n_classes': 4, 'n_num_features': 4, 'n_cat_features': 4, 'n_categories_per_feature': 4, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.54925,0.3731
+0,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.4196999999999999,0.4194499999999999
+1,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.82205,0.7608999999999999
+2,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.55205,0.31894999999999996
+3,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.24225000000000002,0.26680000000000004
+4,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.25575,0.27999999999999997
+5,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.37775000000000003,0.33205
+6,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.39394999999999997,0.35209999999999997
+7,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.36455000000000004,0.33759999999999996
+8,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.47065,0.34090000000000004
+9,Monte Carlo,RandomTree,"{'n_classes': 5, 'n_num_features': 5, 'n_cat_features': 5, 'n_categories_per_feature': 5, 'max_tree_depth': 5, 'first_leaf_level': 2, 'fraction_leaves_per_level': 0.15}",0.43515,0.32720000000000005
+0,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.7581999999999999,0.6773499999999999
+1,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.84845,0.7028999999999999
+2,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.82405,0.6103999999999999
+3,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.8526499999999999,0.65995
+4,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.88045,0.6984
+5,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.7598999999999999,0.6865499999999998
+6,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.79095,0.66725
+7,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.619,0.6865
+8,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.6798499999999998,0.7493000000000001
+9,Monte Carlo,RandomRBF,"{'n_classes': 4, 'n_features': 20, 'n_centroids': 100}",0.8360000000000001,0.75215
