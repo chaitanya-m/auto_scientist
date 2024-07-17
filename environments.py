@@ -81,21 +81,11 @@ model_classes = {
 action_spaces = {
     UpdatableHoeffdingTreeClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
     UpdatableEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
-    CutEFDTClassifier: [
-                        SetEFDTStrategyAction({"_reevaluate_best_split": "original_reevaluate_best_split", "_attempt_to_split": "original_attempt_to_split"}),
-                        SetEFDTStrategyAction({"_reevaluate_best_split": "reevaluate_best_split_removed", "_attempt_to_split": "attempt_to_split_removed"}),
-                        MultiplyDeltaAction(1/100, 1e-10, 1), 
+    CutEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), 
+                        MultiplyDeltaAction(1, 1e-10, 1), 
                         MultiplyDeltaAction(100, 1e-10, 1),
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1, 1e-10, 1), 
+                        SetEFDTStrategyAction({"_reevaluate_best_split": "original_reevaluate_best_split", "_attempt_to_split": "original_attempt_to_split"}),
+                        SetEFDTStrategyAction({"_reevaluate_best_split": "reevaluate_best_split_removed", "_attempt_to_split": "attempt_to_split_removed"})
                         ]
 }
 
@@ -144,22 +134,37 @@ class Environment:
 
     def step(self, action_index):
 
-        action = self.actions[action_index]
-        action.execute()
+        if self.current_epoch == 0:
+            pass # burnin first epoch, no RL action
+        else:
+            action = self.actions[action_index]
+            action.execute()
 
         # Run one epoch of the experiment
         accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()
 
-        # Update cumulative prequential accuracy and cumulative baseline prequential accuracy
-        self.cumulative_accuracy += accuracy
-        self.cumulative_baseline_accuracy += baseline_epoch_prequential_accuracy
-
-        # Calculate the reward as the difference between the prequential accuracy of the model obtained from reinforcement learning 
-        # and that of the baseline model
-        reward = accuracy - baseline_epoch_prequential_accuracy
-
         # Increment the epoch counter
         self.current_epoch += 1
+
+        # Update cumulative prequential accuracy and cumulative baseline prequential accuracy
+        self.cumulative_accuracy = (self.cumulative_accuracy * (self.current_epoch - 1) + accuracy) / (self.current_epoch)
+        self.cumulative_baseline_accuracy = (self.cumulative_baseline_accuracy * (self.current_epoch - 1) + baseline_epoch_prequential_accuracy) / (self.current_epoch)
+
+        # If we trivially calculate the reward as the difference between the prequential accuracy of the model obtained from reinforcement learning...
+        # that unduly rewards past performance. The reward should only take into account improvement over and above the historical improvement.
+
+        # But if we don't reward say a 2% jump on 70% for RL vs a 4% jump on 50% for baseline, we are not rewarding the RL model for its improving performance
+
+        # So we need a formula that always rewards advantage over the baseline, but also rewards improvement over the past performance
+
+        # It is impossible to have a "perfect" reward
+
+        # Eventually we'll have to experiment with evolving the reward (or with different reward functions) to optimise return
+
+        if (self.current_epoch == 1):
+            reward = 0 # burn-in period - learning has just started. Disable RL as well for first epoch
+        else:
+            reward = (accuracy - self.cumulative_accuracy) + (accuracy - baseline_epoch_prequential_accuracy)/10
 
         # Compute accuracy change of current epoch from the last epoch
         epoch_accuracy_change = 0
