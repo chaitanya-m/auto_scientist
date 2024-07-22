@@ -9,16 +9,12 @@ from actions import MultiplyDeltaAction, SetEFDTStrategyAction
 BINS = [1, 2, 3, 4]
 NUM_STATES = len(BINS) * len(BINS)
 
-
-
-
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
 
     def update_delta(self, new_delta):
         self.delta = new_delta
-
 
 class UpdatableEFDTClassifier(tree.ExtremelyFastDecisionTreeClassifier):
     def __init__(self, delta):
@@ -147,8 +143,8 @@ class Environment:
         self.current_epoch += 1
 
         # Update cumulative prequential accuracy and cumulative baseline prequential accuracy
-        self.cumulative_accuracy = (self.cumulative_accuracy * (self.current_epoch - 1) + accuracy) / (self.current_epoch)
-        self.cumulative_baseline_accuracy = (self.cumulative_baseline_accuracy * (self.current_epoch - 1) + baseline_epoch_prequential_accuracy) / (self.current_epoch)
+        self.cumulative_accuracy += accuracy
+        self.cumulative_baseline_accuracy += baseline_epoch_prequential_accuracy
 
         # If we trivially calculate the reward as the difference between the prequential accuracy of the model obtained from reinforcement learning...
         # that unduly rewards past performance. The reward should only take into account improvement over and above the historical improvement.
