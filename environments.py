@@ -164,7 +164,8 @@ class Environment:
         if (self.current_epoch == 1):
             reward = 0 # burn-in period - learning has just started. Disable RL as well for first epoch
         else:
-            reward = (accuracy - self.cumulative_accuracy) + (accuracy - baseline_epoch_prequential_accuracy)/10
+            reward = (accuracy - self.cumulative_accuracy/self.current_epoch)  # reward for improvement over past performance 
+            + (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
 
         # Compute accuracy change of current epoch from the last epoch
         epoch_accuracy_change = 0
