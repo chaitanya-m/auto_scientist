@@ -102,6 +102,15 @@ STREAMS = [
     'stream_type': 'RandomRBF',
      'stream' : {
         'n_classes': 4,
+        'n_features': 10,
+        'n_centroids': 50,
+        }
+    },
+
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 4,
         'n_features': 20,
         'n_centroids': 100,
         }

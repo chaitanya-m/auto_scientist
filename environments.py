@@ -77,8 +77,12 @@ model_classes = {
 action_spaces = {
     UpdatableHoeffdingTreeClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
     UpdatableEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
-    CutEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), 
+    CutEFDTClassifier: [MultiplyDeltaAction(1, 1e-10, 1),
+                        MultiplyDeltaAction(1, 1e-10, 1),
+                        MultiplyDeltaAction(1, 1e-10, 1),
+                        MultiplyDeltaAction(1, 1e-10, 1),
                         MultiplyDeltaAction(1, 1e-10, 1), 
+                        MultiplyDeltaAction(1/100, 1e-10, 1), 
                         MultiplyDeltaAction(100, 1e-10, 1),
                         SetEFDTStrategyAction({"_reevaluate_best_split": "original_reevaluate_best_split", "_attempt_to_split": "original_attempt_to_split"}),
                         SetEFDTStrategyAction({"_reevaluate_best_split": "reevaluate_best_split_removed", "_attempt_to_split": "attempt_to_split_removed"})
