@@ -19,7 +19,6 @@ class BaseAction(ABC):
         self.env = env
 
 
-# Algorithm State Modification Action Class
 class ModifyAlgorithmStateAction(BaseAction):
     '''
     Flips the values at specific indices of the algorithm state vector
@@ -35,13 +34,13 @@ class ModifyAlgorithmStateAction(BaseAction):
         self.env = None
 
     def execute(self, _):
-        if self.state is not None:
+        if self.env is not None and hasattr(self.env, 'state'):
             for index in self.indices:
-                current_value = self.state[index]
+                current_value = self.env.state[index]
                 new_value = 1 - current_value  # Flip the value
                 self.env.state.set_item(index, new_value)
         else:
-            raise ValueError("State is not set for this action.")
+            raise ValueError("Environment or state is not set for this action.")
 
     def get_params(self):
         return {"indices": self.indices}

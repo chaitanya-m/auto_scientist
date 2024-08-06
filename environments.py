@@ -42,12 +42,6 @@ class AlgorithmState:
         self.vector[index] = value
 
 
-
-
-
-
-
-
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
@@ -156,7 +150,7 @@ class Environment:
         self.stream_factory = stream_factory
         self.stream = stream_factory.create(self.current_episode)
 
-        self.accuracy_change_bin = None  # Initialize state - 0 indicates no change in accuracy
+        self.accuracy_change_bin = None  # Initialize accuracy change context - 0 indicates no change in accuracy
 
         self.actions = actions
         for action in self.actions:
