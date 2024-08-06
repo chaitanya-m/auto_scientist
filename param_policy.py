@@ -116,14 +116,12 @@ def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bin
     model = ModelClass(delta=config['delta_hard'])
     model_baseline = ModelClass(delta=config['delta_hard'])
 
-
-
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']
     num_epochs = config['num_epochs']
 
     # Train agent
-    env = Environment(model, state, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
+    env = Environment(state, actions, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
     agent = agent_class(num_accuracy_change_bins=num_accuracy_change_bins, num_actions=len(actions))
 
     accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)

@@ -139,7 +139,7 @@ class Environment:
     Note: Each Environment instance is associated with a single model and a single baseline model and a single stream factory and a single stream and a single set of actions
     '''
 
-    def __init__(self, state, model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs_per_episode):
+    def __init__(self, state, actions, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs_per_episode):
 
         self.state = state
 
