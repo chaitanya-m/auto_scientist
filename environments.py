@@ -36,7 +36,10 @@ class AlgorithmState:
     def __getitem__(self, index):
         return self.vector[index]
 
-
+    def set_item(self, index, value):
+        if value not in [0, 1]:
+            raise ValueError("Value must be 0 or 1.")
+        self.vector[index] = value
 
 
 
@@ -150,7 +153,7 @@ class Environment:
         self.stream_factory = stream_factory
         self.stream = stream_factory.create(self.current_episode)
 
-        self.state = None  # Initialize state - 0 indicates no change in accuracy
+        self.accuracy_change_bin = None  # Initialize state - 0 indicates no change in accuracy
 
         self.actions = actions
         for action in self.actions:
@@ -171,14 +174,14 @@ class Environment:
         self.last_accuracy = None
         self.last_5_epoch_accuracies = []
         self.current_epoch = 0
-        self.state = None # Initialize state - 0 indicates no change in accuracy
+        self.accuracy_change_bin = None # Initialize state - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
 
         self.cumulative_accuracy = 0.0
         self.cumulative_baseline_accuracy = 0.0
 
         # Return the initial state
-        return self.state
+        return self.accuracy_change_bin
 
     def step(self, action_index):
 
@@ -239,12 +242,12 @@ class Environment:
         epoch_5_accuracy_change_bin = self.bin_accuracy_change(epoch_5_accuracy_change)
 
         # Update the state with the accuracy changes
-        self.state = self.index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin)
+        self.accuracy_change_bin = self.index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin)
 
         # Signal if the episode is done
         done = self.current_epoch == self.num_epochs
 
-        return self.state, reward, done
+        return self.accuracy_change_bin, reward, done
 
     @staticmethod
     def bin_accuracy_change(accuracy_change):
