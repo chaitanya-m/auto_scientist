@@ -7,7 +7,7 @@ from collections import OrderedDict
 from actions import MultiplyDeltaAction, SetEFDTStrategyAction
 
 BINS = [1, 2, 3, 4]
-NUM_STATES = len(BINS) * len(BINS)
+NUM_ACCURACY_CHANGE_BINS = len(BINS) * len(BINS)
 
 
 # Define an AlgorithmState class to store the state of the algorithm

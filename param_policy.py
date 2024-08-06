@@ -60,7 +60,7 @@ def train_agent(agent, env, num_episodes):
                     td_error = td_target - agent.Q_table[accuracy_change_bin][action_index]
                     agent.Q_table[accuracy_change_bin][action_index] += agent.alpha * td_error
 
-            # Move to next state
+            # Update the accuracy change bin context
             accuracy_change_bin = next_accuracy_change_bin
 
         # Update the agent's Q-table using Monte Carlo updates at the end of an episode
@@ -125,7 +125,7 @@ def run_RL_agents(config):
         np.random.seed(config['seed0'])
 
         # Define the environment's state space size and number of episodes
-        num_accuracy_change_bins = NUM_STATES
+        num_accuracy_change_bins = NUM_ACCURACY_CHANGE_BINS
         num_episodes = config['num_episodes']
 
         result_qtables = []
