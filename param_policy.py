@@ -39,40 +39,40 @@ def train_agent(agent, env, num_episodes):
 
     # The agent is trained on multiple episodes in sequence, each episode corresponding to the stream initialized differently. The Q-table is persistent.
     for _ in range(num_episodes):
-        state = env.reset() # The stream is seeded afresh for each episode, thus, each episode corresponds to a different random initialization of the stream
+        accuracy_change_bin = env.reset() # The stream is seeded afresh for each episode, thus, each episode corresponds to a different random initialization of the stream
         done = False
         transitions = []  # Store the episode trajectory for Monte Carlo updates
 
 
         while not done:  # As long as the episode is not done
-            action_index = agent.select_action(state)
-            next_state, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
+            action_index = agent.select_action(accuracy_change_bin)
+            next_accuracy_change_bin, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
             # Store transition for Monte Carlo updates if necessary
-            transitions.append((state, action_index, reward))
+            transitions.append((accuracy_change_bin, action_index, reward))
 
             if isinstance(agent, QLearningAgent):
                 # Perform the Q-learning update immediately after the step
-                if state is not None and next_state is not None:
-                    best_next_action = np.argmax(agent.Q_table[next_state])
-                    td_target = reward + agent.gamma * agent.Q_table[next_state][best_next_action] if not done else reward
-                    td_error = td_target - agent.Q_table[state][action_index]
-                    agent.Q_table[state][action_index] += agent.alpha * td_error
+                if accuracy_change_bin is not None and next_accuracy_change_bin is not None:
+                    best_next_action = np.argmax(agent.Q_table[next_accuracy_change_bin])
+                    td_target = reward + agent.gamma * agent.Q_table[next_accuracy_change_bin][best_next_action] if not done else reward
+                    td_error = td_target - agent.Q_table[accuracy_change_bin][action_index]
+                    agent.Q_table[accuracy_change_bin][action_index] += agent.alpha * td_error
 
             # Move to next state
-            state = next_state
+            accuracy_change_bin = next_accuracy_change_bin
 
         # Update the agent's Q-table using Monte Carlo updates at the end of an episode
         if isinstance(agent, MonteCarloAgent):
             returns = 0
-            for (state, action_index, reward) in reversed(transitions):
-                if state is None:
+            for (accuracy_change_bin, action_index, reward) in reversed(transitions):
+                if accuracy_change_bin is None:
                     continue
                 returns = reward + agent.gamma * returns
-                agent.visits[state][action_index] += 1
-                alpha = 1 / agent.visits[state][action_index]
-                agent.Q_table[state][action_index] += alpha * (returns - agent.Q_table[state][action_index])
+                agent.visits[accuracy_change_bin][action_index] += 1
+                alpha = 1 / agent.visits[accuracy_change_bin][action_index]
+                agent.Q_table[accuracy_change_bin][action_index] += alpha * (returns - agent.Q_table[accuracy_change_bin][action_index])
 
         # Get the accuracy and baseline accuracy for this episode
         accuracy = env.cumulative_accuracy / env.current_epoch
@@ -82,9 +82,11 @@ def train_agent(agent, env, num_episodes):
     return episode_accuracies, episode_baseline_accuracies
 
 
-def setup_environment_and_train(agent_class, agent_name, num_states, num_episodes, config):
+def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bins, num_episodes, config):
     # Since CONFIG and other required variables are not defined in this snippet, 
     # they should be defined elsewhere in the code or passed as arguments to the function.
+
+    state = AlgorithmState([0,0])
 
     # Setup stream factory
     stream_type = config['stream_type']
@@ -106,8 +108,8 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     num_epochs = config['num_epochs']
 
     # Train agent
-    env = Environment(model, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
-    agent = agent_class(num_states=num_states, num_actions=len(actions))
+    env = Environment(model, state, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
+    agent = agent_class(num_states=num_accuracy_change_bins, num_actions=len(actions))
 
     accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)
 
@@ -123,7 +125,7 @@ def run_RL_agents(config):
         np.random.seed(config['seed0'])
 
         # Define the environment's state space size and number of episodes
-        num_states = NUM_STATES
+        num_accuracy_change_bins = NUM_STATES
         num_episodes = config['num_episodes']
 
         result_qtables = []
@@ -134,10 +136,10 @@ def run_RL_agents(config):
         ql_result_accuracies_df = pd.DataFrame(columns=['episode', 'agent_type','stream_type', 'stream', 'accuracy', 'baseline_accuracy'])
 
         # Train Monte Carlo agent
-        mc_accuracies, mc_baseline_accuracies, mc_qtable = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_states, num_episodes, config)
+        mc_accuracies, mc_baseline_accuracies, mc_qtable = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_accuracy_change_bins, num_episodes, config)
 
         # Train Q-learning agent
-        ql_accuracies, ql_baseline_accuracies, ql_qtable = setup_environment_and_train(QLearningAgent, "Q-learning", num_states, num_episodes, config)
+        ql_accuracies, ql_baseline_accuracies, ql_qtable = setup_environment_and_train(QLearningAgent, "Q-learning", num_accuracy_change_bins, num_episodes, config)
 
         # Add accuracies to the dataframe. 
         mc_temp_data = []
