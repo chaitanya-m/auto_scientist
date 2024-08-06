@@ -9,6 +9,42 @@ from actions import MultiplyDeltaAction, SetEFDTStrategyAction
 BINS = [1, 2, 3, 4]
 NUM_STATES = len(BINS) * len(BINS)
 
+
+# Define an AlgorithmState class to store the state of the algorithm
+# Algorithms are vectors with each element representing a binary choice, 0 or 1
+# What we want to see is whether regardless of the state vector initialization, 
+# whether we will have the same convergence of state-action values, with EFDT as the optimal choice, matching also the best prequential accuracy
+
+
+class AlgorithmState:
+    def __init__(self, vector):
+        if not all(v in [0, 1] for v in vector):
+            raise ValueError("All elements of the vector must be 0 or 1.")
+        self.vector = vector
+
+    def __repr__(self):
+        return f"State({self.vector})"
+
+    def __eq__(self, other):
+        if not isinstance(other, AlgorithmState):
+            return False
+        return self.vector == other.vector
+
+    def __len__(self):
+        return len(self.vector)
+
+    def __getitem__(self, index):
+        return self.vector[index]
+
+
+
+
+
+
+
+
+
+
 class UpdatableHoeffdingTreeClassifier(tree.HoeffdingTreeClassifier):
     def __init__(self, delta):
         super().__init__(delta=delta)
@@ -88,6 +124,18 @@ action_spaces = {
                         SetEFDTStrategyAction({"_reevaluate_best_split": "reevaluate_best_split_removed", "_attempt_to_split": "attempt_to_split_removed"})
                         ]
 }
+
+# Design space maps the variables to their respective action spaces
+# _reevaluate_best_split can have two values: "original_reevaluate_best_split" and "reevaluate_best_split_removed"
+# _attempt_to_split can have two values: "original_attempt_to_split" and "attempt_to_split_removed"
+# binary_design_spaces  is a dictionary mapping class names to their respective design spaces
+# All design choices should be binary
+
+binary_design_space = {
+    "_reevaluate_best_split": ["original_reevaluate_best_split", "reevaluate_best_split_removed"],
+    "_attempt_to_split": ["original_attempt_to_split", "attempt_to_split_removed"]
+}
+
 
 class Environment:
     '''
