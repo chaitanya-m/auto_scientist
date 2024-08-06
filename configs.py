@@ -8,7 +8,7 @@ BASE_CONFIG = {
     'seed0': 0,
     'seed1': 100,
     'update_delta_dropped_accuracy': 1.0,
-    'num_runs': 2,
+    'algo_vec_len': 2,
     'model': 'CutEFDTClassifier',
     'stream_type': 'RandomTree',
     'stream': {

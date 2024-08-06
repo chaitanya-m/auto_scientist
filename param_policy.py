@@ -86,7 +86,9 @@ def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bin
     # Since CONFIG and other required variables are not defined in this snippet, 
     # they should be defined elsewhere in the code or passed as arguments to the function.
 
-    state = AlgorithmState([0,0])
+    # Every time the environment is setup, we have to create a new state
+    # We may want to start in various random states across runs to determine convergence
+    state = AlgorithmState([0]*config['algo_vec_len'])
 
     # Setup stream factory
     stream_type = config['stream_type']
