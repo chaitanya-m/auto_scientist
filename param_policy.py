@@ -5,7 +5,16 @@ import pandas as pd
 from configs import BASE_CONFIG, STREAMS
 from environments import *
 from agents import *
+from actions import ModifyAlgorithmStateAction
+from itertools import combinations
 
+def generate_combinations(size):
+    indices = list(range(size))
+    
+    # Generate combinations of all lengths from 1 to size
+    for r in range(1, size + 1):
+        for comb in combinations(indices, r):
+            yield list(comb)
 
 def train_agent(agent, env, num_episodes):
     '''
@@ -90,6 +99,14 @@ def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bin
     # We may want to start in various random states across runs to determine convergence
     state = AlgorithmState([0]*config['algo_vec_len'])
 
+    # Setup Actions
+    # actions are now all possible combinations of flips of the binary values in algorithm state vector
+    # This means that for m indices, there are 2^m possible actions
+    # We need to add all the possible actions to the environment by creating ModifyAlgorithmStateAction 
+    # with all possible indices for config['algo_vec_len'] indices
+
+    actions = [ModifyAlgorithmStateAction(indices) for indices in generate_combinations(config['algo_vec_len'])]
+
     # Setup stream factory
     stream_type = config['stream_type']
     stream_factory = StreamFactory(stream_type, config['stream'])
@@ -99,11 +116,7 @@ def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bin
     model = ModelClass(delta=config['delta_hard'])
     model_baseline = ModelClass(delta=config['delta_hard'])
 
-    # Setup Actions
-    # actions is now taken from the action_spaces dictionary in environments.py
-    # the action_spaces dictionary maps a ModelClass to a list of actions
 
-    actions = action_spaces[ModelClass]
 
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']
