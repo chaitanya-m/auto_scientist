@@ -18,6 +18,35 @@ class BaseAction(ABC):
         '''
         self.env = env
 
+# Algorithm State Modification Action Class
+class ModifyAlgorithmStateAction(BaseAction):
+    '''
+    Flips the values at specific indices of the algorithm state vector
+
+    Args:
+        indices (list of int): The indices to modify in the state vector
+    '''
+
+    def __init__(self, indices):
+        if not all(isinstance(index, int) for index in indices):
+            raise ValueError("All indices must be integers.")
+        self.indices = indices
+        self.env = None
+        self.state = None
+
+    def execute(self, _):
+        if self.state is not None:
+            for index in self.indices:
+                current_value = self.state[index]
+                new_value = 1 - current_value  # Flip the value
+                self.state.set_item(index, new_value)
+        else:
+            raise ValueError("State is not set for this action.")
+
+    def get_params(self):
+        return {"indices": self.indices}
+
+
 # Multiply Action Class
 class MultiplyAction(BaseAction):
     '''
