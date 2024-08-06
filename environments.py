@@ -171,13 +171,13 @@ class Environment:
         self.last_accuracy = None
         self.last_5_epoch_accuracies = []
         self.current_epoch = 0
-        self.accuracy_change_bin = None # Initialize state - 0 indicates no change in accuracy
+        self.accuracy_change_bin = None # Initialize context - accuracy change bin - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
 
         self.cumulative_accuracy = 0.0
         self.cumulative_baseline_accuracy = 0.0
 
-        # Return the initial state
+        # Return the initial accuracy change bin
         return self.accuracy_change_bin
 
     def step(self, action_index):
@@ -238,8 +238,8 @@ class Environment:
         epoch_accuracy_change_bin = self.bin_accuracy_change(epoch_accuracy_change)
         epoch_5_accuracy_change_bin = self.bin_accuracy_change(epoch_5_accuracy_change)
 
-        # Update the state with the accuracy changes
-        self.accuracy_change_bin = self.index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin)
+        # Update the accuracy change bin
+        self.accuracy_change_bin = self.index_accuracy_change_bin(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin)
 
         # Signal if the episode is done
         done = self.current_epoch == self.num_epochs
@@ -258,11 +258,11 @@ class Environment:
             return BINS[3]
 
     @staticmethod
-    def index_state(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin):
-        # We take epoch_accuracy_change_bin and epoch_5_accuracy_change_bin and return a state index in the range [0, 24]
-        # The state index is calculated as below:
-        state_index = (epoch_accuracy_change_bin - 1) * len(BINS) + (epoch_5_accuracy_change_bin - 1) # 0, 5, 10, 15, 20 correspond to increasingly large 
-        return state_index
+    def index_accuracy_change_bin(epoch_accuracy_change_bin, epoch_5_accuracy_change_bin):
+        # We take epoch_accuracy_change_bin and epoch_5_accuracy_change_bin and return an accuracy change bin index in the range [0, 24]
+        # The index is calculated as below:
+        accuracy_change_bin_index = (epoch_accuracy_change_bin - 1) * len(BINS) + (epoch_5_accuracy_change_bin - 1) # 0, 5, 10, 15, 20 correspond to increasingly large 
+        return accuracy_change_bin_index
 
     def action_reintroduce_comparison_with_other_splits(self):
         # If the model is CutEFDTClassifier, reintroduce the comparison with other splits

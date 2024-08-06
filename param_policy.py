@@ -109,7 +109,7 @@ def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bin
 
     # Train agent
     env = Environment(model, state, model_baseline, stream_factory, actions, num_samples_per_epoch, num_epochs)
-    agent = agent_class(num_states=num_accuracy_change_bins, num_actions=len(actions))
+    agent = agent_class(num_accuracy_change_bins=num_accuracy_change_bins, num_actions=len(actions))
 
     accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)
 
@@ -124,7 +124,7 @@ def run_RL_agents(config):
         random.seed(config['seed0'])
         np.random.seed(config['seed0'])
 
-        # Define the environment's state space size and number of episodes
+        # Define the environment's context and number of episodes
         num_accuracy_change_bins = NUM_ACCURACY_CHANGE_BINS
         num_episodes = config['num_episodes']
 
