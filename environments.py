@@ -177,8 +177,12 @@ class Environment:
         self.cumulative_accuracy = 0.0
         self.cumulative_baseline_accuracy = 0.0
 
+        self.state = [np.random.choice([0, 1]) for _ in range(len(self.state))] # Randomly initialize the state vector
+        # No matter which algorithm state we start in, we want to see if the agent will converge to the near-optimal state-action 
+        # values for EFDT (or some other unknown algorithm in the design space)
+
         # Return the initial accuracy change bin
-        return self.accuracy_change_bin
+        return self.state
 
     def step(self, action_index):
 
