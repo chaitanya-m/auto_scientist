@@ -2,7 +2,7 @@ import numpy as np
 
 class BaseAgent:
     def __init__(self, num_states, num_actions, epsilon):
-        self.num_accuracy_change_bins = num_states
+        self.num_states = num_states
         self.num_actions = num_actions
         self.epsilon = epsilon  # Epsilon for epsilon-greedy policy
         self.Q_table = np.zeros((num_states, num_actions))  # Initialize Q-values to zeros
