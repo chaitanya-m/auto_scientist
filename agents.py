@@ -8,7 +8,7 @@ class BaseAgent:
         self.Q_table = np.zeros((num_states, num_actions))  # Initialize Q-values to zeros
         self.rng = np.random.default_rng(0)
 
-    def select_action(self, state):
+    def select_action(self, state, context=None):
         # Select action using epsilon-greedy policy
         if np.random.rand() < self.epsilon:
             # With probability epsilon, return a random action
