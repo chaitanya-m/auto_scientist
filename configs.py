@@ -6,7 +6,7 @@ BASE_CONFIG = {
     'delta_easy': 1e-3,
     'delta_hard': 1e-7,
     'seed0': 0,
-    'seed1': 100,
+    'seed1': 1000,
     'update_delta_dropped_accuracy': 1.0,
     'algo_vec_len': 2,
     'model': 'CutEFDTClassifier',
