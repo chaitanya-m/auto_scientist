@@ -54,7 +54,7 @@ def train_agent(agent, env, num_episodes):
 
         while not done:  # As long as the episode is not done
             action_index = agent.select_action(state_index)
-            new_state_index, next_accuracy_change_bin, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
+            new_state_index, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
             # Store transition for Monte Carlo updates if necessary. Note that step should've already updated the state.
@@ -68,8 +68,7 @@ def train_agent(agent, env, num_episodes):
                     td_error = td_target - agent.Q_table[state_index][action_index]
                     agent.Q_table[state_index][action_index] += agent.alpha * td_error
 
-            # Update the state and context
-            accuracy_change_bin = next_accuracy_change_bin
+            # Update the state index for the next iteration
             state_index = new_state_index
 
         # Update the agent's Q-table using Monte Carlo updates at the end of an episode

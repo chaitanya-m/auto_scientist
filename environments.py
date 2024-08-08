@@ -257,7 +257,7 @@ class Environment:
         # Signal if the episode is done
         done = self.current_epoch == self.num_epochs
 
-        return self.index_state_vector(self.state), self.accuracy_change_bin, reward, done
+        return self.index_state_vector(self.state), reward, done
 
     def apply_design_elements(binary_design_space, state, set_method_action_class):
         """
