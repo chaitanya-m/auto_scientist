@@ -33,7 +33,8 @@ class ModifyAlgorithmStateAction(BaseAction):
         self.indices = indices
         self.env = None
 
-    def execute(self):
+    def execute(self, env):
+        self.env = env
         if self.env is not None and hasattr(self.env, 'state'):
             # Flip the values at the specified indices to set the new algorithm state vector
             for index in self.indices:

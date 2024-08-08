@@ -196,7 +196,7 @@ class Environment:
             pass # Burn-in epoch
         else:
             action = self.actions[action_index]
-            action.execute()
+            action.execute(self)
         # State has been updated by the action
 
         self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
@@ -286,8 +286,7 @@ class Environment:
 
         # Create an instance of the action class with the design dictionary and execute it
         write_state = set_method_action_class(design_dict)
-        write_state.set_env(self)
-        write_state.execute()
+        write_state.execute(self)
 
         # The updated algorithm (state) has been written to the environment
 
