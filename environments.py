@@ -194,6 +194,20 @@ class Environment:
         # No matter which algorithm state we start in, we want to see if the agent will converge to the near-optimal state-action 
         # values for EFDT (or some other unknown algorithm in the design space)
 
+        # For each design element, assign the corresponding function as given by the state vector
+        # 0 signifies turning off a design element, 1 signifies turning it on
+        # The functions should be written in such a way that the feature can be turned off or on
+
+        design_dict = {}
+        state_element = 0
+        for design_element, design_values in self.binary_design_space:
+            design_dict[design_element] = design_values[self.state[state_element]]
+            state_element += 1
+        write_state = SetMethodAction(design_dict)
+        write_state.execute()
+
+        # The updated algorithm (state) has been written to the environment
+
         # Return the initial accuracy change bin
         return self.state
 
