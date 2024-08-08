@@ -223,13 +223,10 @@ def main():
 
     # Loop through the STREAMS dictionaries in the configs and replace the BASE_CONFIG with the STREAMS one at a time
     for stream_config in STREAMS:
-        for seed in range(10):
-            new_config = config.copy()
-            new_config['stream_type'] = stream_config['stream_type']
-            new_config['stream'] = stream_config['stream']
-            new_config['seed0'] = seed
-            new_config['seed1'] = seed + 100
-            configs.append(new_config)
+        new_config = config.copy()
+        new_config['stream_type'] = stream_config['stream_type']
+        new_config['stream'] = stream_config['stream']
+        configs.append(new_config)
 
     # Using ProcessPoolExecutor to run tasks in parallel
     with concurrent.futures.ProcessPoolExecutor() as executor:
