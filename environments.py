@@ -110,16 +110,16 @@ model_classes = {
 action_spaces = {
     UpdatableHoeffdingTreeClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
     UpdatableEFDTClassifier: [MultiplyDeltaAction(1/100, 1e-10, 1), MultiplyDeltaAction(1/10, 1e-10, 1), MultiplyDeltaAction(1, 1e-10, 1), MultiplyDeltaAction(10, 1e-10, 1), MultiplyDeltaAction(100, 1e-10, 1)],
-    CutEFDTClassifier: [MultiplyDeltaAction(1, 1e-10, 1),
-                        MultiplyDeltaAction(1, 1e-10, 1),
-                        MultiplyDeltaAction(1, 1e-10, 1),
-                        MultiplyDeltaAction(1, 1e-10, 1),
-                        MultiplyDeltaAction(1, 1e-10, 1), 
-                        MultiplyDeltaAction(1/100, 1e-10, 1), 
-                        MultiplyDeltaAction(100, 1e-10, 1),
-                        SetEFDTStrategyAction({"_reevaluate_best_split": "original_reevaluate_best_split", "_attempt_to_split": "original_attempt_to_split"}),
-                        SetEFDTStrategyAction({"_reevaluate_best_split": "reevaluate_best_split_removed", "_attempt_to_split": "attempt_to_split_removed"})
-                        ]
+    # CutEFDTClassifier: [MultiplyDeltaAction(1, 1e-10, 1),
+    #                     MultiplyDeltaAction(1, 1e-10, 1),
+    #                     MultiplyDeltaAction(1, 1e-10, 1),
+    #                     MultiplyDeltaAction(1, 1e-10, 1),
+    #                     MultiplyDeltaAction(1, 1e-10, 1), 
+    #                     MultiplyDeltaAction(1/100, 1e-10, 1), 
+    #                     MultiplyDeltaAction(100, 1e-10, 1),
+    #                     SetEFDTStrategyAction({"_reevaluate_best_split": "original_reevaluate_best_split", "_attempt_to_split": "original_attempt_to_split"}),
+    #                     SetEFDTStrategyAction({"_reevaluate_best_split": "reevaluate_best_split_removed", "_attempt_to_split": "attempt_to_split_removed"})
+    #                     ]
 }
 
 # Design space maps the variables to their respective action spaces
@@ -141,10 +141,10 @@ class Environment:
         self.state = state
         self.binary_design_space = binary_design_space
 
-        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
-
         self.model = model
         self.model_baseline = model_baseline
+
+        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
 
         self.current_episode = 0
         self.stream_factory = stream_factory
@@ -211,23 +211,6 @@ class Environment:
         self.cumulative_accuracy += accuracy
         self.cumulative_baseline_accuracy += baseline_epoch_prequential_accuracy
 
-        # If we trivially calculate the reward as the difference between the prequential accuracy of the model obtained from reinforcement learning...
-        # that unduly rewards past performance. The reward should only take into account improvement over and above the historical improvement.
-
-        # But if we don't reward say a 2% jump on 70% for RL vs a 4% jump on 50% for baseline, we are not rewarding the RL model for its improving performance
-
-        # So we need a formula that always rewards advantage over the baseline, but also rewards improvement over the past performance
-
-        # It is impossible to have a "perfect" reward
-
-        # Eventually we'll have to experiment with evolving the reward (or with different reward functions) to optimise return
-
-        if (self.current_epoch == 1):
-            reward = 0 # burn-in period - learning has just started. Disable RL as well for first epoch
-        else:
-            #reward = (accuracy - self.cumulative_accuracy/self.current_epoch) + # reward for improvement over past performance 
-            reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
-
         # Compute accuracy change of current epoch from the last epoch
         epoch_accuracy_change = 0
         if self.last_accuracy is not None:
@@ -257,9 +240,30 @@ class Environment:
         # Signal if the episode is done
         done = self.current_epoch == self.num_epochs
 
+
+        # If we trivially calculate the reward as the difference between the prequential accuracy of the model obtained from reinforcement learning...
+        # that unduly rewards past performance. The reward should only take into account improvement over and above the historical improvement.
+
+        # But if we don't reward say a 2% jump on 70% for RL vs a 4% jump on 50% for baseline, we are not rewarding the RL model for its improving performance
+
+        # So we need a formula that always rewards advantage over the baseline, but also rewards improvement over the past performance
+
+        # It is impossible to have a "perfect" reward
+
+        # Eventually we'll have to experiment with evolving the reward (or with different reward functions) to optimise return
+
+        # We should be able to use the accuracy change bin context to guess the state of learning (early in the stream or not, if stationary) and adjust 
+        # the reward function accordingly
+
+        if (self.current_epoch == 1):
+            reward = 0 # burn-in period - learning has just started. Disable RL as well for first epoch
+        else:
+            #reward = (accuracy - self.cumulative_accuracy/self.current_epoch) + # reward for improvement over past performance 
+            reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
+
         return self.index_state_vector(self.state), reward, done
 
-    def apply_design_elements(binary_design_space, state, set_method_action_class):
+    def apply_design_elements(self, binary_design_space, state, set_method_action_class):
         """
         Applies the design elements based on the provided state vector.
 
@@ -282,6 +286,7 @@ class Environment:
 
         # Create an instance of the action class with the design dictionary and execute it
         write_state = set_method_action_class(design_dict)
+        write_state.set_env(self)
         write_state.execute()
 
         # The updated algorithm (state) has been written to the environment

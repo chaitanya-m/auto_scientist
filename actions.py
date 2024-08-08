@@ -33,13 +33,13 @@ class ModifyAlgorithmStateAction(BaseAction):
         self.indices = indices
         self.env = None
 
-    def execute(self, _):
+    def execute(self):
         if self.env is not None and hasattr(self.env, 'state'):
             # Flip the values at the specified indices to set the new algorithm state vector
             for index in self.indices:
                 current_value = self.env.state[index]
                 new_value = 1 - current_value  # Flip the value
-                self.env.state.set_item(index, new_value)
+                self.env.state[index] = new_value
                     
         else:
             raise ValueError("Environment or state is not set for this action.")
@@ -118,8 +118,10 @@ class MethodSwitchAction(BaseAction):
         self.other_alternative = other_alternative
 
     def execute(self):
-        if self.env is None or self.env.model is None:
-            raise ValueError("Environment or model is not set.")
+        if self.env is None: 
+            raise ValueError("Environment is not set.")
+        if self.env.model is None:
+            raise ValueError("Model is not set.")
         
         # Swap the methods
         if getattr(self.env.model, self.method) == self.current_alternative:
@@ -162,8 +164,10 @@ class SetMethodAction(BaseAction):
         self.methods_to_update = methods_to_update
 
     def execute(self):
-        if self.env is None or self.env.model is None:
-            raise ValueError("Environment or model is not set.")
+        if self.env is None: 
+            raise ValueError("Environment is not set.")
+        if self.env.model is None:
+            raise ValueError("Model is not set.")
         else:
             for method, method_to_use in self.methods_to_update.items():
                 new_method = getattr(self.env.model, method_to_use)

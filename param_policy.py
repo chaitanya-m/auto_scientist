@@ -49,6 +49,7 @@ def train_agent(agent, env, num_episodes):
     # The agent is trained on multiple episodes in sequence, each episode corresponding to the stream initialized differently. The Q-table is persistent.
     for _ in range(num_episodes):
         state_index = env.reset() # The stream is seeded afresh for each episode, thus, each episode corresponds to a different random initialization of the stream
+        # An algorithm is also randomly picked from the design space
         done = False
         transitions = []  # Store the episode trajectory for Monte Carlo updates
 

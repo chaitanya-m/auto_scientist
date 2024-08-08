@@ -116,23 +116,23 @@ STREAMS = [
         }
     },
 
-    {
-    'stream_type': 'Hyperplane',
-     'stream' : {
-         'n_features': 10,
-         'noise_percentage': 0.05,
-         'sigma': 0.1,
-        }
-    },
+    # {
+    # 'stream_type': 'Hyperplane',
+    #  'stream' : {
+    #      'n_features': 10,
+    #      'noise_percentage': 0.05,
+    #      'sigma': 0.1,
+    #     }
+    # },
 
-    {
-    'stream_type': 'Hyperplane',
-     'stream' : {
-         'n_features': 20,
-         'noise_percentage': 0.1,
-         'sigma': 0.2,
-        }
-    },
+    # {
+    # 'stream_type': 'Hyperplane',
+    #  'stream' : {
+    #      'n_features': 20,
+    #      'noise_percentage': 0.1,
+    #      'sigma': 0.2,
+    #     }
+    # },
 
     # {
     # 'stream_type': 'SEA',
