@@ -57,6 +57,19 @@ STREAMS = [
      'stream' : {
         'n_classes': 4,
         'n_num_features': 4,
+        'n_cat_features': 3,
+        'n_categories_per_feature': 3,
+        'max_tree_depth': 5,
+        'first_leaf_level': 2,
+        'fraction_leaves_per_level': 0.15,
+        }
+    },
+
+    {
+    'stream_type': 'RandomTree',
+     'stream' : {
+        'n_classes': 4,
+        'n_num_features': 4,
         'n_cat_features': 4,
         'n_categories_per_feature': 4,
         'max_tree_depth': 5,
@@ -70,8 +83,8 @@ STREAMS = [
      'stream' : {
         'n_classes': 5,
         'n_num_features': 5,
-        'n_cat_features': 5,
-        'n_categories_per_feature': 5,
+        'n_cat_features': 4,
+        'n_categories_per_feature': 4,
         'max_tree_depth': 5,
         'first_leaf_level': 2,
         'fraction_leaves_per_level': 0.15,
@@ -91,12 +104,21 @@ STREAMS = [
     {
     'stream_type': 'RandomRBF',
      'stream' : {
+        'n_classes': 4,
+        'n_features': 10,
+        'n_centroids': 20,
+        }
+    },
+
+
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
         'n_classes': 2,
         'n_features': 10,
         'n_centroids': 50,
         }
     },
-
 
     {
     'stream_type': 'RandomRBF',
@@ -115,6 +137,19 @@ STREAMS = [
         'n_centroids': 100,
         }
     },
+
+    # {
+    # 'stream_type': 'RandomTree',
+    #  'stream' : {
+    #     'n_classes': 5,
+    #     'n_num_features': 5,
+    #     'n_cat_features': 5,
+    #     'n_categories_per_feature': 5,
+    #     'max_tree_depth': 5,
+    #     'first_leaf_level': 2,
+    #     'fraction_leaves_per_level': 0.15,
+    #     }
+    # },
 
     # {
     # 'stream_type': 'Hyperplane',
