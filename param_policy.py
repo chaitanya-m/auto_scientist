@@ -48,40 +48,40 @@ def train_agent(agent, env, num_episodes):
 
     # The agent is trained on multiple episodes in sequence, each episode corresponding to the stream initialized differently. The Q-table is persistent.
     for _ in range(num_episodes):
-        algo_state = env.reset() # The stream is seeded afresh for each episode, thus, each episode corresponds to a different random initialization of the stream
+        state_index = env.reset() # The stream is seeded afresh for each episode, thus, each episode corresponds to a different random initialization of the stream
         done = False
         transitions = []  # Store the episode trajectory for Monte Carlo updates
 
         while not done:  # As long as the episode is not done
-            action_index = agent.select_action(algo_state)
-            prev_algo_state = algo_state # because step updates algo_state, store current state as previous state
-            next_accuracy_change_bin, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
+            action_index = agent.select_action(state_index)
+            new_state_index, next_accuracy_change_bin, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
             # Store transition for Monte Carlo updates if necessary. Note that step should've already updated the state.
-            transitions.append((prev_algo_state, action_index, reward))
+            transitions.append((state_index, action_index, reward))
 
             if isinstance(agent, QLearningAgent):
                 # Perform the Q-learning update immediately after the step
-                if accuracy_change_bin is not None and next_accuracy_change_bin is not None:
-                    best_next_action = np.argmax(agent.Q_table[next_accuracy_change_bin])
-                    td_target = reward + agent.gamma * agent.Q_table[next_accuracy_change_bin][best_next_action] if not done else reward
-                    td_error = td_target - agent.Q_table[accuracy_change_bin][action_index]
-                    agent.Q_table[accuracy_change_bin][action_index] += agent.alpha * td_error
+                if state_index is not None and new_state_index is not None:
+                    best_next_action = np.argmax(agent.Q_table[new_state_index])
+                    td_target = reward + agent.gamma * agent.Q_table[new_state_index][best_next_action] if not done else reward
+                    td_error = td_target - agent.Q_table[state_index][action_index]
+                    agent.Q_table[state_index][action_index] += agent.alpha * td_error
 
-            # Update the accuracy change bin context
+            # Update the state and context
             accuracy_change_bin = next_accuracy_change_bin
+            state_index = new_state_index
 
         # Update the agent's Q-table using Monte Carlo updates at the end of an episode
         if isinstance(agent, MonteCarloAgent):
             returns = 0
-            for (accuracy_change_bin, action_index, reward) in reversed(transitions):
-                if accuracy_change_bin is None:
+            for (state_index, action_index, reward) in reversed(transitions):
+                if state_index is None:
                     continue
                 returns = reward + agent.gamma * returns
-                agent.visits[accuracy_change_bin][action_index] += 1
-                alpha = 1 / agent.visits[accuracy_change_bin][action_index]
-                agent.Q_table[accuracy_change_bin][action_index] += alpha * (returns - agent.Q_table[accuracy_change_bin][action_index])
+                agent.visits[state_index][action_index] += 1
+                alpha = 1 / agent.visits[state_index][action_index]
+                agent.Q_table[state_index][action_index] += alpha * (returns - agent.Q_table[state_index][action_index])
 
         # Get the accuracy and baseline accuracy for this episode
         accuracy = env.cumulative_accuracy / env.current_epoch

@@ -141,7 +141,7 @@ class Environment:
         self.state = state
         self.binary_design_space = binary_design_space
 
-        apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
+        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
 
         self.model = model
         self.model_baseline = model_baseline
@@ -181,10 +181,10 @@ class Environment:
         # No matter which algorithm state we start in, we want to see if the agent will converge to the near-optimal state-action 
         # values for EFDT (or some other unknown algorithm in the design space)
 
-        apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
+        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
 
-        # Return the initial accuracy change bin
-        return self.state
+        # Return the state index
+        return self.index_state_vector(self.state)
 
     def step(self, action_index):
 
@@ -199,7 +199,7 @@ class Environment:
             action.execute()
         # State has been updated by the action
 
-        apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
+        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
 
         # Run one epoch of the experiment
         accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()
@@ -257,35 +257,53 @@ class Environment:
         # Signal if the episode is done
         done = self.current_epoch == self.num_epochs
 
-        return self.accuracy_change_bin, reward, done
+        return self.index_state_vector(self.state), self.accuracy_change_bin, reward, done
 
-def apply_design_elements(binary_design_space, state, set_method_action_class):
-    """
-    Applies the design elements based on the provided state vector.
+    def apply_design_elements(binary_design_space, state, set_method_action_class):
+        """
+        Applies the design elements based on the provided state vector.
 
-    Args:
-        binary_design_space (dict): A dictionary where keys are design element names and values are lists of functions 
-                                    or methods corresponding to the possible states (0 or 1).
-        state (list): A list representing the current state of each design element, where 0 signifies turning off 
-                      a design element and 1 signifies turning it on.
-        set_method_action_class (class): The class to be used for setting the design elements. This class should have 
-                                         an execute method that applies the design elements.
-    """
-    design_dict = {}
-    state_element = 0
+        Args:
+            binary_design_space (dict): A dictionary where keys are design element names and values are lists of functions 
+                                        or methods corresponding to the possible states (0 or 1).
+            state (list): A list representing the current state of each design element, where 0 signifies turning off 
+                        a design element and 1 signifies turning it on.
+            set_method_action_class (class): The class to be used for setting the design elements. This class should have 
+                                            an execute method that applies the design elements.
+        """
+        design_dict = {}
+        state_element = 0
 
-    # For each design element, assign the corresponding function as given by the state vector
-    for design_element, design_values in binary_design_space.items():
-        # The state vector determines which function to assign to the design element
-        design_dict[design_element] = design_values[state[state_element]]
-        state_element += 1
+        # For each design element, assign the corresponding function as given by the state vector
+        for design_element, design_values in binary_design_space.items():
+            # The state vector determines which function to assign to the design element
+            design_dict[design_element] = design_values[state[state_element]]
+            state_element += 1
 
-    # Create an instance of the action class with the design dictionary and execute it
-    write_state = set_method_action_class(design_dict)
-    write_state.execute()
+        # Create an instance of the action class with the design dictionary and execute it
+        write_state = set_method_action_class(design_dict)
+        write_state.execute()
 
-    # The updated algorithm (state) has been written to the environment
+        # The updated algorithm (state) has been written to the environment
 
+    @staticmethod
+    def index_state_vector(binary_vector):
+        """
+        Converts a binary vector to an index.
+
+        Args:
+            binary_vector (list of int): A list representing a binary vector, where each element is 0 or 1.
+
+        Returns:
+            int: The index corresponding to the binary vector.
+        """
+        index = 0
+        length = len(binary_vector)
+        
+        for i in range(length):
+            index += binary_vector[i] * (2 ** (length - i - 1))
+        
+        return index
 
     @staticmethod
     def bin_accuracy_change(accuracy_change):
