@@ -48,18 +48,18 @@ def train_agent(agent, env, num_episodes):
 
     # The agent is trained on multiple episodes in sequence, each episode corresponding to the stream initialized differently. The Q-table is persistent.
     for _ in range(num_episodes):
-        accuracy_change_bin = env.reset() # The stream is seeded afresh for each episode, thus, each episode corresponds to a different random initialization of the stream
+        algo_state = env.reset() # The stream is seeded afresh for each episode, thus, each episode corresponds to a different random initialization of the stream
         done = False
         transitions = []  # Store the episode trajectory for Monte Carlo updates
 
-
         while not done:  # As long as the episode is not done
-            action_index = agent.select_action(accuracy_change_bin)
+            action_index = agent.select_action(algo_state)
+            prev_algo_state = algo_state # because step updates algo_state, store current state as previous state
             next_accuracy_change_bin, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
-            # Store transition for Monte Carlo updates if necessary
-            transitions.append((accuracy_change_bin, action_index, reward))
+            # Store transition for Monte Carlo updates if necessary. Note that step should've already updated the state.
+            transitions.append((prev_algo_state, action_index, reward))
 
             if isinstance(agent, QLearningAgent):
                 # Perform the Q-learning update immediately after the step
@@ -91,7 +91,7 @@ def train_agent(agent, env, num_episodes):
     return episode_accuracies, episode_baseline_accuracies
 
 
-def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bins, num_episodes, config):
+def setup_environment_and_train(agent_class, agent_name, num_states, num_episodes, config):
     # Since CONFIG and other required variables are not defined in this snippet, 
     # they should be defined elsewhere in the code or passed as arguments to the function.
 
@@ -101,11 +101,18 @@ def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bin
 
     # Setup Actions
     # actions are now all possible combinations of flips of the binary values in algorithm state vector
-    # This means that for m indices, there are 2^m possible actions
+    # Plus the no-op action
+    # This means that for m indices, there are 2^m+1 possible actions
     # We need to add all the possible actions to the environment by creating ModifyAlgorithmStateAction 
     # with all possible indices for config['algo_vec_len'] indices
 
     actions = [ModifyAlgorithmStateAction(indices) for indices in generate_combinations(config['algo_vec_len'])]
+    actions.append(ModifyAlgorithmStateAction([]))  # Add the no-op action
+
+    binary_design_space = {
+    "_reevaluate_best_split": ["reevaluate_best_split_removed", "original_reevaluate_best_split"],
+    "_attempt_to_split": ["attempt_to_split_removed", "original_attempt_to_split"]
+    }
 
     # Setup stream factory
     stream_type = config['stream_type']
@@ -121,8 +128,8 @@ def setup_environment_and_train(agent_class, agent_name, num_accuracy_change_bin
     num_epochs = config['num_epochs']
 
     # Train agent
-    env = Environment(state, actions, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
-    agent = agent_class(num_accuracy_change_bins=num_accuracy_change_bins, num_actions=len(actions))
+    env = Environment(state, actions, binary_design_space ,model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
+    agent = agent_class(num_states=num_states, num_actions=len(actions))
 
     accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)
 
@@ -138,7 +145,7 @@ def run_RL_agents(config):
         np.random.seed(config['seed0'])
 
         # Define the environment's context and number of episodes
-        num_accuracy_change_bins = NUM_ACCURACY_CHANGE_BINS
+        num_states = 2 ** config['algo_vec_len']
         num_episodes = config['num_episodes']
 
         result_qtables = []
@@ -149,10 +156,10 @@ def run_RL_agents(config):
         ql_result_accuracies_df = pd.DataFrame(columns=['episode', 'agent_type','stream_type', 'stream', 'accuracy', 'baseline_accuracy'])
 
         # Train Monte Carlo agent
-        mc_accuracies, mc_baseline_accuracies, mc_qtable = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_accuracy_change_bins, num_episodes, config)
+        mc_accuracies, mc_baseline_accuracies, mc_qtable = setup_environment_and_train(MonteCarloAgent, "Monte Carlo", num_states, num_episodes, config)
 
         # Train Q-learning agent
-        ql_accuracies, ql_baseline_accuracies, ql_qtable = setup_environment_and_train(QLearningAgent, "Q-learning", num_accuracy_change_bins, num_episodes, config)
+        ql_accuracies, ql_baseline_accuracies, ql_qtable = setup_environment_and_train(QLearningAgent, "Q-learning", num_states, num_episodes, config)
 
         # Add accuracies to the dataframe. 
         mc_temp_data = []

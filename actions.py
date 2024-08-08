@@ -35,10 +35,12 @@ class ModifyAlgorithmStateAction(BaseAction):
 
     def execute(self, _):
         if self.env is not None and hasattr(self.env, 'state'):
+            # Flip the values at the specified indices to set the new algorithm state vector
             for index in self.indices:
                 current_value = self.env.state[index]
                 new_value = 1 - current_value  # Flip the value
                 self.env.state.set_item(index, new_value)
+                    
         else:
             raise ValueError("Environment or state is not set for this action.")
 

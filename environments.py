@@ -4,7 +4,7 @@ from river import tree
 from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, Waveform, SEA, STAGGER, Friedman, Mv, Planes2D
 from river.datasets import ImageSegments
 from collections import OrderedDict
-from actions import MultiplyDeltaAction, SetEFDTStrategyAction
+from actions import MultiplyDeltaAction, SetEFDTStrategyAction, SetMethodAction
 
 BINS = [1, 2, 3, 4]
 NUM_ACCURACY_CHANGE_BINS = len(BINS) * len(BINS)
@@ -128,10 +128,7 @@ action_spaces = {
 # binary_design_spaces  is a dictionary mapping class names to their respective design spaces
 # All design choices should be binary
 
-binary_design_space = {
-    "_reevaluate_best_split": ["original_reevaluate_best_split", "reevaluate_best_split_removed"],
-    "_attempt_to_split": ["original_attempt_to_split", "attempt_to_split_removed"]
-}
+
 
 
 class Environment:
@@ -139,9 +136,25 @@ class Environment:
     Note: Each Environment instance is associated with a single model and a single baseline model and a single stream factory and a single stream and a single set of actions
     '''
 
-    def __init__(self, state, actions, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs_per_episode):
+    def __init__(self, state, actions, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs_per_episode):
 
         self.state = state
+        self.binary_design_space = binary_design_space
+
+
+        # For each design element, assign the corresponding function as given by the state vector
+        # 0 signifies turning off a design element, 1 signifies turning it on
+        # The functions should be written in such a way that the feature can be turned off or on
+
+        design_dict = {}
+        state_element = 0
+        for design_element, design_values in self.binary_design_space:
+            design_dict[design_element] = design_values[self.state[state_element]]
+            state_element += 1
+        write_state = SetMethodAction(design_dict)
+        write_state.execute()
+
+        # The updated algorithm (state) has been written to the environment
 
         self.model = model
         self.model_baseline = model_baseline
@@ -187,10 +200,29 @@ class Environment:
     def step(self, action_index):
 
         if self.current_epoch == 0:
-            pass # burnin first epoch, no RL action
+             # first epoch
+             # its likely that a more eager to split tree will do far better here if noise is low
+             # We could associate this with an accuracy_change_bin and use that context to determine the next action
+             # If we pass, we are effectively using this as a burn-in epoch
+            pass # Burn-in epoch
         else:
             action = self.actions[action_index]
             action.execute()
+        # State has been updated by the action
+
+        # For each design element, assign the corresponding function as given by the state vector
+        # 0 signifies turning off a design element, 1 signifies turning it on
+        # The functions should be written in such a way that the feature can be turned off or on
+
+        design_dict = {}
+        state_element = 0
+        for design_element, design_values in self.binary_design_space:
+            design_dict[design_element] = design_values[self.state[state_element]]
+            state_element += 1
+        write_state = SetMethodAction(design_dict)
+        write_state.execute()
+
+        # The updated algorithm (state) has been written to the environment
 
         # Run one epoch of the experiment
         accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()
@@ -216,8 +248,8 @@ class Environment:
         if (self.current_epoch == 1):
             reward = 0 # burn-in period - learning has just started. Disable RL as well for first epoch
         else:
-            reward = (accuracy - self.cumulative_accuracy/self.current_epoch)  # reward for improvement over past performance 
-            + (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
+            #reward = (accuracy - self.cumulative_accuracy/self.current_epoch) + # reward for improvement over past performance 
+            reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
 
         # Compute accuracy change of current epoch from the last epoch
         epoch_accuracy_change = 0
