@@ -20,7 +20,7 @@ BASE_CONFIG = {
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
     },
-    'num_episodes': 100
+    'num_episodes': 20
 }
 
 STREAMS = [
@@ -134,7 +134,7 @@ STREAMS = [
      'stream' : {
         'n_classes': 4,
         'n_features': 20,
-        'n_centroids': 50,
+        'n_centroids': 20,
         }
     },
 
