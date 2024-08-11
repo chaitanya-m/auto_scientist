@@ -5,6 +5,7 @@ from river.datasets.synth import RandomRBF, RandomTree, Sine, Hyperplane, Wavefo
 from river.datasets import ImageSegments
 from collections import OrderedDict
 from actions import MultiplyDeltaAction, SetEFDTStrategyAction, SetMethodAction
+import copy
 
 BINS = [1, 2, 3, 4]
 NUM_ACCURACY_CHANGE_BINS = len(BINS) * len(BINS)
@@ -142,6 +143,7 @@ class Environment:
         self.binary_design_space = binary_design_space
 
         self.model = model
+        self.prev_model = None
         self.model_baseline = model_baseline
 
         self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
@@ -195,14 +197,15 @@ class Environment:
              # If we pass, we are effectively using this as a burn-in epoch
             pass # Burn-in epoch
         else:
-            action = self.actions[action_index]
+            action = self.actions[action_index] # Action that determines updating algorithm bit vector
             action.execute()
         # State has been updated by the action
 
-        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
+        self.prev_model = copy.deepcopy(self.model)
+        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction) # Updated algorithm bit vector applied, algorithm updated
 
         # Run one epoch of the experiment
-        accuracy, baseline_epoch_prequential_accuracy = self.run_one_epoch()
+        accuracy, accuracy_prev_model, baseline_epoch_prequential_accuracy = self.run_one_epoch()
 
         # Increment the epoch counter
         self.current_epoch += 1
@@ -259,7 +262,8 @@ class Environment:
             reward = 0 # burn-in period - learning has just started. Disable RL as well for first epoch
         else:
             #reward = (accuracy - self.cumulative_accuracy/self.current_epoch) + # reward for improvement over past performance 
-            reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
+            #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
+            reward = (accuracy - accuracy_prev_model) # reward for improvement over baseline is difference in epoch accuracy between current model and previous model
 
         return self.index_state_vector(self.state), reward, done
 
@@ -351,6 +355,7 @@ class Environment:
 
         # Initialize the total accuracy for this epoch
         total_correctly_classified = 0
+        total_correctly_classified_prev_model = 0
         total_baseline_correctly_classified = 0
         total_samples = 0
 
@@ -359,18 +364,23 @@ class Environment:
 
             # Predict the output for the current input
             prediction = self.model.predict_one(x)
+            prev_model_prediction = self.prev_model.predict_one(x)
             baseline_prediction = self.model_baseline.predict_one(x)
 
             # Learn from the current input-output pair
             self.model.learn_one(x, y)
+            self.prev_model.learn_one(x, y)
             self.model_baseline.learn_one(x, y)
+
 
             # Calculate the accuracy of the prediction against the actual output
             is_correctly_classified = self.correctly_classified(prediction, y)
+            is_correctly_classified_prev_model = self.correctly_classified(prev_model_prediction, y)
             is_baseline_correctly_classified = self.correctly_classified(baseline_prediction, y)
 
             # Add the correctly classified to the total correctly classified
             total_correctly_classified += is_correctly_classified
+            total_correctly_classified_prev_model += is_correctly_classified_prev_model
             total_baseline_correctly_classified += is_baseline_correctly_classified
 
             # Increment the total number of samples
@@ -378,10 +388,11 @@ class Environment:
 
         # Calculate the prequential accuracy for this epoch
         epoch_prequential_accuracy = self.average_classification_accuracy(total_correctly_classified, total_samples)
+        epoch_prequential_accuracy_prev_model = self.average_classification_accuracy(total_correctly_classified_prev_model, total_samples)
         baseline_epoch_prequential_accuracy = self.average_classification_accuracy(total_baseline_correctly_classified, total_samples)
 
         # Return the prequential accuracy and baseline_epoch_prequential_accuracy
-        return epoch_prequential_accuracy, baseline_epoch_prequential_accuracy
+        return epoch_prequential_accuracy, epoch_prequential_accuracy_prev_model, baseline_epoch_prequential_accuracy
 
     @staticmethod
     def average_classification_accuracy(correct_predictions, total_predictions):

@@ -63,6 +63,7 @@ def train_agent(agent, env, num_episodes):
 
             if isinstance(agent, QLearningAgent):
                 # Perform the Q-learning update immediately after the step
+                # On policy because we're using the best possible next action
                 if state_index is not None and new_state_index is not None:
                     best_next_action = np.argmax(agent.Q_table[new_state_index])
                     td_target = reward + agent.gamma * agent.Q_table[new_state_index][best_next_action] if not done else reward
@@ -73,6 +74,7 @@ def train_agent(agent, env, num_episodes):
             state_index = new_state_index
 
         # Update the agent's Q-table using Monte Carlo updates at the end of an episode
+        # Off policy because we're using the transition as is, not the best possible next action
         if isinstance(agent, MonteCarloAgent):
             returns = 0
             for (state_index, action_index, reward) in reversed(transitions):
