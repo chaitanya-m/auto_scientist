@@ -20,7 +20,8 @@ BASE_CONFIG = {
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
     },
-    'num_episodes': 2
+    'num_episodes': 2,
+    'debug': True,
 }
 
 STREAMS = [

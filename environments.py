@@ -201,9 +201,9 @@ class Environment:
         action.execute()
         # State has been updated by the action
 
-
-        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction) # Updated algorithm bit vector applied, algorithm updated
         self.prev_model = copy.deepcopy(self.model)
+        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction) # Updated algorithm bit vector applied, algorithm updated
+
         # Run one epoch of the experiment
         accuracy, accuracy_prev_model, baseline_epoch_prequential_accuracy = self.run_one_epoch()
 
