@@ -20,7 +20,7 @@ BASE_CONFIG = {
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
     },
-    'num_episodes': 20,
+    'num_episodes': 100,
     'action_delay': 5,
     'debug': False,
     'alpha': 0.1,
