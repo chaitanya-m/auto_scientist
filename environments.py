@@ -202,7 +202,9 @@ class Environment:
         # State has been updated by the action
 
         self.prev_model = copy.deepcopy(self.model)
+        prev_state_index = self.index_state_vector(self.state)
         self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction) # Updated algorithm bit vector applied, algorithm updated
+        state_index = self.index_state_vector(self.state)
 
         # Run one epoch of the experiment
         accuracy, accuracy_prev_model, baseline_epoch_prequential_accuracy = self.run_one_epoch()
@@ -265,8 +267,10 @@ class Environment:
             #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
             reward = 100.0 * (accuracy - accuracy_prev_model) # reward is difference in epoch accuracy between current model and previous model
             # reward = 1 if reward > 0 else -1
-            print(f"Accuracy: {accuracy} Prev Accuracy: {accuracy_prev_model} Reward: {reward}")
-        return self.index_state_vector(self.state), reward, done
+            print(f"Accuracy: {accuracy} Prev Accuracy: {accuracy_prev_model}  State Sequence: {prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
+
+
+        return state_index, reward, done
 
     def apply_design_elements(self, binary_design_space, state, set_method_action_class):
         """
