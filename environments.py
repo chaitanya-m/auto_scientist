@@ -137,13 +137,14 @@ class Environment:
     Note: Each Environment instance is associated with a single model and a single baseline model and a single stream factory and a single stream and a single set of actions
     '''
 
-    def __init__(self, state, actions, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs_per_episode):
+    def __init__(self, state, actions, action_delay, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs_per_episode):
 
         self.state = state
         self.binary_design_space = binary_design_space
 
         self.model = model
         self.prev_model = None
+        self.prev_state_index = None
         self.model_baseline = model_baseline
 
         self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
@@ -157,6 +158,9 @@ class Environment:
         self.actions = actions
         for action in self.actions:
             action.set_env(self)
+
+        self.action_delay = action_delay
+        self.action_delay_counter = 0
 
         self.current_epoch = 0
         self.num_epochs = num_epochs_per_episode
@@ -175,6 +179,10 @@ class Environment:
         self.current_epoch = 0
         self.accuracy_change_bin = None # Initialize context - accuracy change bin - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
+        self.action_delay_counter = 0
+
+        self.prev_model = None
+        self.prev_state_index = None
 
         self.cumulative_accuracy = 0.0
         self.cumulative_baseline_accuracy = 0.0
@@ -197,17 +205,20 @@ class Environment:
         #      # If we pass, we are effectively using this as a burn-in epoch
         #     pass # Burn-in epoch
         # else:
-        prev_state_index = self.index_state_vector(self.state)
-        self.prev_model = copy.deepcopy(self.model)
-        
+
+        if action_index < len(self.actions) - 1: # the last action should always be the null action 
+            self.action_delay_counter = 0 # Reset the action delay counter, as a new action has been taken
+            self.prev_state_index = self.index_state_vector(self.state)
+            self.prev_model = copy.deepcopy(self.model)
+        else: # Null action. Do not update the model
+            self.action_delay_counter += 1
+            if self.prev_model is None: # If the previous model is None, set it to the current model, otherwise, keep it as is
+                self.prev_model = copy.deepcopy(self.model)
+            if self.prev_state_index is None:
+                self.prev_state_index = self.index_state_vector(self.state)
+
         action = self.actions[action_index] # Action that determines updating algorithm bit vector
-
-        print(f"Action Index:  {action_index} State: {self.state}")
         action.execute()
-        print(f"Updated State: {self.state}")
-        # State vector has been updated by the action
-
-
 
         self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction) # Updated algorithm bit vector applied, algorithm updated
         state_index = self.index_state_vector(self.state)
@@ -273,7 +284,7 @@ class Environment:
             #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
             reward = 100.0 * (accuracy - accuracy_prev_model) # reward is difference in epoch accuracy between current model and previous model
             # reward = 1 if reward > 0 else -1
-            print(f"Accuracy: {accuracy} Prev Accuracy: {accuracy_prev_model}  State Sequence: {prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
+            print(f"Prev Accuracy: {accuracy_prev_model} Accuracy: {accuracy} State Sequence: {self.prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
 
 
         return state_index, reward, done

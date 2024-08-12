@@ -54,7 +54,7 @@ def train_agent(agent, env, num_episodes):
         transitions = []  # Store the episode trajectory for Monte Carlo updates
 
         while not done:  # As long as the episode is not done
-            action_index = agent.select_action(state_index)
+            action_index = agent.select_action(state_index, env.action_delay, env.action_delay_counter)  # Select an action using the agent's policy
             new_state_index, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
@@ -109,7 +109,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     # with all possible indices for config['algo_vec_len'] indices
 
     actions = [ModifyAlgorithmStateAction(indices) for indices in generate_combinations(config['algo_vec_len'])]
-    actions.append(ModifyAlgorithmStateAction([]))  # Add the no-op action
+    actions.append(ModifyAlgorithmStateAction([]))  # Add the no-op action. Last action should always be no-op.
 
     binary_design_space = {
     "_reevaluate_best_split": ["reevaluate_best_split_removed", "original_reevaluate_best_split"],
@@ -128,6 +128,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']
     num_epochs = config['num_epochs']
+    action_delay = config['action_delay']
 
     if config['debug']:
         print("\nDebug: Actions are all null\n")
@@ -136,8 +137,8 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
         actions = test_null_actions
 
     # Train agent
-    env = Environment(state, actions, binary_design_space ,model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
-    agent = agent_class(num_states=num_states, num_actions=len(actions))
+    env = Environment(state, actions, action_delay, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
+    agent = agent_class(num_states=num_states, num_actions=len(actions), alpha=config['alpha'], gamma=config['gamma'], epsilon=config['epsilon'])
 
     accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)
 

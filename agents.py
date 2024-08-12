@@ -8,9 +8,14 @@ class BaseAgent:
         self.Q_table = np.zeros((num_states, num_actions))  # Initialize Q-values to zeros
         self.rng = np.random.default_rng(0)
 
-    def select_action(self, state, context=None):
+    def select_action(self, state, action_delay, action_delay_counter):
         # Select action using epsilon-greedy policy
-        if np.random.rand() < self.epsilon:
+
+        if action_delay_counter < action_delay:
+            # If action delay is not yet reached, return the last action, as it is always the null action
+            action_no = self.num_actions - 1
+
+        elif np.random.rand() < self.epsilon:
             # With probability epsilon, return a random action
             action_no = self.rng.integers(self.num_actions)
             # print("Initial or exploratory action " + str(action_no))
@@ -33,7 +38,7 @@ class QLearningAgent(BaseAgent):
         # Uses the Q_table initialized in the BaseAgent class
 
 class MonteCarloAgent(BaseAgent):
-    def __init__(self, num_states, num_actions, gamma=0.9, epsilon=0.1):
+    def __init__(self, num_states, num_actions, alpha = None, gamma=0.9, epsilon=0.1): # Never use alpha for Monte Carlo... this is just to keep the same function signature
         super().__init__(num_states, num_actions, epsilon)
         self.gamma = gamma  # Discount factor
         self.visits = np.zeros((num_states, num_actions))  # Track number of visits for each state-action pair
