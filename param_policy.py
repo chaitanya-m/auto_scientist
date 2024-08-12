@@ -129,7 +129,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     num_samples_per_epoch = config['evaluation_interval']
     num_epochs = config['num_epochs']
 
-    if config['debug'] & False:
+    if config['debug']:
         print("\nDebug: Actions are all null\n")
         test_null_actions = [ModifyAlgorithmStateAction([]) for _ in generate_combinations(config['algo_vec_len'])]
         test_null_actions.append(ModifyAlgorithmStateAction([]))

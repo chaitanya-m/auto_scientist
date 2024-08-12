@@ -197,12 +197,18 @@ class Environment:
         #      # If we pass, we are effectively using this as a burn-in epoch
         #     pass # Burn-in epoch
         # else:
-        action = self.actions[action_index] # Action that determines updating algorithm bit vector
-        action.execute()
-        # State has been updated by the action
-
-        self.prev_model = copy.deepcopy(self.model)
         prev_state_index = self.index_state_vector(self.state)
+        self.prev_model = copy.deepcopy(self.model)
+        
+        action = self.actions[action_index] # Action that determines updating algorithm bit vector
+
+        print(f"Action Index:  {action_index} State: {self.state}")
+        action.execute()
+        print(f"Updated State: {self.state}")
+        # State vector has been updated by the action
+
+
+
         self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction) # Updated algorithm bit vector applied, algorithm updated
         state_index = self.index_state_vector(self.state)
 
