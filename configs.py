@@ -20,23 +20,23 @@ BASE_CONFIG = {
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
     },
-    'num_episodes': 20
+    'num_episodes': 2
 }
 
 STREAMS = [
 
-    {
-    'stream_type': 'RandomTree',
-     'stream' : {
-        'n_classes': 2,
-        'n_num_features': 2,
-        'n_cat_features': 2,
-        'n_categories_per_feature': 2,
-        'max_tree_depth': 5,
-        'first_leaf_level': 2,
-        'fraction_leaves_per_level': 0.15,
-        }
-    },
+    # {
+    # 'stream_type': 'RandomTree',
+    #  'stream' : {
+    #     'n_classes': 2,
+    #     'n_num_features': 2,
+    #     'n_cat_features': 2,
+    #     'n_categories_per_feature': 2,
+    #     'max_tree_depth': 5,
+    #     'first_leaf_level': 2,
+    #     'fraction_leaves_per_level': 0.15,
+    #     }
+    # },
 
 
     {
@@ -65,78 +65,78 @@ STREAMS = [
         }
     },
 
-    {
-    'stream_type': 'RandomTree',
-     'stream' : {
-        'n_classes': 4,
-        'n_num_features': 4,
-        'n_cat_features': 4,
-        'n_categories_per_feature': 3,
-        'max_tree_depth': 5,
-        'first_leaf_level': 2,
-        'fraction_leaves_per_level': 0.15,
-        }
-    },
+    # {
+    # 'stream_type': 'RandomTree',
+    #  'stream' : {
+    #     'n_classes': 4,
+    #     'n_num_features': 4,
+    #     'n_cat_features': 4,
+    #     'n_categories_per_feature': 3,
+    #     'max_tree_depth': 5,
+    #     'first_leaf_level': 2,
+    #     'fraction_leaves_per_level': 0.15,
+    #     }
+    # },
 
-    {
-    'stream_type': 'RandomTree',
-     'stream' : {
-        'n_classes': 4,
-        'n_num_features': 4,
-        'n_cat_features': 4,
-        'n_categories_per_feature': 4,
-        'max_tree_depth': 5,
-        'first_leaf_level': 2,
-        'fraction_leaves_per_level': 0.15,
-        }
-    },
-
-
-    {
-    'stream_type': 'RandomRBF',
-     'stream' : {
-        'n_classes': 4,
-        'n_features': 5,
-        'n_centroids': 10,
-        }
-    },
-
-    {
-    'stream_type': 'RandomRBF',
-     'stream' : {
-        'n_classes': 4,
-        'n_features': 10,
-        'n_centroids': 20,
-        }
-    },
+    # {
+    # 'stream_type': 'RandomTree',
+    #  'stream' : {
+    #     'n_classes': 4,
+    #     'n_num_features': 4,
+    #     'n_cat_features': 4,
+    #     'n_categories_per_feature': 4,
+    #     'max_tree_depth': 5,
+    #     'first_leaf_level': 2,
+    #     'fraction_leaves_per_level': 0.15,
+    #     }
+    # },
 
 
-    {
-    'stream_type': 'RandomRBF',
-     'stream' : {
-        'n_classes': 2,
-        'n_features': 10,
-        'n_centroids': 50,
-        }
-    },
+    # {
+    # 'stream_type': 'RandomRBF',
+    #  'stream' : {
+    #     'n_classes': 4,
+    #     'n_features': 5,
+    #     'n_centroids': 10,
+    #     }
+    # },
 
-    {
-    'stream_type': 'RandomRBF',
-     'stream' : {
-        'n_classes': 4,
-        'n_features': 10,
-        'n_centroids': 50,
-        }
-    },
+    # {
+    # 'stream_type': 'RandomRBF',
+    #  'stream' : {
+    #     'n_classes': 4,
+    #     'n_features': 10,
+    #     'n_centroids': 20,
+    #     }
+    # },
 
-    {
-    'stream_type': 'RandomRBF',
-     'stream' : {
-        'n_classes': 4,
-        'n_features': 20,
-        'n_centroids': 20,
-        }
-    },
+
+    # {
+    # 'stream_type': 'RandomRBF',
+    #  'stream' : {
+    #     'n_classes': 2,
+    #     'n_features': 10,
+    #     'n_centroids': 50,
+    #     }
+    # },
+
+    # {
+    # 'stream_type': 'RandomRBF',
+    #  'stream' : {
+    #     'n_classes': 4,
+    #     'n_features': 10,
+    #     'n_centroids': 50,
+    #     }
+    # },
+
+    # {
+    # 'stream_type': 'RandomRBF',
+    #  'stream' : {
+    #     'n_classes': 4,
+    #     'n_features': 20,
+    #     'n_centroids': 20,
+    #     }
+    # },
 
     # {
     # 'stream_type': 'RandomTree',
