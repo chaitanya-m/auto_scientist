@@ -123,7 +123,9 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     # Setup model
     ModelClass = model_classes[config['model']]
     model = ModelClass(delta=config['delta_hard'])
-    model_baseline = ModelClass(delta=config['delta_hard'])
+
+    BaselineModelClass = model_classes[config['baseline_model']]
+    model_baseline = BaselineModelClass(delta=config['delta_hard'])
 
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']
