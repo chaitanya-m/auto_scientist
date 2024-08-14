@@ -2,7 +2,7 @@
 BASE_CONFIG = {
     'change_point_epoch': 10,
     'evaluation_interval': 1000,
-    'num_epochs': 20,
+    'num_epochs': 100,
     'delta_easy': 1e-3,
     'delta_hard': 1e-7,
     'seed0': 0,
