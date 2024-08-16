@@ -21,7 +21,7 @@ BASE_CONFIG = {
             'fraction_leaves_per_level': 0.15,
     },
     'num_episodes': 100,
-    'action_delay': 5,
+    'test_phase_length': 5,
     'debug': False,
     'alpha': 0.1,
     'gamma': 0.9,

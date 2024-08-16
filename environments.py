@@ -143,7 +143,7 @@ class Environment:
         self.binary_design_space = binary_design_space
 
         self.model = model
-        self.prev_model = None
+        self.comparator_model = None
         self.prev_state_index = None
         self.model_baseline = model_baseline
 
@@ -181,7 +181,7 @@ class Environment:
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
         self.action_delay_counter = 0
 
-        self.prev_model = None
+        self.comparator_model = None
         self.prev_state_index = None
 
         self.cumulative_accuracy = 0.0
@@ -206,17 +206,6 @@ class Environment:
         #     pass # Burn-in epoch
         # else:
 
-        if action_index < len(self.actions) - 1: # the last action should always be the null action 
-            self.action_delay_counter = 0 # Reset the action delay counter, as a new action has been taken
-            self.prev_state_index = self.index_state_vector(self.state)
-            self.prev_model = copy.deepcopy(self.model)
-        else: # Null action. Do not update the model
-            self.action_delay_counter += 1
-            if self.prev_model is None: # If the previous model is None, set it to the current model, otherwise, keep it as is
-                self.prev_model = copy.deepcopy(self.model)
-            if self.prev_state_index is None:
-                self.prev_state_index = self.index_state_vector(self.state)
-
         action = self.actions[action_index] # Action that determines updating algorithm bit vector
         action.execute()
 
@@ -224,7 +213,7 @@ class Environment:
         state_index = self.index_state_vector(self.state)
 
         # Run one epoch of the experiment
-        accuracy, accuracy_prev_model, baseline_epoch_prequential_accuracy = self.run_one_epoch()
+        accuracy, accuracy_comparator_model, baseline_epoch_prequential_accuracy = self.run_one_epoch()
 
         # Increment the epoch counter
         self.current_epoch += 1
@@ -282,9 +271,9 @@ class Environment:
         else:
             #reward = (accuracy - self.cumulative_accuracy/self.current_epoch) + # reward for improvement over past performance 
             #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
-            reward = 100.0 * (accuracy - accuracy_prev_model) # reward is difference in epoch accuracy between current model and previous model
+            reward = 100.0 * (accuracy - accuracy_comparator_model) # reward is difference in epoch accuracy between current model and previous model
             # reward = 1 if reward > 0 else -1
-            print(f"Prev Accuracy: {accuracy_prev_model} Accuracy: {accuracy} State Sequence: {self.prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
+            print(f"Prev Accuracy: {accuracy_comparator_model} Accuracy: {accuracy}")
 
 
         return state_index, reward, done
@@ -386,12 +375,12 @@ class Environment:
 
             # Predict the output for the current input
             prediction = self.model.predict_one(x)
-            prev_model_prediction = self.prev_model.predict_one(x)
+            prev_model_prediction = self.comparator_model.predict_one(x)
             baseline_prediction = self.model_baseline.predict_one(x)
 
             # Learn from the current input-output pair
             self.model.learn_one(x, y)
-            self.prev_model.learn_one(x, y)
+            self.comparator_model.learn_one(x, y)
             self.model_baseline.learn_one(x, y)
 
 
