@@ -137,13 +137,13 @@ class Environment:
     Note: Each Environment instance is associated with a single model and a single baseline model and a single stream factory and a single stream and a single set of actions
     '''
 
-    def __init__(self, state, actions, action_delay, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs_per_episode):
+    def __init__(self, state, actions, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs_per_episode):
 
         self.state = state
         self.binary_design_space = binary_design_space
 
         self.model = model
-        self.comparator_model = None
+        self.step_comparator_model = None
         self.prev_state_index = None
         self.model_baseline = model_baseline
 
@@ -158,9 +158,6 @@ class Environment:
         self.actions = actions
         for action in self.actions:
             action.set_env(self)
-
-        self.action_delay = action_delay
-        self.action_delay_counter = 0
 
         self.current_epoch = 0
         self.num_epochs = num_epochs_per_episode
@@ -179,9 +176,9 @@ class Environment:
         self.current_epoch = 0
         self.accuracy_change_bin = None # Initialize context - accuracy change bin - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
-        self.action_delay_counter = 0
 
-        self.comparator_model = None
+
+        self.step_comparator_model = None
         self.prev_state_index = None
 
         self.cumulative_accuracy = 0.0
@@ -196,8 +193,8 @@ class Environment:
         # Return the state index
         return self.index_state_vector(self.state)
 
-    def step(self, action_index):
-
+    def step(self, action_index, comparator_model):
+        self.step_comparator_model = comparator_model
         # if self.current_epoch == 0:
         #      # first epoch
         #      # its likely that a more eager to split tree will do far better here if noise is low
@@ -375,12 +372,12 @@ class Environment:
 
             # Predict the output for the current input
             prediction = self.model.predict_one(x)
-            prev_model_prediction = self.comparator_model.predict_one(x)
+            prev_model_prediction = self.step_comparator_model.predict_one(x)
             baseline_prediction = self.model_baseline.predict_one(x)
 
             # Learn from the current input-output pair
             self.model.learn_one(x, y)
-            self.comparator_model.learn_one(x, y)
+            self.step_comparator_model.learn_one(x, y)
             self.model_baseline.learn_one(x, y)
 
 

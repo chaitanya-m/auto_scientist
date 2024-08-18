@@ -49,7 +49,7 @@ class BaseAgent:
 
 class QLearningAgent(BaseAgent):
     def __init__(self, num_states, num_actions, test_phase_length, alpha=0.1, gamma=0.9, epsilon=0.1):
-        super().__init__(num_states, num_actions, epsilon)
+        super().__init__(num_states, num_actions, test_phase_length, epsilon)
         self.alpha = alpha  # Learning rate
         self.gamma = gamma  # Discount factor
         self.test_phase_length = test_phase_length
@@ -57,7 +57,7 @@ class QLearningAgent(BaseAgent):
 
 class MonteCarloAgent(BaseAgent):
     def __init__(self, num_states, num_actions, test_phase_length, alpha = None, gamma=0.9, epsilon=0.1): # Never use alpha for Monte Carlo... this is just to keep the same function signature
-        super().__init__(num_states, num_actions, epsilon)
+        super().__init__(num_states, num_actions, test_phase_length, epsilon)
         self.gamma = gamma  # Discount factor
         self.visits = np.zeros((num_states, num_actions))  # Track number of visits for each state-action pair
         self.test_phase_length = test_phase_length

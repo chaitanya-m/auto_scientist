@@ -64,6 +64,12 @@ def train_agent(agent, env, num_episodes):
                 start_test_phase_action_index = action_index
                 comparator_model = copy.deepcopy(env.model)
                 test_phase_start = True
+            elif is_test_phase: # Inside the test phase, use the same model
+                pass
+            elif not is_test_phase and action_index < agent.num_actions - 1: # Not in the test phase and not null action, use the current model to compare against
+                comparator_model = copy.deepcopy(env.model)
+            else: # Null action and not test phase, compare against itself
+                comparator_model = copy.deepcopy(env.model)
 
             new_state_index, reward, done = env.step(action_index, comparator_model) # A step runs a single stream learning epoch of say 1000 examples
             print(f"State Sequence: {state_index} {new_state_index}, Action: {action_index}, Reward: {reward}")
@@ -83,7 +89,7 @@ def train_agent(agent, env, num_episodes):
                     td_target = reward + agent.gamma * agent.Q_table[new_state_index][best_next_action] if not done else reward
                     td_error = td_target - agent.Q_table[state_index][action_index]
                     agent.Q_table[state_index][action_index] += agent.alpha * td_error
-                    
+
                     if test_phase_finish: # share the reward with the starting state-action pair
                         td_target = reward + agent.gamma * agent.Q_table[state_index][np.argmax(agent.Q_table[state_index])] if not done else reward 
                         # we use the current state because it's the stable state that just ended
@@ -150,7 +156,8 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']
     num_epochs = config['num_epochs']
-    action_delay = config['action_delay']
+
+    
 
     if config['debug']:
         print("\nDebug: Actions are all null\n")
@@ -159,7 +166,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
         actions = test_null_actions
 
     # Train agent
-    env = Environment(state, actions, action_delay, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
+    env = Environment(state, actions, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
     agent = agent_class(num_states=num_states, num_actions=len(actions), test_phase_length=config['test_phase_length'], alpha=config['alpha'], 
                         gamma=config['gamma'], epsilon=config['epsilon'])
 

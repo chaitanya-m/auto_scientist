@@ -2,7 +2,7 @@
 BASE_CONFIG = {
     'change_point_epoch': 10,
     'evaluation_interval': 1000,
-    'num_epochs': 100,
+    'num_epochs': 50,
     'delta_easy': 1e-3,
     'delta_hard': 1e-7,
     'seed0': 0,
@@ -25,7 +25,7 @@ BASE_CONFIG = {
     'debug': False,
     'alpha': 0.1,
     'gamma': 0.9,
-    'epsilon': 0.5,
+    'epsilon': 0.3,
     'baseline_model': 'UpdatableEFDTClassifier',
 }
 
