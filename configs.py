@@ -2,7 +2,7 @@
 BASE_CONFIG = {
     'change_point_epoch': 10,
     'evaluation_interval': 1000,
-    'num_epochs': 20,
+    'num_epochs': 10,
     'delta_easy': 1e-3,
     'delta_hard': 1e-7,
     'seed0': 0,
@@ -20,7 +20,7 @@ BASE_CONFIG = {
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
     },
-    'num_episodes': 10,
+    'num_episodes': 20,
     'test_phase_length': 5,
     'debug': False,
     'alpha': 1,
