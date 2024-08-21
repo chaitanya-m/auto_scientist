@@ -122,7 +122,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     stream_factory = StreamFactory(stream_type, config['stream'])
 
     # Setup model
-    ModelClass = model_classes[config['model']]
+    ModelClass = model_classes[config['model_class']]
     model = ModelClass(delta=config['delta_hard'])
     BaselineModelClass = model_classes[config['baseline_model']]
     model_baseline = BaselineModelClass(delta=config['delta_hard'])

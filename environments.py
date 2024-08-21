@@ -141,6 +141,7 @@ class Environment:
 
         self.state = state
         self.binary_design_space = binary_design_space
+        self.prev_state_index = -1 # Initialize the previous state index to -1
 
         self.model = model
         self.prev_model = None
@@ -175,6 +176,7 @@ class Environment:
         self.current_epoch = 0
         self.accuracy_change_bin = None # Initialize context - accuracy change bin - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
+        self.prev_model = None
 
         self.cumulative_accuracy = 0.0
         self.cumulative_baseline_accuracy = 0.0
@@ -183,7 +185,9 @@ class Environment:
         # No matter which algorithm state we start in, we want to see if the agent will converge to the near-optimal state-action 
         # values for EFDT (or some other unknown algorithm in the design space)
 
-        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
+        self.prev_state_index = -1 # Initialize the previous state index to -1
+
+        self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction) # Updates the algorithm
 
         # Return the state index
         return self.index_state_vector(self.state)
@@ -198,14 +202,12 @@ class Environment:
         #     pass # Burn-in epoch
         # else:
 
-
         if self.prev_model is None: # No state changes have occurred yet, so we can use the baseline model as comparison
             self.prev_model = self.model_baseline
-            prev_state_index = -1 # meaning baseline model is the comparison. change this is prev_state_index is used other than for debugging
 
         elif action_index < len(self.actions) - 1 : # If the action is not the last (no op) action, there will be a state (algorithm) change
             # Use the current algorithm's model as comparison for the next algorithm's model
-            prev_state_index = self.index_state_vector(self.state)
+            self.prev_state_index = self.index_state_vector(self.state)
             self.prev_model = copy.deepcopy(self.model)
         
         action = self.actions[action_index] # Action that determines updating algorithm bit vector
@@ -281,7 +283,7 @@ class Environment:
             #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
             reward = 100.0 * (accuracy - accuracy_prev_model) # reward is difference in epoch accuracy between current model and previous model
             # reward = 1 if reward > 0 else -1
-            print(f"Accuracy: {accuracy} Prev Accuracy: {accuracy_prev_model}  State Sequence: {prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
+            print(f"Accuracy: {accuracy} Prev Accuracy: {accuracy_prev_model}  State Sequence: {self.prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
 
 
         return state_index, reward, done
