@@ -20,13 +20,13 @@ BASE_CONFIG = {
             'first_leaf_level': 3,
             'fraction_leaves_per_level': 0.15,
     },
-    'num_episodes': 2,
+    'num_episodes': 20,
     'debug': False,
     'alpha': 0.5,
-    'alpha_decay': 0.95,
-    'alpha_mc_decay': 0.95,
+    'alpha_decay': 0.99,
+    'alpha_mc_decay': 0.99,
     'gamma': 0.9,
-    'epsilon': 0.1,
+    'epsilon': 0.2,
     'baseline_model': 'UpdatableEFDTClassifier',
 }
 
