@@ -143,8 +143,7 @@ class Environment:
         self.binary_design_space = binary_design_space
 
         self.model = model
-        self.step_comparator_model = None
-        self.prev_state_index = None
+        self.prev_model = None
         self.model_baseline = model_baseline
 
         self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction)
@@ -177,10 +176,6 @@ class Environment:
         self.accuracy_change_bin = None # Initialize context - accuracy change bin - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
 
-
-        self.step_comparator_model = None
-        self.prev_state_index = None
-
         self.cumulative_accuracy = 0.0
         self.cumulative_baseline_accuracy = 0.0
 
@@ -193,8 +188,8 @@ class Environment:
         # Return the state index
         return self.index_state_vector(self.state)
 
-    def step(self, action_index, comparator_model):
-        self.step_comparator_model = comparator_model
+    def step(self, action_index):
+
         # if self.current_epoch == 0:
         #      # first epoch
         #      # its likely that a more eager to split tree will do far better here if noise is low
@@ -202,15 +197,23 @@ class Environment:
         #      # If we pass, we are effectively using this as a burn-in epoch
         #     pass # Burn-in epoch
         # else:
-
+        prev_state_index = self.index_state_vector(self.state)
+        self.prev_model = copy.deepcopy(self.model)
+        
         action = self.actions[action_index] # Action that determines updating algorithm bit vector
+
+        print(f"Action Index:  {action_index} State: {self.state}")
         action.execute()
+        print(f"Updated State: {self.state}")
+        # State vector has been updated by the action
+
+
 
         self.apply_design_elements(self.binary_design_space, self.state, SetMethodAction) # Updated algorithm bit vector applied, algorithm updated
         state_index = self.index_state_vector(self.state)
 
         # Run one epoch of the experiment
-        accuracy, accuracy_comparator_model, baseline_epoch_prequential_accuracy = self.run_one_epoch()
+        accuracy, accuracy_prev_model, baseline_epoch_prequential_accuracy = self.run_one_epoch()
 
         # Increment the epoch counter
         self.current_epoch += 1
@@ -268,9 +271,9 @@ class Environment:
         else:
             #reward = (accuracy - self.cumulative_accuracy/self.current_epoch) + # reward for improvement over past performance 
             #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
-            reward = 100.0 * (accuracy - accuracy_comparator_model) # reward is difference in epoch accuracy between current model and previous model
+            reward = 100.0 * (accuracy - accuracy_prev_model) # reward is difference in epoch accuracy between current model and previous model
             # reward = 1 if reward > 0 else -1
-            print(f"Prev Accuracy: {accuracy_comparator_model} Accuracy: {accuracy}")
+            print(f"Accuracy: {accuracy} Prev Accuracy: {accuracy_prev_model}  State Sequence: {prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
 
 
         return state_index, reward, done
@@ -372,12 +375,12 @@ class Environment:
 
             # Predict the output for the current input
             prediction = self.model.predict_one(x)
-            prev_model_prediction = self.step_comparator_model.predict_one(x)
+            prev_model_prediction = self.prev_model.predict_one(x)
             baseline_prediction = self.model_baseline.predict_one(x)
 
             # Learn from the current input-output pair
             self.model.learn_one(x, y)
-            self.step_comparator_model.learn_one(x, y)
+            self.prev_model.learn_one(x, y)
             self.model_baseline.learn_one(x, y)
 
 

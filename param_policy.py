@@ -54,31 +54,11 @@ def train_agent(agent, env, num_episodes):
         transitions = []  # Store the episode trajectory for Monte Carlo updates
 
         while not done:  # As long as the episode is not done
-            test_phase_start = False
-            test_phase_finish = False
-            action_index, is_test_phase, test_phase_counter = agent.select_action(state_index)  # Select an action using the agent's policy
-            if is_test_phase and test_phase_counter == 0: 
-                # If the phase just started 
-                # Setup in order to apportion reward to the starting state-action pair
-                start_test_phase_state_index = state_index
-                start_test_phase_action_index = action_index
-                comparator_model = copy.deepcopy(env.model)
-                test_phase_start = True
-            elif is_test_phase: # Inside the test phase, use the same model
-                pass
-            elif not is_test_phase and action_index < agent.num_actions - 1: # Not in the test phase and not null action, use the current model to compare against
-                comparator_model = copy.deepcopy(env.model)
-            else: # Null action and not test phase, compare against itself
-                comparator_model = copy.deepcopy(env.model)
-
-            new_state_index, reward, done = env.step(action_index, comparator_model) # A step runs a single stream learning epoch of say 1000 examples
-            print(f"State Sequence: {state_index} {new_state_index}, Action: {action_index}, Reward: {reward}")
-            if is_test_phase and test_phase_counter == agent.num_actions-1: # last test phase step just ran
-                test_phase_finish = True
-
+            action_index = agent.select_action(state_index)
+            new_state_index, reward, done = env.step(action_index) # A step runs a single stream learning epoch of say 1000 examples
             # Store the transition information for later update (used by both Q-learning and Monte Carlo)
 
-            # Store transition for Monte Carlo updates if necessary.
+            # Store transition for Monte Carlo updates if necessary. Note that step should've already updated the state.
             transitions.append((state_index, action_index, reward))
 
             if isinstance(agent, QLearningAgent):
@@ -89,12 +69,6 @@ def train_agent(agent, env, num_episodes):
                     td_target = reward + agent.gamma * agent.Q_table[new_state_index][best_next_action] if not done else reward
                     td_error = td_target - agent.Q_table[state_index][action_index]
                     agent.Q_table[state_index][action_index] += agent.alpha * td_error
-
-                    if test_phase_finish: # share the reward with the starting state-action pair
-                        td_target = reward + agent.gamma * agent.Q_table[state_index][np.argmax(agent.Q_table[state_index])] if not done else reward 
-                        # we use the current state because it's the stable state that just ended
-                        td_error = td_target - agent.Q_table[start_test_phase_state_index][start_test_phase_action_index]
-                        agent.Q_table[start_test_phase_state_index][start_test_phase_action_index] += agent.alpha * td_error
 
             # Update the state index for the next iteration
             state_index = new_state_index
@@ -135,11 +109,11 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     # with all possible indices for config['algo_vec_len'] indices
 
     actions = [ModifyAlgorithmStateAction(indices) for indices in generate_combinations(config['algo_vec_len'])]
-    actions.append(ModifyAlgorithmStateAction([]))  # Add the no-op action. Last action should always be no-op.
+    actions.append(ModifyAlgorithmStateAction([]))  # Add the no-op action
 
     binary_design_space = {
-    "_reevaluate_best_split": ["reevaluate_best_split_removed", "original_reevaluate_best_split"], # split revision
-    "_attempt_to_split": ["attempt_to_split_removed", "original_attempt_to_split"] # eager splitting
+    "_reevaluate_best_split": ["reevaluate_best_split_removed", "original_reevaluate_best_split"],
+    "_attempt_to_split": ["attempt_to_split_removed", "original_attempt_to_split"]
     }
 
     # Setup stream factory
@@ -149,15 +123,11 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
     # Setup model
     ModelClass = model_classes[config['model']]
     model = ModelClass(delta=config['delta_hard'])
-
-    BaselineModelClass = model_classes[config['baseline_model']]
-    model_baseline = BaselineModelClass(delta=config['delta_hard'])
+    model_baseline = ModelClass(delta=config['delta_hard'])
 
     # Setup Environment
     num_samples_per_epoch = config['evaluation_interval']
     num_epochs = config['num_epochs']
-
-    
 
     if config['debug']:
         print("\nDebug: Actions are all null\n")
@@ -166,9 +136,8 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
         actions = test_null_actions
 
     # Train agent
-    env = Environment(state, actions, binary_design_space, model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
-    agent = agent_class(num_states=num_states, num_actions=len(actions), test_phase_length=config['test_phase_length'], alpha=config['alpha'], 
-                        gamma=config['gamma'], epsilon=config['epsilon'])
+    env = Environment(state, actions, binary_design_space ,model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
+    agent = agent_class(num_states=num_states, num_actions=len(actions))
 
     accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)
 
