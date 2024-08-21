@@ -137,7 +137,7 @@ def setup_environment_and_train(agent_class, agent_name, num_states, num_episode
 
     # Train agent
     env = Environment(state, actions, binary_design_space ,model, model_baseline, stream_factory, num_samples_per_epoch, num_epochs)
-    agent = agent_class(num_states=num_states, num_actions=len(actions))
+    agent = agent_class(num_states=num_states, num_actions=len(actions), config=config)
 
     accuracies, baseline_accuracies = train_agent(agent, env, num_episodes)
 

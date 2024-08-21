@@ -22,6 +22,10 @@ BASE_CONFIG = {
     },
     'num_episodes': 2,
     'debug': False,
+    'alpha': 0.5,
+    'alpha_decay': 0.95,
+    'gamma': 0.9,
+    'epsilon': 0.1,
 }
 
 STREAMS = [
