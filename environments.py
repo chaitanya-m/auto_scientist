@@ -202,8 +202,8 @@ class Environment:
         #     pass # Burn-in epoch
         # else:
 
-        if self.prev_model is None: # No state changes have occurred yet, so we can use the baseline model as comparison
-            self.prev_model = self.model_baseline
+        if self.prev_model is None: # No state changes have occurred yet
+            self.prev_model = self.model
 
         elif action_index < len(self.actions) - 1 : # If the action is not the last (no op) action, there will be a state (algorithm) change
             # Use the current algorithm's model as comparison for the next algorithm's model
