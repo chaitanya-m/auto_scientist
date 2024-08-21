@@ -82,7 +82,8 @@ def train_agent(agent, env, num_episodes):
                     continue
                 returns = reward + agent.gamma * returns
                 agent.visits[state_index][action_index] += 1
-                alpha = 1 / agent.visits[state_index][action_index]
+                #alpha = 1 / agent.visits[state_index][action_index]
+                alpha = agent.alpha_mc_decay ** agent.visits[state_index][action_index]  # Decay alpha
                 agent.Q_table[state_index][action_index] += alpha * (returns - agent.Q_table[state_index][action_index])
 
         # Get the accuracy and baseline accuracy for this episode

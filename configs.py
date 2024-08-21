@@ -24,6 +24,7 @@ BASE_CONFIG = {
     'debug': False,
     'alpha': 0.5,
     'alpha_decay': 0.95,
+    'alpha_mc_decay': 0.95,
     'gamma': 0.9,
     'epsilon': 0.1,
     'baseline_model': 'UpdatableEFDTClassifier',

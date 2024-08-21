@@ -42,5 +42,6 @@ class MonteCarloAgent(BaseAgent):
         super().__init__(num_states, num_actions, config)
         self.gamma = config['gamma']  # Discount factor
         self.visits = np.zeros((num_states, num_actions))  # Track number of visits for each state-action pair
+        self.alpha_mc_decay = config['alpha_mc_decay']
         # Uses the Q_table from the BaseAgent class
 
