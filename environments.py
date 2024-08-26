@@ -283,9 +283,9 @@ class Environment:
             #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
             reward = 100.0 * (accuracy - accuracy_prev_model) # reward is difference in epoch accuracy between current model and previous model
             if action_index == len(self.actions) - 1 and reward > 0:
-                reward *=2 # Double positive reward for choosing the no-op action
+                reward *=10 # Multiply positive reward for choosing the no-op action
             elif action_index < len(self.actions) - 1 and reward < 0:
-                reward /= 2 # Halve negative reward for choosing any other action
+                reward /= 2 # Reduce negative reward for choosing any other action
             else:
                 pass
    
