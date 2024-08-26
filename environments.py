@@ -282,6 +282,13 @@ class Environment:
             #reward = (accuracy - self.cumulative_accuracy/self.current_epoch) + # reward for improvement over past performance 
             #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
             reward = 100.0 * (accuracy - accuracy_prev_model) # reward is difference in epoch accuracy between current model and previous model
+            if action_index == len(self.actions) - 1 and reward > 0:
+                reward *=2 # Double positive reward for choosing the no-op action
+            elif action_index < len(self.actions) - 1 and reward < 0:
+                reward /= 2 # Halve negative reward for choosing any other action
+            else:
+                pass
+   
             # reward = 1 if reward > 0 else -1
             print(f"Accuracy: {accuracy} Prev Accuracy: {accuracy_prev_model}  State Sequence: {self.prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
 
@@ -392,7 +399,6 @@ class Environment:
             self.model.learn_one(x, y)
             self.prev_model.learn_one(x, y)
             self.model_baseline.learn_one(x, y)
-
 
             # Calculate the accuracy of the prediction against the actual output
             is_correctly_classified = self.correctly_classified(prediction, y)
