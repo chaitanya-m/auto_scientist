@@ -142,6 +142,7 @@ class Environment:
         self.state = state
         self.binary_design_space = binary_design_space
         self.prev_state_index = -1 # Initialize the previous state index to -1
+        self.prev_action_index = -1
 
         self.model = model
         self.prev_model = None
@@ -177,6 +178,7 @@ class Environment:
         self.accuracy_change_bin = None # Initialize context - accuracy change bin - 0 indicates no change in accuracy
         self.stream = self.stream_factory.create(seed=self.current_episode) # A new seed for the stream
         self.prev_model = None
+        self.prev_action_index = -1
 
         self.cumulative_accuracy = 0.0
         self.cumulative_baseline_accuracy = 0.0
@@ -282,10 +284,12 @@ class Environment:
             #reward = (accuracy - self.cumulative_accuracy/self.current_epoch) + # reward for improvement over past performance 
             #reward = (accuracy - baseline_epoch_prequential_accuracy)/(self.current_epoch) # linearly decayed reward for improvement over baseline
             reward = 100.0 * (accuracy - accuracy_prev_model) # reward is difference in epoch accuracy between current model and previous model
+            if self.prev_action_index >= 0 and self.prev_action_index < len(self.actions) - 1 and action_index == len(self.actions) - 1: # if prev action is a state change and current action is no-op
+                 reward = 1 if reward < 1 else reward # Positive reward for staying in a state for one step after transition
             if action_index == len(self.actions) - 1 and reward > 0:
-                reward *=10 # Multiply positive reward for choosing the no-op action
+                reward *= 2 # Multiply positive reward for choosing the no-op action
             elif action_index < len(self.actions) - 1 and reward < 0:
-                reward /= 2 # Reduce negative reward for choosing any other action
+                reward = 0 # Reduce negative reward for choosing any other action
             else:
                 pass
    
@@ -293,6 +297,7 @@ class Environment:
             print(f"Accuracy: {accuracy} Prev Accuracy: {accuracy_prev_model}  State Sequence: {self.prev_state_index} {state_index} Action: {action_index} Reward: {reward}")
 
 
+        self.prev_action_index = action_index
         return state_index, reward, done
 
     def apply_design_elements(self, binary_design_space, state, set_method_action_class):
