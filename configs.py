@@ -22,28 +22,28 @@ BASE_CONFIG = {
     },
     'num_episodes': 20,
     'debug': False,
-    'alpha': 0.5,
+    'alpha': 1,
     'alpha_decay': 0.99,
     'alpha_mc_decay': 0.99,
     'gamma': 0.9,
-    'epsilon': 0.2,
+    'epsilon': 0.33,
     'baseline_model': 'UpdatableEFDTClassifier',
 }
 
 STREAMS = [
 
-    # {
-    # 'stream_type': 'RandomTree',
-    #  'stream' : {
-    #     'n_classes': 2,
-    #     'n_num_features': 2,
-    #     'n_cat_features': 2,
-    #     'n_categories_per_feature': 2,
-    #     'max_tree_depth': 5,
-    #     'first_leaf_level': 2,
-    #     'fraction_leaves_per_level': 0.15,
-    #     }
-    # },
+    {
+    'stream_type': 'RandomTree',
+     'stream' : {
+        'n_classes': 2,
+        'n_num_features': 2,
+        'n_cat_features': 2,
+        'n_categories_per_feature': 2,
+        'max_tree_depth': 5,
+        'first_leaf_level': 2,
+        'fraction_leaves_per_level': 0.15,
+        }
+    },
 
 
     {
@@ -59,18 +59,18 @@ STREAMS = [
         }
     },
 
-    # {
-    # 'stream_type': 'RandomTree',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_num_features': 4,
-    #     'n_cat_features': 3,
-    #     'n_categories_per_feature': 3,
-    #     'max_tree_depth': 5,
-    #     'first_leaf_level': 2,
-    #     'fraction_leaves_per_level': 0.15,
-    #     }
-    # },
+    {
+    'stream_type': 'RandomTree',
+     'stream' : {
+        'n_classes': 4,
+        'n_num_features': 4,
+        'n_cat_features': 3,
+        'n_categories_per_feature': 3,
+        'max_tree_depth': 5,
+        'first_leaf_level': 2,
+        'fraction_leaves_per_level': 0.15,
+        }
+    },
 
     # {
     # 'stream_type': 'RandomTree',
@@ -85,65 +85,65 @@ STREAMS = [
     #     }
     # },
 
-    # {
-    # 'stream_type': 'RandomTree',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_num_features': 4,
-    #     'n_cat_features': 4,
-    #     'n_categories_per_feature': 4,
-    #     'max_tree_depth': 5,
-    #     'first_leaf_level': 2,
-    #     'fraction_leaves_per_level': 0.15,
-    #     }
-    # },
+    {
+    'stream_type': 'RandomTree',
+     'stream' : {
+        'n_classes': 4,
+        'n_num_features': 4,
+        'n_cat_features': 4,
+        'n_categories_per_feature': 4,
+        'max_tree_depth': 5,
+        'first_leaf_level': 2,
+        'fraction_leaves_per_level': 0.15,
+        }
+    },
 
 
-    # {
-    # 'stream_type': 'RandomRBF',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_features': 5,
-    #     'n_centroids': 10,
-    #     }
-    # },
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 4,
+        'n_features': 5,
+        'n_centroids': 10,
+        }
+    },
 
-    # {
-    # 'stream_type': 'RandomRBF',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_features': 10,
-    #     'n_centroids': 20,
-    #     }
-    # },
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 4,
+        'n_features': 10,
+        'n_centroids': 20,
+        }
+    },
 
 
-    # {
-    # 'stream_type': 'RandomRBF',
-    #  'stream' : {
-    #     'n_classes': 2,
-    #     'n_features': 10,
-    #     'n_centroids': 50,
-    #     }
-    # },
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 2,
+        'n_features': 10,
+        'n_centroids': 50,
+        }
+    },
 
-    # {
-    # 'stream_type': 'RandomRBF',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_features': 10,
-    #     'n_centroids': 50,
-    #     }
-    # },
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 4,
+        'n_features': 10,
+        'n_centroids': 50,
+        }
+    },
 
-    # {
-    # 'stream_type': 'RandomRBF',
-    #  'stream' : {
-    #     'n_classes': 4,
-    #     'n_features': 20,
-    #     'n_centroids': 20,
-    #     }
-    # },
+    {
+    'stream_type': 'RandomRBF',
+     'stream' : {
+        'n_classes': 4,
+        'n_features': 20,
+        'n_centroids': 20,
+        }
+    },
 
     # {
     # 'stream_type': 'RandomTree',
