@@ -5,8 +5,12 @@ import tensorflow as tf
 import random
 import os
 
+# Set the starting value for the random seed used in schema generation, and other random seeds
+RANDOM_SEED = 0
+
 # Setting up random seed values for reproducibility
-def set_random_seeds(seed_value=0):
+def set_random_seeds(seed_value=RANDOM_SEED) :
+    """Sets random seeds for Python, NumPy, and TensorFlow for reproducibility."""
     # Python random seed
     random.seed(seed_value)
     # NumPy random seed
@@ -28,6 +32,7 @@ class SimpleNet:
         self.model = self._build_model()
 
     def _build_model(self):
+        """Builds the neural network model."""
         model = tf.keras.Sequential()
         model.add(tf.keras.layers.Input(shape=(self.input_dim,)))  # Input layer
         for _ in range(self.hidden_layers):
@@ -40,24 +45,27 @@ class SimpleNet:
         return model
 
     def compile(self, optimizer='adam', loss=None):
+        """Compiles the model with the specified loss function."""
         if loss is None:
             loss = 'categorical_crossentropy' if self.num_classes > 2 else 'binary_crossentropy'
         self.model.compile(optimizer=optimizer, loss=loss, metrics=['accuracy'])
 
     def fit(self, X, y, epochs=10, verbose=0):
+        """Fits the model on the provided data."""
         self.model.fit(X, y, epochs=epochs, verbose=verbose)
 
     def evaluate(self, X, y, verbose=0):
+        """Evaluates the model on the provided data."""
         _, accuracy = self.model.evaluate(X, y, verbose=verbose)
         return accuracy
 
     def predict(self, X):
+        """Predicts on the provided data."""
         return self.model.predict(X)
 
 
-# Data preparation with one-hot encoding for multi-class classification
-
 def prepare_data(dataset, num_classes):
+    """Prepares data by performing necessary transformations like encoding."""
     X = dataset.iloc[:, :-1].values.astype(float)
     y = dataset.iloc[:, -1].values.astype(int)
 
@@ -68,8 +76,9 @@ def prepare_data(dataset, num_classes):
     
     return X, y
 
-# Train and evaluate the neural network
+
 def train_and_evaluate_neural_net(X, y, num_classes):
+    """Trains and evaluates the neural network on the provided data."""
     input_dim = X.shape[1]
     net = SimpleNet(input_dim, num_classes)
 
@@ -95,11 +104,42 @@ def train_and_evaluate_neural_net(X, y, num_classes):
     return accuracy
 
 
-# Set random seed for reproducibility
-set_random_seeds(42)
+def run_experiment(schema_types, num_schemas_per_type=10, seed_value=RANDOM_SEED):
+    """
+    Runs the experiment by setting up random seeds, generating schemas and datasets,
+    and running the neural network experiment.
+    
+    Parameters:
+    - schema_types (dict): Dictionary of schema types to generate.
+    - num_schemas_per_type (int): Number of schemas to generate per schema type.
+    - seed_value (int): Random seed value for reproducibility.
+    """
+    # Set random seed for reproducibility
+    set_random_seeds(seed_value)
 
-# Create an instance of the DataSchemaFactory to generate schemas
-factory = categorical_classification.DataSchemaFactory()
+    # Create an instance of the DataSchemaFactory to generate schemas
+    factory = categorical_classification.DataSchemaFactory()
+
+    # Create a generator object that will yield schemas and datasets one by one
+    dataset_generator = factory.generate_schemas_and_datasets(schema_types, num_schemas_per_type, seed_value)
+
+    # Loop through generated datasets, process them, and run experiments
+    for i, (schema_type, schema, dataset) in enumerate(dataset_generator):
+        print(f"\nProcessing schema type: {schema_type}, Iteration: {i}")
+        print(f"Schema details:")
+        schema.print_schema()
+
+        print(f"Dataset head:")
+        print(dataset.head())
+
+        # 1. Prepare data
+        X, y = prepare_data(dataset, schema.num_classes)
+
+        # 2. Train and evaluate
+        accuracy = train_and_evaluate_neural_net(X, y, schema.num_classes)
+
+        print(f"Neural network accuracy on dataset: {accuracy}")
+
 
 # Define the types of schemas to generate, with their parameters
 schema_types = {
@@ -107,28 +147,5 @@ schema_types = {
     "type2": {"num_features": 3, "num_categories": 3, "num_classes": 3, "flatness": 5},
 }
 
-# Specify the number of schemas to generate for each type
-num_schemas_per_type = 10
-
-# Set the starting value for the random seed used in schema generation
-random_seed_start = 0
-
-# Create a generator object that will yield schemas and datasets one by one
-dataset_generator = factory.generate_schemas_and_datasets(schema_types, num_schemas_per_type, random_seed_start)
-
-# Loop through generated datasets, process them, and run experiments
-for i, (schema_type, schema, dataset) in enumerate(dataset_generator):
-    print(f"\nProcessing schema type: {schema_type}, Iteration: {i}")
-    print(f"Schema details:")
-    schema.print_schema()
-
-    print(f"Dataset head:")
-    print(dataset.head())
-
-    # 1. Prepare data
-    X, y = prepare_data(dataset, schema.num_classes)
-
-    # 2. Train and evaluate
-    accuracy = train_and_evaluate_neural_net(X, y, schema.num_classes)
-
-    print(f"Neural network accuracy on dataset: {accuracy}")
+# Run the experiment
+run_experiment(schema_types=schema_types, num_schemas_per_type=10)
