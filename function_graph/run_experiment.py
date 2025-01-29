@@ -1,5 +1,10 @@
 import data_gen.categorical_classification as categorical_classification
+
+from function_graph.composer import SimpleComposer
+from function_graph.node import Identity
+
 from sklearn.preprocessing import OneHotEncoder
+
 import numpy as np
 import tensorflow as tf
 import random
@@ -140,6 +145,16 @@ def run_experiment(schema_types, num_schemas_per_type=10, seed_value=RANDOM_SEED
 
         print(f"Neural network accuracy on dataset: {accuracy}")
 
+        composer = SimpleComposer()
+        identity_node = Identity("identity")
+        composer.add_function(identity_node)
+
+        # Create a very small sample dataset for testing
+        X = np.array([[1, 2], [3, 4]])
+
+        output = composer.execute(X)
+        print("Function Graph Output:", output)  # Verify it's the same as X
+
 
 # Define the types of schemas to generate, with their parameters
 schema_types = {
@@ -149,3 +164,5 @@ schema_types = {
 
 # Run the experiment
 run_experiment(schema_types=schema_types, num_schemas_per_type=10)
+
+
