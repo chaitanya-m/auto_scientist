@@ -9,6 +9,8 @@ class FunctionNode(ABC):
     them. Each FunctionNode has a name, an input shape, and an output shape.
     It encapsulates a specific function or computation within the larger 
     network architecture.
+
+    Eventually, this can be updated to allow (finite) cycles.
     """
 
     def __init__(self, name):
@@ -50,3 +52,62 @@ class FunctionNode(ABC):
             The output of the function node after processing the inputs.
         """
         pass
+
+
+class Identity(FunctionNode):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def build(self, input_shape):
+        self.input_shape = input_shape
+        self.output_shape = input_shape  # Identity: input shape = output shape
+
+    def __call__(self, inputs):
+        return inputs  # Identity: returns input unchanged
+
+class Add(FunctionNode):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def build(self, input_shape):
+        self.input_shape = input_shape
+        self.output_shape = input_shape  # Add: input shape = output shape
+
+    def __call__(self, inputs):
+        return tf.add_n(inputs)  # Add all inputs together
+
+class Multiply(FunctionNode):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def build(self, input_shape):
+        self.input_shape = input_shape
+        self.output_shape = input_shape  # Multiply: input shape = output shape
+
+    def __call__(self, inputs):
+        result = inputs[0]
+        for x in inputs[1:]:
+            result = tf.multiply(result, x)
+        return result
+
+class ReLU(FunctionNode):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def build(self, input_shape):
+        self.input_shape = input_shape
+        self.output_shape = input_shape  # ReLU: input shape = output shape
+
+    def __call__(self, inputs):
+        return tf.nn.relu(inputs)  # ReLU activation
+
+class Sigmoid(FunctionNode):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def build(self, input_shape):
+        self.input_shape = input_shape
+        self.output_shape = input_shape  # Sigmoid: input shape = output shape
+
+    def __call__(self, inputs):
+        return tf.nn.sigmoid(inputs)  # Sigmoid activation
