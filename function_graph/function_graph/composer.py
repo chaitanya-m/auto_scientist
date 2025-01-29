@@ -91,6 +91,7 @@ class SimpleComposer(GraphFunctionComposer):  # Start by adding a single node
     def __init__(self):
         super().__init__()  # Important: Call the superclass constructor
         self.graph: Dict[str, FunctionNode] = {}  # Dictionary to store nodes
+        self.connections: Dict[str, List[str]] = {}  # Dictionary to store node connections
 
     @overload
     def add_function(self, node: FunctionNode) -> FunctionNode:
@@ -100,23 +101,6 @@ class SimpleComposer(GraphFunctionComposer):  # Start by adding a single node
     def add_function(self, node: FunctionNode, input_nodes: List[FunctionNode]) -> FunctionNode:
         ...
 
-    def add_function(self, node: FunctionNode, input_nodes: List[FunctionNode] = None) -> FunctionNode:
-        if input_nodes is None:
-            if self.is_empty():
-              self.graph[node.name] = node
-              return node
-            else:
-              raise ValueError("Input nodes must be provided for subsequent nodes")
-        else:
-            if not self.is_empty():
-              for input_node in input_nodes:
-                  if input_node.name not in self.graph:
-                      raise ValueError(f"Input node '{input_node.name}' not found in graph.")
-                  node.add_input(self.graph[input_node.name])
-              self.graph[node.name] = node
-              return node
-            else:
-              raise ValueError("First node cannot have input nodes")
 
     def get_function(self, name: str) -> FunctionNode:
         if name not in self.graph:
@@ -132,11 +116,40 @@ class SimpleComposer(GraphFunctionComposer):  # Start by adding a single node
     def is_empty(self) -> bool:
         return not self.graph
 
+    def add_function(self, node: FunctionNode, input_nodes: List[FunctionNode] = None) -> FunctionNode:
+        if input_nodes is None:  # First node
+            if self.is_empty():
+                self.graph[node.name] = node
+                self.connections[node.name] = []  # No inputs for the first node
+                return node
+            else:
+                raise ValueError("Input nodes must be provided for subsequent nodes.")
+        else:  # Subsequent nodes
+            if not self.is_empty():
+                for input_node in input_nodes:
+                    if input_node.name not in self.graph:
+                        raise ValueError(f"Input node '{input_node.name}' not found in graph.")
+                self.graph[node.name] = node
+                self.connections[node.name] = [n.name for n in input_nodes] # Store connections
+                return node
+            else:
+                raise ValueError("First node cannot have input nodes.")
+
     def execute(self, input_data):
         if not self.graph:
             raise ValueError("Graph is empty.")
 
-        # For this initial version, assume only one node in the graph
-        node = list(self.graph.values())[0] # Get the only node
-        node.build(input_data.shape)  # Build the node using the shape of the input data
-        return node(input_data)       # Execute the node with the input data
+        # Build all nodes first
+        for node in self.graph.values():
+            input_shape = input_data.shape if not self.connections.get(node.name) else self.graph[self.connections[node.name][0]].output_shape
+            node.build(input_shape)
+
+        # Execute the graph
+        outputs = {"input": input_data}  # Initialize outputs with input data
+        for node_name, node in self.graph.items():
+            input_names = self.connections.get(node_name, [])  # Get input node names
+            inputs = [outputs[name] for name in input_names] if input_names else [input_data]
+            outputs[node_name] = node(inputs)  # Execute and store the output
+
+        # Return the output of the last node
+        return outputs[list(self.graph.keys())[-1]]

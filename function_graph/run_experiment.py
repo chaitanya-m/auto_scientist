@@ -1,7 +1,7 @@
 import data_gen.categorical_classification as categorical_classification
 
 from function_graph.composer import SimpleComposer
-from function_graph.node import Identity
+from function_graph.node import Sigmoid
 
 from sklearn.preprocessing import OneHotEncoder
 
@@ -146,14 +146,20 @@ def run_experiment(schema_types, num_schemas_per_type=10, seed_value=RANDOM_SEED
         print(f"Neural network accuracy on dataset: {accuracy}")
 
         composer = SimpleComposer()
-        identity_node = Identity("identity")
-        composer.add_function(identity_node)
+
+        sigmoid1 = Sigmoid("sigmoid1")
+        sigmoid2 = Sigmoid("sigmoid2")
+        sigmoid3 = Sigmoid("sigmoid3")
+
+        composer.add_function(sigmoid1)
+        composer.add_function(sigmoid2, [sigmoid1])  # Connect sigmoid2 to sigmoid1
+        composer.add_function(sigmoid3, [sigmoid2])  # Connect sigmoid3 to sigmoid2
 
         # Create a very small sample dataset for testing
         X = np.array([[1, 2], [3, 4]])
 
         output = composer.execute(X)
-        print("Function Graph Output:", output)  # Verify it's the same as X
+        print("Function Graph Output:", output)
 
 
 # Define the types of schemas to generate, with their parameters

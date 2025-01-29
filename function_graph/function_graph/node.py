@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import tensorflow as tf
 
 class FunctionNode(ABC):
     """
@@ -110,4 +111,5 @@ class Sigmoid(FunctionNode):
         self.output_shape = input_shape  # Sigmoid: input shape = output shape
 
     def __call__(self, inputs):
+        inputs = tf.cast(inputs, tf.float32)  # Cast inputs to float32
         return tf.nn.sigmoid(inputs)  # Sigmoid activation
