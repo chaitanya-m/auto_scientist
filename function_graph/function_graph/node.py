@@ -2,114 +2,162 @@ from abc import ABC, abstractmethod
 import tensorflow as tf
 
 class FunctionNode(ABC):
-    """
-    Abstract base class for function nodes in the function graph.
-
-    Represents a node in a function graph, which is a directed acyclic graph 
-    where nodes represent functions and edges represent data flow between 
-    them. Each FunctionNode has a name, an input shape, and an output shape.
-    It encapsulates a specific function or computation within the larger 
-    network architecture.
-
-    Eventually, this can be updated to allow (finite) cycles.
-    """
-
-    def __init__(self, name):
-        """
-        Initializes a FunctionNode with a given name.
-
-        Args:
-            name: The name of the function node within the graph.
-        """
+    def __init__(self, name: str):
         self.name = name
-        self.input_shape = None  # Will be set when connected in the graph
-        self.output_shape = None  # Determined after building the node's internal model
+        self.input_shape = None
+        self.output_shape = None
 
     @abstractmethod
     def build(self, input_shape):
-        """
-        Builds the underlying TensorFlow/Keras model for the function node.
-
-        This method defines the internal neural network structure of the node, 
-        which will be executed when the node is called as a function.
-
-        Args:
-            input_shape: The shape of the input data expected by the node.
-        """
         pass
 
     @abstractmethod
     def __call__(self, inputs):
-        """
-        Applies the function node to the given inputs.
-
-        Executes the node's internal model, effectively treating the node as
-        a callable function within the larger function graph.
-
-        Args:
-            inputs: The input data to the function node.
-
-        Returns:
-            The output of the function node after processing the inputs.
-        """
         pass
 
+class Trainable(ABC):
+    @abstractmethod
+    def train(self, inputs, targets, optimizer, loss_function, epochs=1, verbose=0):
+        pass
 
-class Identity(FunctionNode):
-    def __init__(self, name):
+class TrainableNode(FunctionNode, Trainable):
+    def add_weight(self, name, shape):
+        return tf.Variable(tf.random.normal(shape), name=name)
+
+    def add_bias(self, name, shape):
+        return tf.Variable(tf.zeros(shape), name=name)
+
+    def train(self, inputs, targets, optimizer, loss_function, epochs=1, verbose=0):
+        inputs = tf.cast(inputs, tf.float32)
+        with tf.GradientTape() as tape:
+            outputs = self(inputs)
+            loss = loss_function(targets, outputs)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+        return loss
+
+    @property
+    def trainable_variables(self):
+        return self._trainable_variables()
+
+    def _trainable_variables(self):
+        trainable_vars = []
+        for var in self.__dict__.values():
+            if isinstance(var, tf.Variable):
+                trainable_vars.append(var)
+            elif isinstance(var, TrainableNode):
+                trainable_vars.extend(var.trainable_variables)
+        return trainable_vars
+
+
+class FixedActivation(FunctionNode):
+    def __init__(self, name: str, activation_function=tf.nn.sigmoid):
         super().__init__(name)
+        self.activation_function = activation_function
 
     def build(self, input_shape):
         self.input_shape = input_shape
-        self.output_shape = input_shape  # Identity: input shape = output shape
+        self.output_shape = input_shape
 
     def __call__(self, inputs):
-        return inputs  # Identity: returns input unchanged
+        if isinstance(inputs, list):
+            batch_sizes = [tf.shape(x)[0] for x in inputs]
+            if not all(size == batch_sizes[0] for size in batch_sizes):
+                raise ValueError("Input tensors must have consistent batch sizes for concatenation.")
+            inputs = tf.concat(inputs, axis=-1)
+        inputs = tf.cast(inputs, tf.float32)
+        return self.activation_function(inputs)
 
-class Add(FunctionNode):
-    def __init__(self, name):
+class TrainableActivation(TrainableNode):
+    def __init__(self, name: str, activation_function=tf.nn.sigmoid, num_outputs=1):
         super().__init__(name)
+        self.activation_function = activation_function
+        self.num_outputs = num_outputs
 
     def build(self, input_shape):
         self.input_shape = input_shape
-        self.output_shape = input_shape  # Add: input shape = output shape
+        input_dim = input_shape[-1]
+        self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
+        self.b = self.add_bias("b", shape=(self.num_outputs,))
+
+        input_rank = tf.TensorShape(input_shape).rank
+        if input_rank == 1:
+            self.output_shape = (self.num_outputs,)
+        elif input_rank == 2:
+            self.output_shape = (None, self.num_outputs)
+        else:
+            raise ValueError("Input shape must have rank 1 or 2.")
 
     def __call__(self, inputs):
-        return tf.add_n(inputs)  # Add all inputs together
+        if isinstance(inputs, list):
+            batch_sizes = [tf.shape(x)[0] for x in inputs]
+            if not all(size == batch_sizes[0] for size in batch_sizes):
+                raise ValueError("Input tensors must have consistent batch sizes for concatenation.")
+            inputs = tf.concat(inputs, axis=-1)
+        inputs = tf.cast(inputs, tf.float32)
+        z = tf.matmul(inputs, self.W) + self.b
+        return self.activation_function(z)
 
-class Multiply(FunctionNode):
-    def __init__(self, name):
+class FixedSigmoid(FixedActivation):
+    def __init__(self, name: str):
+        super().__init__(name, activation_function=tf.nn.sigmoid)
+
+class FixedReLU(FixedActivation):
+    def __init__(self, name: str):
+        super().__init__(name, activation_function=tf.nn.relu)
+
+
+class ReLU(TrainableNode):
+    def __init__(self, name, num_outputs):
         super().__init__(name)
+        self.num_outputs = num_outputs
 
     def build(self, input_shape):
         self.input_shape = input_shape
-        self.output_shape = input_shape  # Multiply: input shape = output shape
+        input_rank = tf.TensorShape(input_shape).rank
+        if input_rank == 1:
+            self.output_shape = (self.num_outputs,)
+        elif input_rank == 2:
+            self.output_shape = (None, self.num_outputs)
+        else:
+            raise ValueError("Input shape must have rank 1 or 2.")
+
+        self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs)) # Corrected shape
+        self.b = self.add_bias("b", shape=(self.num_outputs,)) # Corrected shape
 
     def __call__(self, inputs):
-        result = inputs[0]
-        for x in inputs[1:]:
-            result = tf.multiply(result, x)
-        return result
+        if isinstance(inputs, list):
+            batch_sizes = [tf.shape(x)[0] for x in inputs]
+            if not all(size == batch_sizes[0] for size in batch_sizes):
+                raise ValueError("Input tensors must have consistent batch sizes for concatenation.")
+            inputs = tf.concat(inputs, axis=-1)
+        z = tf.matmul(inputs, self.W) + self.b
+        return tf.maximum(0., z)
 
-class ReLU(FunctionNode):
-    def __init__(self, name):
+
+class Sigmoid(TrainableNode):
+    def __init__(self, name, num_outputs):
         super().__init__(name)
+        self.num_outputs = num_outputs
 
     def build(self, input_shape):
         self.input_shape = input_shape
-        self.output_shape = input_shape  # ReLU: input shape = output shape
+        input_rank = tf.TensorShape(input_shape).rank
+        if input_rank == 1:
+            self.output_shape = (self.num_outputs,)
+        elif input_rank == 2:
+            self.output_shape = (None, self.num_outputs)
+        else:
+            raise ValueError("Input shape must have rank 1 or 2.")
+
+        self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Corrected shape
+        self.b = self.add_bias("b", shape=(self.num_outputs,))  # Corrected shape
 
     def __call__(self, inputs):
-        return tf.nn.relu(inputs)  # ReLU activation
-
-class Sigmoid(FunctionNode):
-    def __init__(self, name):
-        super().__init__(name)
-
-    def build(self, input_shape):
-        self.input_shape = input_shape
-        self.output_shape = input_shape  # Sigmoid: input shape = output shape
-
-    def __call__(self, inputs):
-        inputs = tf.cast(inputs, tf.float32)  # Cast inputs to float32
-        return tf.nn.sigmoid(inputs)  # Sigmoid activation
+        if isinstance(inputs, list):
+            batch_sizes = [tf.shape(x)[0] for x in inputs]
+            if not all(size == batch_sizes[0] for size in batch_sizes):
+                raise ValueError("Input tensors must have consistent batch sizes for concatenation.")
+            inputs = tf.concat(inputs, axis=-1)
+        z = tf.matmul(inputs, self.W) + self.b
+        return tf.sigmoid(z)
