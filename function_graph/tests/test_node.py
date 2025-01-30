@@ -104,7 +104,26 @@ class TestFunctionNodes(unittest.TestCase):
         self._test_fixed_activation_creation(FixedActivation, "fixed_activation") 
 
     def test_relu_build_and_call(self):
-        """Tests the build and call methods of a ReLU node."""
+        """
+        Tests the build and call methods of a ReLU (Rectified Linear Unit) node.
+
+        This test verifies the correct initialization and functionality of a ReLU node.  It performs the following steps:
+
+        1. **Node Creation and Build:**
+           - Creates a ReLU node instance named "my_relu" with 1 output feature.
+           - Calls the `_test_activation_build_and_call` helper method to:
+             - Build the ReLU node, initializing its weights and biases based on the input shape (10, 5). This sets up the internal structure of the node for processing data.
+             - Generate random input data with shape (10, 5). This simulates real-world input to the node.
+             - Call the ReLU node with the input data. This performs the forward pass calculation: `output = ReLU(input)`.
+             - Assert that the output shape is (10, 1), as expected for a ReLU node with 1 output feature.
+             - Call the provided lambda function `lambda output: self.assertTrue(tf.reduce_all(output >= 0))` to perform an extra check.  This lambda function asserts that all elements in the output tensor are greater than or equal to 0, which is a defining characteristic of the ReLU activation function.
+
+        2. **Multiple Input Call:**
+           - Calls the `_test_call_with_multiple_inputs` helper method to test the ReLU node's behavior with multiple input tensors. This simulates a scenario where the input to the node is composed of multiple parts.
+           - The inputs are (10, 2) and (10, 3) which will be concatenated to (10,5)
+           - The expected output features are 1 because that is how the ReLU was initialized.
+           - This helper method concatenates the input tensors along the last axis, builds the node based on the concatenated input shape, calls the node with the concatenated input, and checks if the output shape is correct.  It also re-asserts the ReLU characteristic (output >= 0).
+        """
         self._test_activation_build_and_call(
             ReLU("my_relu", num_outputs=1),
             (10, 5),
@@ -114,7 +133,26 @@ class TestFunctionNodes(unittest.TestCase):
         self._test_call_with_multiple_inputs(ReLU("my_relu", num_outputs=1), (10, 2), (10, 3), 1)
 
     def test_sigmoid_build_and_call(self):
-        """Tests the build and call methods of a Sigmoid node."""
+        """
+        Tests the build and call methods of a Sigmoid node.
+
+        This test is similar to the `test_relu_build_and_call` test, but it focuses on the Sigmoid activation function.  It performs the following steps:
+
+        1. **Node Creation and Build:**
+           - Creates a Sigmoid node instance named "my_sigmoid" with 2 output features.
+           - Calls the `_test_activation_build_and_call` helper method to:
+             - Build the Sigmoid node, initializing its weights and biases based on the input shape (10, 5).
+             - Generate random input data with shape (10, 5).
+             - Call the Sigmoid node with the input data.
+             - Assert that the output shape is (10, 2), as expected for a Sigmoid node with 2 output features.
+             - Call the provided lambda function `lambda output: (self.assertTrue(tf.reduce_all(output >= 0)) and self.assertTrue(tf.reduce_all(output <= 1)))` to perform extra checks.  This lambda function asserts that all elements in the output tensor are between 0 and 1 (inclusive), which is a defining characteristic of the Sigmoid activation function.
+
+        2. **Multiple Input Call:**
+           - Calls the `_test_call_with_multiple_inputs` helper method to test the Sigmoid node's behavior with multiple input tensors.
+           - The inputs are (10, 2) and (10, 3) which will be concatenated to (10,5)
+           - The expected output features are 2 because that is how the Sigmoid was initialized.
+           - This helper method concatenates the input tensors, builds the node, calls the node, and checks the output shape. It also re-asserts the Sigmoid characteristic (0 <= output <= 1).
+        """
         self._test_activation_build_and_call(
             Sigmoid("my_sigmoid", num_outputs=2),
             (10, 5),
