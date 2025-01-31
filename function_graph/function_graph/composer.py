@@ -8,7 +8,16 @@ from function_graph.node import FunctionNode, TrainableNode
 #      FixedSigmoid, FixedReLU, ReLU, Sigmoid classes remain unchanged)
 
 class FunctionGraph:  # The core graph structure (separate class)
-    def __init__(self):
+    @property
+    def optimizer(self):
+        return self._composer.optimizer  # Fetch from composer dynamically
+
+    @property
+    def loss_function(self):
+        return self._composer.loss_function  # Fetch from composer dynamically
+
+    def __init__(self, composer):
+        self._composer = composer  # Store reference to composer
         self.nodes: Dict[str, FunctionNode] = {}
         self.input_node = None
         self.output_node = None
@@ -106,7 +115,9 @@ class FunctionGraph:  # The core graph structure (separate class)
 # composer.py
 class FunctionGraphComposer:  # Composer class (separate)
     def __init__(self):
-        self.graph = FunctionGraph()
+        self.optimizer = None
+        self.loss_function = None
+        self.graph = FunctionGraph(self)  # Pass self to FunctionGraph
         self.input_shape = None
 
     def set_input_shape(self, input_shape):
@@ -188,10 +199,7 @@ class FunctionGraphComposer:  # Composer class (separate)
     def compile(self, optimizer, loss_function):
         self.optimizer = optimizer
         self.loss_function = loss_function
-        self.graph.optimizer = optimizer
-        self.graph.loss_function = loss_function
-        return self
-
+        return self  # Optional for method chaining
 
     def train(self, inputs, targets, epochs=1, verbose=0):
         if not hasattr(self, 'optimizer') or not hasattr(self, 'loss_function'):
