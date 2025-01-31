@@ -369,27 +369,43 @@ class ReLU(TrainableNode):
         super().__init__(name)
         self.num_outputs = num_outputs
 
+    # def build(self, input_shape):
+    #     """
+    #     Builds the ReLU node by initializing weights and biases.
+
+    #     The weights and biases are initialized randomly, and the output shape is set based on 
+    #     the number of output neurons. The weights are initialized as random values, and biases are initialized as zeros.
+
+    #     Args:
+    #         input_shape: The shape of the input data expected by the ReLU node.
+    #     """
+    #     self.input_shape = input_shape
+    #     input_rank = tf.TensorShape(input_shape).rank
+    #     if input_rank == 1:
+    #         self.output_shape = (self.num_outputs,)
+    #     elif input_rank == 2:
+    #         self.output_shape = (None, self.num_outputs)
+    #     else:
+    #         raise ValueError("Input shape must have rank 1 or 2.")
+
+    #     self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Initialize weights
+    #     self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
+
+    # def build(self, input_shape):
+    #     self.input_shape = input_shape
+    #     input_dim = input_shape[-1]  # This is now safe because input_shape is correct
+    #     self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
+    #     self.b = self.add_bias("b", shape=(self.num_outputs,))
+
+    #     self.output_shape = (None, self.num_outputs) if len(input_shape) == 2 else (self.num_outputs,)
+
     def build(self, input_shape):
-        """
-        Builds the ReLU node by initializing weights and biases.
-
-        The weights and biases are initialized randomly, and the output shape is set based on 
-        the number of output neurons. The weights are initialized as random values, and biases are initialized as zeros.
-
-        Args:
-            input_shape: The shape of the input data expected by the ReLU node.
-        """
         self.input_shape = input_shape
-        input_rank = tf.TensorShape(input_shape).rank
-        if input_rank == 1:
-            self.output_shape = (self.num_outputs,)
-        elif input_rank == 2:
-            self.output_shape = (None, self.num_outputs)
-        else:
-            raise ValueError("Input shape must have rank 1 or 2.")
+        input_dim = input_shape[-1]
+        self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
+        self.b = self.add_bias("b", shape=(self.num_outputs,))
 
-        self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Initialize weights
-        self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
+        self.output_shape = (None, self.num_outputs)  # Consistent rank 2 output
 
     def __call__(self, inputs):
         """
@@ -446,27 +462,43 @@ class Sigmoid(TrainableNode):
         super().__init__(name)
         self.num_outputs = num_outputs
 
+    # def build(self, input_shape):
+    #     """
+    #     Builds the Sigmoid node by initializing weights and biases.
+
+    #     Similar to the ReLU node, weights and biases are initialized randomly, and the 
+    #     output shape is determined by the number of output neurons.
+
+    #     Args:
+    #         input_shape: The shape of the input data expected by the Sigmoid node.
+    #     """
+    #     self.input_shape = input_shape
+    #     input_rank = tf.TensorShape(input_shape).rank
+    #     if input_rank == 1:
+    #         self.output_shape = (self.num_outputs,)
+    #     elif input_rank == 2:
+    #         self.output_shape = (None, self.num_outputs)
+    #     else:
+    #         raise ValueError("Input shape must have rank 1 or 2.")
+
+    #     self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Initialize weights
+    #     self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
+
+    # def build(self, input_shape):
+    #     self.input_shape = input_shape
+    #     input_dim = input_shape[-1]  # This is now safe because input_shape is correct
+    #     self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
+    #     self.b = self.add_bias("b", shape=(self.num_outputs,))
+
+    #     self.output_shape = (None, self.num_outputs) if len(input_shape) == 2 else (self.num_outputs,)
+
     def build(self, input_shape):
-        """
-        Builds the Sigmoid node by initializing weights and biases.
-
-        Similar to the ReLU node, weights and biases are initialized randomly, and the 
-        output shape is determined by the number of output neurons.
-
-        Args:
-            input_shape: The shape of the input data expected by the Sigmoid node.
-        """
         self.input_shape = input_shape
-        input_rank = tf.TensorShape(input_shape).rank
-        if input_rank == 1:
-            self.output_shape = (self.num_outputs,)
-        elif input_rank == 2:
-            self.output_shape = (None, self.num_outputs)
-        else:
-            raise ValueError("Input shape must have rank 1 or 2.")
+        input_dim = input_shape[-1]
+        self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
+        self.b = self.add_bias("b", shape=(self.num_outputs,))
 
-        self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Initialize weights
-        self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
+        self.output_shape = (None, self.num_outputs)  # Consistent rank 2 output
 
     def __call__(self, inputs):
         """
