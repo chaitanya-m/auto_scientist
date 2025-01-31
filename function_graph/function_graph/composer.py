@@ -188,7 +188,10 @@ class FunctionGraphComposer:  # Composer class (separate)
     def compile(self, optimizer, loss_function):
         self.optimizer = optimizer
         self.loss_function = loss_function
+        self.graph.optimizer = optimizer
+        self.graph.loss_function = loss_function
         return self
+
 
     def train(self, inputs, targets, epochs=1, verbose=0):
         if not hasattr(self, 'optimizer') or not hasattr(self, 'loss_function'):

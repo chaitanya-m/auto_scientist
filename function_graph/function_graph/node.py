@@ -391,14 +391,6 @@ class ReLU(TrainableNode):
     #     self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Initialize weights
     #     self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
 
-    # def build(self, input_shape):
-    #     self.input_shape = input_shape
-    #     input_dim = input_shape[-1]  # This is now safe because input_shape is correct
-    #     self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
-    #     self.b = self.add_bias("b", shape=(self.num_outputs,))
-
-    #     self.output_shape = (None, self.num_outputs) if len(input_shape) == 2 else (self.num_outputs,)
-
     def build(self, input_shape):
         self.input_shape = input_shape
         input_dim = input_shape[-1]
@@ -483,14 +475,6 @@ class Sigmoid(TrainableNode):
 
     #     self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Initialize weights
     #     self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
-
-    # def build(self, input_shape):
-    #     self.input_shape = input_shape
-    #     input_dim = input_shape[-1]  # This is now safe because input_shape is correct
-    #     self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
-    #     self.b = self.add_bias("b", shape=(self.num_outputs,))
-
-    #     self.output_shape = (None, self.num_outputs) if len(input_shape) == 2 else (self.num_outputs,)
 
     def build(self, input_shape):
         self.input_shape = input_shape

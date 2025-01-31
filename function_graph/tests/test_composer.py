@@ -105,6 +105,10 @@ class TestFunctionGraph(unittest.TestCase):
         input_data = tf.random.normal((100, 10))
         target_data = tf.random.normal((100, 1))
 
+        assert hasattr(composer.graph, "optimizer"), "Optimizer not set. Did you call compile()?"
+        assert hasattr(composer.graph, "loss_function"), "Loss function not set. Did you call compile()?"
+
+
         loss = composer.train(input_data, target_data, epochs=5, verbose=0)
 
         self.assertIsInstance(loss, tf.Tensor)
