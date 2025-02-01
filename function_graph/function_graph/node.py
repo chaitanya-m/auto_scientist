@@ -5,10 +5,16 @@ class FunctionNode(ABC):
     """
     Abstract base class representing a node in a function graph.
 
-    A FunctionNode represents a computation step in a directed acyclic graph (DAG) of computations.
-    Nodes can either be trainable or fixed, and they transform their inputs according to the 
-    function they represent (e.g., an activation function, a layer, etc.). Each node has an input shape 
-    and an output shape, which are defined when the node is connected in the graph.
+    A FunctionNode represents a computation step in a directed acyclic graph (DAG) of computations (finite cycles in future?).
+
+    Nodes can either be trainable or fixed, and they transform their inputs according to suit the shape of the 
+    nodes that feed into them. That is, each node has an input shape and an output shape, which are defined when the node is 
+    connected in the graph.
+    
+    Nodes contain functions. For a start, we will use the neural net paradigm mainly due to accessibility.
+    
+    A function in a node may be fixed or learnable (allowing exploration of function space). In the neural net context, we mean
+    neural nets at nodes. We may have layers, multiple layers, activation functions, etc. that operate on the incoming tensor.
 
     Attributes:
         name: The name of the function node.
@@ -24,7 +30,7 @@ class FunctionNode(ABC):
             name: The name of the function node within the graph.
         """
         self.name = name
-        self.input_shape = None  # Will be set during the build phase
+        self.input_shape = None  # Will be set during the build phase - can this be better streamlined?
         self.output_shape = None  # Determined after building the node's internal model
 
     @abstractmethod
@@ -32,7 +38,7 @@ class FunctionNode(ABC):
         """
         Builds the underlying model for the function node based on the input shape.
 
-        This method should define the structure of the node (e.g., weights, biases, etc.).
+        This method should define the structure of the node (e.g., weights, biases, etc. for a learnable node).
 
         Args:
             input_shape: The shape of the input data expected by the node. This is typically 
@@ -50,7 +56,7 @@ class FunctionNode(ABC):
                     if the node has multiple inputs.
 
         Returns:
-            The output of the function node after processing the inputs.
+            The output of the function node after processing the inputs, i.e. the function has been called.
         """
         pass
 
@@ -58,9 +64,8 @@ class Trainable(ABC):
     """
     Abstract base class for trainable nodes that have learnable parameters.
     
-    This class defines the interface for nodes that need to train their parameters
+    This class defines the interface for function nodes that need to train their parameters
     (e.g., weights, biases) using a training process such as backpropagation.
-
     """
 
     @abstractmethod
@@ -92,28 +97,28 @@ class TrainableNode(FunctionNode, Trainable):
     """
 
     def add_weight(self, name, shape):
-        """
-        Creates and initializes a weight variable for the node with the given name and shape.
+        """Creates and initializes a weight variable with the given name and shape.
 
         Args:
-            name: The name of the weight variable.
-            shape: The shape of the weight variable (e.g., (input_dim, output_dim)).
+            name: The name of the weight variable (e.g., "weights_layer1").
+            shape: A tuple or list specifying the dimensions of the weight matrix 
+                (e.g., (input_dim, output_dim)).
 
         Returns:
-            A TensorFlow variable representing the weight.
+            A TensorFlow variable representing the weight matrix.
         """
         return tf.Variable(tf.random.normal(shape), name=name)
 
     def add_bias(self, name, shape):
-        """
-        Creates and initializes a bias variable for the node with the given name and shape.
+        """Creates and initializes a weight variable with the given name and shape.
 
         Args:
-            name: The name of the bias variable.
-            shape: The shape of the bias variable (e.g., (output_dim,)).
+            name: The name of the weight variable (e.g., "weights_layer1").
+            shape: A tuple or list specifying the dimensions of the weight matrix 
+                (e.g., (input_dim, output_dim)).
 
         Returns:
-            A TensorFlow variable representing the bias.
+            A TensorFlow variable representing the weight matrix.
         """
         return tf.Variable(tf.zeros(shape), name=name)
 
@@ -134,10 +139,10 @@ class TrainableNode(FunctionNode, Trainable):
         """
         inputs = tf.cast(inputs, tf.float32)
         with tf.GradientTape() as tape:
-            outputs = self(inputs)
-            loss = loss_function(targets, outputs)
-        gradients = tape.gradient(loss, self.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+            outputs = self(inputs) # perform forward pass
+            loss = loss_function(targets, outputs) # compute loss
+        gradients = tape.gradient(loss, self.trainable_variables) # calculate loss gradients for all trainable variables
+        optimizer.apply_gradients(zip(gradients, self.trainable_variables)) # apply gradients, to update all trainable variables 
         return loss
 
     @property
@@ -168,8 +173,9 @@ class FixedActivation(FunctionNode):
     """
     Base class for fixed (non-trainable) activation functions.
 
-    This class implements fixed transformations (such as Sigmoid, ReLU, etc.) that do not have learnable
-    parameters. The output shape is the same as the input shape since activations typically don't change
+    This class implements fixed activations that do not have learnable parameters. 
+    
+    The output shape is the same as the input shape since activations typically don't change
     the dimensions of the data.
 
     Attributes:
@@ -392,8 +398,8 @@ class ReLU(TrainableNode):
     #     self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
 
     def build(self, input_shape):
-        self.input_shape = input_shape
-        input_dim = input_shape[-1]
+        self.input_shape = input_shape # usually (batch_size, num_features)
+        input_dim = input_shape[-1] # number of features
         self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
         self.b = self.add_bias("b", shape=(self.num_outputs,))
 
@@ -401,25 +407,32 @@ class ReLU(TrainableNode):
 
     def __call__(self, inputs):
         """
-        Applies the ReLU function after computing the weighted sum of inputs.
+        Performs a forward pass through the ReLU activation layer.
 
-        First, the input is passed through a linear transformation (matrix multiplication 
-        with weights and bias), and then the ReLU function is applied element-wise.
+        This method applies a linear transformation (matrix multiplication with weights and 
+        addition of a bias) followed by the ReLU activation function element-wise.  Handles 
+        input concatenation if a list of tensors is provided.
 
         Args:
-            inputs: The input data to the ReLU activation function, which can be a single tensor 
-                    or a list of tensors. If a list is provided, they will be concatenated.
+            inputs: Input tensor(s) to the ReLU layer. Can be a single tensor or a list of 
+                    tensors. If a list is provided, the tensors are concatenated along the 
+                    last axis (axis=-1) after verifying consistent batch sizes.
 
         Returns:
-            The output after applying the ReLU activation function.
+            The output tensor after the linear transformation and ReLU activation.
+            
+        Raises:
+            ValueError: If input tensors provided as a list do not have consistent 
+                            batch sizes.
         """
+
         if isinstance(inputs, list):
             batch_sizes = [tf.shape(x)[0] for x in inputs]
             if not all(size == batch_sizes[0] for size in batch_sizes):
                 raise ValueError("Input tensors must have consistent batch sizes for concatenation.")
             inputs = tf.concat(inputs, axis=-1)
-        z = tf.matmul(inputs, self.W) + self.b  # Linear transformation
-        return tf.maximum(0., z)  # Apply ReLU: returns the max between 0 and the input
+        z = tf.matmul(inputs, self.W) + self.b  # Linear transformation - multiply by weight, add bias
+        return tf.maximum(0., z)  # Apply ReLU elementwise to the tensor: returns the max between 0 and the input
 
 class Sigmoid(TrainableNode):
     """
