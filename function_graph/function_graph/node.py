@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Union, List
 import tensorflow as tf
+import keras
+from keras import layers
 
 class FunctionNode(ABC):
     """
@@ -96,6 +98,18 @@ class TrainableNode(FunctionNode, Trainable):
     train the node's parameters using a training loop (e.g., backpropagation).
 
     """
+    def __init__(self, name: str, input_shape=None, output_shape=None):
+        """
+        Initializes a trainable function node.
+
+        Args:
+            name: The name of the function node.
+            input_shape: The expected shape of the input data.
+            output_shape: The shape of the output data after processing.
+        """
+        super().__init__(name)
+        self.input_shape = input_shape
+        self.output_shape = output_shape
 
     def add_weight(self, name, shape):
         """Creates and initializes a weight variable with the given name and shape.
@@ -170,6 +184,54 @@ class TrainableNode(FunctionNode, Trainable):
                 trainable_vars.extend(var.trainable_variables)
         return trainable_vars
 
+
+class TrainableNN(TrainableNode):
+    """Represents a trainable neural network node using Keras."""
+    def __init__(self, name: str, model: tf.keras.Model):
+        super().__init__(name)
+        self.model = model
+        self._is_built = False
+
+    def build(self, input_shape):
+        if self._is_built and self.input_shape != input_shape:
+            raise ValueError(f"TrainableNN '{self.name}' was already built with a different input shape: {self.input_shape}, got {input_shape}.")
+        if not self._is_built:
+            self.input_shape = input_shape
+            input_tensor = keras.Input(shape=input_shape[1:])
+            self.model(input_tensor) # Force build
+            self.output_shape = self.model.output.shape
+            self._is_built = True
+
+    def __call__(self, inputs: Union[tf.Tensor, List[tf.Tensor]]):
+        if isinstance(inputs, list):
+            if len(inputs) > 1:
+                inputs = tf.concat(inputs, axis=-1)
+            else:
+                inputs = inputs[0]
+        return self.model(inputs)
+
+    @property
+    def trainable_variables(self):
+        return self.model.trainable_variables
+
+    def save_weights(self, filepath: str):
+        self.model.save_weights(filepath)
+
+    def load_weights(self, filepath: str):
+        self.model.load_weights(filepath)
+
+class ReLU(TrainableNN):
+    def __init__(self, name: str):
+        model = keras.Sequential([layers.Dense(1, activation=tf.nn.relu)]) # one output for the neuron
+        super().__init__(name, model)
+
+class Sigmoid(TrainableNN):
+    def __init__(self, name: str):
+        model = keras.Sequential([layers.Dense(1, activation=tf.nn.sigmoid)]) # one output for the neuron
+        super().__init__(name, model)
+
+
+
 class FixedActivation(FunctionNode):
     """
     Base class for fixed (non-trainable) activation functions.
@@ -226,48 +288,6 @@ class FixedActivation(FunctionNode):
         return self.activation_function(inputs)
 
 
-class TrainableNN(TrainableNode):
-    """Represents a trainable neural network node in a computational graph.
-
-    This node wraps a Keras model, allowing it to be used as a unit
-    in a larger computational graph.
-    """
-    def __init__(self, name: str, model: tf.keras.Model):
-        """Initializes the TrainableNN."""
-        super().__init__(name)
-        self.model = model
-        self._is_built = False
-
-    def build(self, input_shape):
-        """Builds the Keras model (only once) and sets input/output shapes."""
-        if self._is_built and self.input_shape != input_shape:
-            raise ValueError(f"TrainableNN '{self.name}' was already built with a different input shape: {self.input_shape}, got {input_shape}.")
-        if not self._is_built:
-            self.input_shape = input_shape
-            self.model.build(input_shape)
-            self.output_shape = self.model.output_shape
-            self._is_built = True
-
-
-    def __call__(self, inputs: Union[tf.Tensor, List[tf.Tensor]]):
-        """Performs a forward pass while ensuring correct input format."""
-        if isinstance(inputs, list):
-            inputs = [tf.convert_to_tensor(i) for i in inputs]
-        return self.model(inputs)  # Forward pass
-
-    @property
-    def trainable_variables(self):
-        return self.model.trainable_variables
-
-    def save_weights(self, filepath: str):
-        """Saves the model weights."""
-        self.model.save_weights(filepath)
-
-    def load_weights(self, filepath: str):
-        """Loads weights into the model."""
-        self.model.load_weights(filepath)
-
-
 class FixedSigmoid(FixedActivation):
     """
     A fixed (non-trainable) Sigmoid activation function.
@@ -318,181 +338,3 @@ class FixedReLU(FixedActivation):
             name: The name of the ReLU node in the graph.
         """
         super().__init__(name, activation_function=tf.nn.relu)
-
-class ReLU(TrainableNode):
-    """
-    A trainable ReLU activation function.
-
-    This class represents a ReLU activation function that has learnable parameters. 
-    This is a custom activation that includes trainable weights and biases. 
-    Typically, a ReLU function does not include parameters, but in this case, we allow 
-    the possibility of learning weights and biases that are then added to the input 
-    before applying the ReLU function.
-
-    ReLU applies the following transformation element-wise to the input:
-        - If input > 0: return input
-        - If input <= 0: return 0
-
-    Inherits from:
-        TrainableNode: Allows the node to have learnable parameters and be part of a training process.
-
-    Attributes:
-        num_outputs: The number of output neurons from the ReLU function (determines the size of the output).
-
-    """
-
-    def __init__(self, name: str, num_outputs: int):
-        """
-        Initializes the ReLU activation function with learnable parameters.
-
-        Args:
-            name: The name of the ReLU node in the graph.
-            num_outputs: The number of output neurons from this activation function.
-        """
-        super().__init__(name)
-        self.num_outputs = num_outputs
-
-    # def build(self, input_shape):
-    #     """
-    #     Builds the ReLU node by initializing weights and biases.
-
-    #     The weights and biases are initialized randomly, and the output shape is set based on 
-    #     the number of output neurons. The weights are initialized as random values, and biases are initialized as zeros.
-
-    #     Args:
-    #         input_shape: The shape of the input data expected by the ReLU node.
-    #     """
-    #     self.input_shape = input_shape
-    #     input_rank = tf.TensorShape(input_shape).rank
-    #     if input_rank == 1:
-    #         self.output_shape = (self.num_outputs,)
-    #     elif input_rank == 2:
-    #         self.output_shape = (None, self.num_outputs)
-    #     else:
-    #         raise ValueError("Input shape must have rank 1 or 2.")
-
-    #     self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Initialize weights
-    #     self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
-
-    def build(self, input_shape):
-        self.input_shape = input_shape # usually (batch_size, num_features)
-        input_dim = input_shape[-1] # number of features
-        self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
-        self.b = self.add_bias("b", shape=(self.num_outputs,))
-
-        self.output_shape = (None, self.num_outputs)  # Consistent rank 2 output
-
-    def __call__(self, inputs):
-        """
-        Performs a forward pass through the ReLU activation layer.
-
-        This method applies a linear transformation (matrix multiplication with weights and 
-        addition of a bias) followed by the ReLU activation function element-wise.  Handles 
-        input concatenation if a list of tensors is provided.
-
-        Args:
-            inputs: Input tensor(s) to the ReLU layer. Can be a single tensor or a list of 
-                    tensors. If a list is provided, the tensors are concatenated along the 
-                    last axis (axis=-1) after verifying consistent batch sizes.
-
-        Returns:
-            The output tensor after the linear transformation and ReLU activation.
-            
-        Raises:
-            ValueError: If input tensors provided as a list do not have consistent 
-                            batch sizes.
-        """
-
-        if isinstance(inputs, list):
-            batch_sizes = [tf.shape(x)[0] for x in inputs]
-            if not all(size == batch_sizes[0] for size in batch_sizes):
-                raise ValueError("Input tensors must have consistent batch sizes for concatenation.")
-            inputs = tf.concat(inputs, axis=-1)
-        z = tf.matmul(inputs, self.W) + self.b  # Linear transformation - multiply by weight, add bias
-        return tf.maximum(0., z)  # Apply ReLU elementwise to the tensor: returns the max between 0 and the input
-
-class Sigmoid(TrainableNode):
-    """
-    A trainable Sigmoid activation function.
-
-    This class represents a Sigmoid activation function that has learnable weights and biases. 
-    While standard Sigmoid functions don't have parameters, this class allows the Sigmoid 
-    to include trainable weights and biases for advanced architectures that may require such 
-    flexibility.
-
-    The Sigmoid function applies the following transformation to the input:
-        Sigmoid(x) = 1 / (1 + exp(-x))
-
-    This transformation squashes the output between 0 and 1.
-
-    Inherits from:
-        TrainableNode: Enables the Sigmoid function to have learnable parameters and to be part of a training process.
-
-    Attributes:
-        num_outputs: The number of output neurons from the Sigmoid activation.
-
-    """
-
-    def __init__(self, name: str, num_outputs: int):
-        """
-        Initializes the Sigmoid activation function with learnable parameters.
-
-        Args:
-            name: The name of the Sigmoid node in the graph.
-            num_outputs: The number of output neurons from this activation function.
-        """
-        super().__init__(name)
-        self.num_outputs = num_outputs
-
-    # def build(self, input_shape):
-    #     """
-    #     Builds the Sigmoid node by initializing weights and biases.
-
-    #     Similar to the ReLU node, weights and biases are initialized randomly, and the 
-    #     output shape is determined by the number of output neurons.
-
-    #     Args:
-    #         input_shape: The shape of the input data expected by the Sigmoid node.
-    #     """
-    #     self.input_shape = input_shape
-    #     input_rank = tf.TensorShape(input_shape).rank
-    #     if input_rank == 1:
-    #         self.output_shape = (self.num_outputs,)
-    #     elif input_rank == 2:
-    #         self.output_shape = (None, self.num_outputs)
-    #     else:
-    #         raise ValueError("Input shape must have rank 1 or 2.")
-
-    #     self.W = self.add_weight("W", shape=(input_shape[-1], self.num_outputs))  # Initialize weights
-    #     self.b = self.add_bias("b", shape=(self.num_outputs,))  # Initialize biases
-
-    def build(self, input_shape):
-        self.input_shape = input_shape
-        input_dim = input_shape[-1]
-        self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
-        self.b = self.add_bias("b", shape=(self.num_outputs,))
-
-        self.output_shape = (None, self.num_outputs)  # Consistent rank 2 output
-
-    def __call__(self, inputs):
-        """
-        Applies the Sigmoid function after computing the weighted sum of inputs.
-
-        First, the input is passed through a linear transformation (matrix multiplication 
-        with weights and bias), and then the Sigmoid function is applied to squash the 
-        output between 0 and 1.
-
-        Args:
-            inputs: The input data to the Sigmoid activation function, which can be a single tensor 
-                    or a list of tensors. If a list is provided, they will be concatenated.
-
-        Returns:
-            The output after applying the Sigmoid activation function.
-        """
-        if isinstance(inputs, list):
-            batch_sizes = [tf.shape(x)[0] for x in inputs]
-            if not all(size == batch_sizes[0] for size in batch_sizes):
-                raise ValueError("Input tensors must have consistent batch sizes for concatenation.")
-            inputs = tf.concat(inputs, axis=-1)
-        z = tf.matmul(inputs, self.W) + self.b  # Linear transformation
-        return tf.sigmoid(z)  # Apply Sigmoid activation: squashes between 0 and 1

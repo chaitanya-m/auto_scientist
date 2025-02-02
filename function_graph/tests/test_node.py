@@ -121,12 +121,12 @@ class TestFunctionNodes(unittest.TestCase):
            - This helper method concatenates the input tensors along the last axis, builds the node based on the concatenated input shape, calls the node with the concatenated input, and checks if the output shape is correct.  It also re-asserts the ReLU characteristic (output >= 0).
         """
         self._test_activation_build_and_call(
-            ReLU("my_relu", num_outputs=1),
+            ReLU("my_relu"),
             (10, 5),
             (10, 1),
             lambda output: self.assertTrue(tf.reduce_all(output >= 0))
         )
-        self._test_call_with_multiple_inputs(ReLU("my_relu", num_outputs=1), (10, 2), (10, 3), 1)
+        self._test_call_with_multiple_inputs(ReLU("my_relu"), (10, 2), (10, 3), 1)
 
     def test_sigmoid_build_and_call(self):
         """
@@ -140,7 +140,7 @@ class TestFunctionNodes(unittest.TestCase):
              - Build the Sigmoid node, initializing its weights and biases based on the input shape (10, 5).
              - Generate random input data with shape (10, 5).
              - Call the Sigmoid node with the input data.
-             - Assert that the output shape is (10, 2), as expected for a Sigmoid node with 2 output features.
+             - Assert that the output shape is (10, 1), as expected for a Sigmoid node with 1 output features.
              - Call the provided lambda function `lambda output: (self.assertTrue(tf.reduce_all(output >= 0)) and self.assertTrue(tf.reduce_all(output <= 1)))` to perform extra checks.  This lambda function asserts that all elements in the output tensor are between 0 and 1 (inclusive), which is a defining characteristic of the Sigmoid activation function.
 
         2. **Multiple Input Call:**
@@ -150,13 +150,13 @@ class TestFunctionNodes(unittest.TestCase):
            - This helper method concatenates the input tensors, builds the node, calls the node, and checks the output shape. It also re-asserts the Sigmoid characteristic (0 <= output <= 1).
         """
         self._test_activation_build_and_call(
-            Sigmoid("my_sigmoid", num_outputs=2),
+            Sigmoid("my_sigmoid"),
             (10, 5),
-            (10, 2),
+            (10, 1),
             lambda output: (self.assertTrue(tf.reduce_all(output >= 0)) and
                             self.assertTrue(tf.reduce_all(output <= 1)))
         )
-        self._test_call_with_multiple_inputs(Sigmoid("my_sigmoid", num_outputs=2), (10, 2), (10, 3), 2)
+        self._test_call_with_multiple_inputs(Sigmoid("my_sigmoid"), (10, 2), (10, 3), 1)
 
     def test_fixed_sigmoid_build_and_call(self):
         """Tests the build and call methods of a FixedSigmoid node."""
@@ -206,7 +206,10 @@ class TestFunctionNodes(unittest.TestCase):
 
         inputs = tf.random.normal(input_shape)
         output = node(inputs)
-        self.assertEqual(output.shape, node.output_shape)
+        self.assertEqual(output.shape[1:], node.output_shape[1:]) 
+        # Batch size for keras model is None for genericity; only compares number of features
+
+
 
 
 if __name__ == "__main__":
