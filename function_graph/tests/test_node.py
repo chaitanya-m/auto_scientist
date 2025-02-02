@@ -2,7 +2,7 @@ import unittest
 import tensorflow as tf
 from function_graph.node import (
     Trainable,
-    TrainableActivation,
+    TrainableNN,
     FixedActivation,
     FixedSigmoid,
     FixedReLU,
@@ -21,7 +21,7 @@ class TestFunctionNodes(unittest.TestCase):
         Tests the creation of a FunctionNode, verifying name and initial shape.
 
         Args:
-            node_class: The class of the node to create (e.g., TrainableActivation).
+            node_class: The class of the node to create (e.g., TrainableNN).
             expected_name: The expected name of the node.
         """
         node = node_class(expected_name)
@@ -94,10 +94,6 @@ class TestFunctionNodes(unittest.TestCase):
         elif isinstance(node, Sigmoid):
             self.assertTrue(tf.reduce_all(output >= 0))
             self.assertTrue(tf.reduce_all(output <= 1))   
-
-    def test_trainable_creation(self):
-        """Tests the creation of TrainableActivation nodes."""
-        self._test_trainable_creation(TrainableActivation, "trainable_activation") 
 
     def test_fixed_activation_creation(self):
         """Tests the creation of FixedActivation nodes."""
@@ -183,47 +179,35 @@ class TestFunctionNodes(unittest.TestCase):
         )
         self._test_call_with_multiple_inputs(FixedReLU("fixed_relu"), (10, 2), (10, 3), 5)
 
-    def test_trainable_activation_train(self):
-        """
-        Tests the train method of a TrainableActivation node, verifying weight and bias updates.
 
-        This test performs the following steps:
-        1. Initializes a TrainableActivation node with a specified number of outputs.
-        2. Builds the node with a given input shape, initializing the weights (W) and biases (b).
-        3. Generates random input data and target data.  The target data's shape is crucial; it must match the output shape of the TrainableActivation node.
-        4. Initializes an Adam optimizer with a learning rate.  Setting the learning rate is important for the test to be meaningful.
-        5. Defines a MeanSquaredError loss function.
-        6. Stores the initial values of the weights (W) and biases (b) before training.
-        7. Calls the `train` method of the TrainableActivation node, performing one training step. This calculates the loss, computes gradients, and updates the weights and biases using the optimizer.
-        8. Asserts that the returned loss is a TensorFlow tensor.
-        9. Retrieves the values of the weights (W) and biases (b) *after* training.
-        10. Asserts that the weights and biases have been updated after the training step.  This verifies that the `train` method correctly calculates and applies gradients.
+    def test_trainable_nn_creation(self):
+        """Tests the creation of TrainableNN nodes."""
+        model = tf.keras.Sequential([
+            tf.keras.layers.Dense(4, activation="relu"),
+            tf.keras.layers.Dense(2, activation="sigmoid")
+        ])
+        node = TrainableNN("trainable_nn", model)
+        self.assertEqual(node.name, "trainable_nn")
+        self.assertIsInstance(node, Trainable)
 
-        The test uses a fixed random seed (`tf.random.set_seed(42)`) to ensure consistent weight initialization and test reproducibility.  This means that the initial weights and biases will be the same every time the test is run, making the test deterministic.
-        """
 
-        tf.random.set_seed(42)
-        activation = TrainableActivation("trainable_sigmoid", num_outputs=2)
+    def test_trainable_nn_build_and_call(self):
+        """Tests the build and forward pass of TrainableNN."""
+        model = tf.keras.Sequential([
+            tf.keras.layers.Dense(4, activation="relu"),
+            tf.keras.layers.Dense(2, activation="sigmoid")
+        ])
+        node = TrainableNN("trainable_nn", model)
+
         input_shape = (10, 5)
-        activation.build(input_shape)
+        node.build(input_shape)
+        self.assertEqual(node.input_shape, input_shape)
+        self.assertEqual(node.output_shape, model.output_shape)
 
         inputs = tf.random.normal(input_shape)
-        targets = tf.random.normal((10, 2))
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
-        loss_fn = tf.keras.losses.MeanSquaredError()
+        output = node(inputs)
+        self.assertEqual(output.shape, node.output_shape)
 
-        W_before_train = activation.W.numpy()
-        b_before_train = activation.b.numpy()
-
-        loss = activation.train(inputs, targets, optimizer, loss_fn)
-
-        self.assertIsInstance(loss, tf.Tensor)
-
-        W_after_train = activation.W.numpy()
-        b_after_train = activation.b.numpy()
-
-        self.assertFalse(np.array_equal(W_before_train, W_after_train), "Weights should be updated")
-        self.assertFalse(np.array_equal(b_before_train, b_after_train), "Biases should be updated")
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Union, List
 import tensorflow as tf
 
 class FunctionNode(ABC):
@@ -224,72 +225,48 @@ class FixedActivation(FunctionNode):
         inputs = tf.cast(inputs, tf.float32)
         return self.activation_function(inputs)
 
-class TrainableActivation(TrainableNode):
+
+class TrainableNN(TrainableNode):
+    """Represents a trainable neural network node in a computational graph.
+
+    This node wraps a Keras model, allowing it to be used as a unit
+    in a larger computational graph.
     """
-    A class for trainable activation functions, where the activations have learnable parameters (weights and biases).
-
-    This class implements an activation function that can learn its own parameters (such as weights and biases)
-    during training. This is useful in some advanced neural network architectures where the activation function 
-    itself can adapt during training.
-
-    Attributes:
-        activation_function: The TensorFlow activation function (default is Sigmoid).
-        num_outputs: The number of outputs (units) in the activation.
-    """
-
-    def __init__(self, name: str, activation_function=tf.nn.sigmoid, num_outputs=1):
-        """
-        Initializes a TrainableActivation.
-
-        Args:
-            name: The name of the activation node.
-            activation_function: The TensorFlow activation function (default is tf.nn.sigmoid).
-            num_outputs: The number of output units (neurons) for this activation (default is 1).
-        """
+    def __init__(self, name: str, model: tf.keras.Model):
+        """Initializes the TrainableNN."""
         super().__init__(name)
-        self.activation_function = activation_function
-        self.num_outputs = num_outputs
+        self.model = model
+        self._is_built = False
 
     def build(self, input_shape):
-        """
-        Builds the weights and biases for the trainable activation function.
+        """Builds the Keras model (only once) and sets input/output shapes."""
+        if self._is_built and self.input_shape != input_shape:
+            raise ValueError(f"TrainableNN '{self.name}' was already built with a different input shape: {self.input_shape}, got {input_shape}.")
+        if not self._is_built:
+            self.input_shape = input_shape
+            self.model.build(input_shape)
+            self.output_shape = self.model.output_shape
+            self._is_built = True
 
-        This method initializes weights and biases that will be learned during training.
 
-        Args:
-            input_shape: The shape of the input data to the activation function.
-        """
-        self.input_shape = input_shape
-        input_dim = input_shape[-1]
-        self.W = self.add_weight("W", shape=(input_dim, self.num_outputs))
-        self.b = self.add_bias("b", shape=(self.num_outputs,))
-
-        input_rank = tf.TensorShape(input_shape).rank
-        if input_rank == 1:
-            self.output_shape = (self.num_outputs,)
-        elif input_rank == 2:
-            self.output_shape = (None, self.num_outputs)
-        else:
-            raise ValueError("Input shape must have rank 1 or 2.")
-
-    def __call__(self, inputs):
-        """
-        Applies the activation function with weights and biases to the inputs.
-
-        Args:
-            inputs: The input data (single tensor or a list of tensors).
-
-        Returns:
-            The output after applying the activation function with weights and biases.
-        """
+    def __call__(self, inputs: Union[tf.Tensor, List[tf.Tensor]]):
+        """Performs a forward pass while ensuring correct input format."""
         if isinstance(inputs, list):
-            batch_sizes = [tf.shape(x)[0] for x in inputs]
-            if not all(size == batch_sizes[0] for size in batch_sizes):
-                raise ValueError("Input tensors must have consistent batch sizes for concatenation.")
-            inputs = tf.concat(inputs, axis=-1)
-        inputs = tf.cast(inputs, tf.float32)
-        z = tf.matmul(inputs, self.W) + self.b
-        return self.activation_function(z)
+            inputs = [tf.convert_to_tensor(i) for i in inputs]
+        return self.model(inputs)  # Forward pass
+
+    @property
+    def trainable_variables(self):
+        return self.model.trainable_variables
+
+    def save_weights(self, filepath: str):
+        """Saves the model weights."""
+        self.model.save_weights(filepath)
+
+    def load_weights(self, filepath: str):
+        """Loads weights into the model."""
+        self.model.load_weights(filepath)
+
 
 class FixedSigmoid(FixedActivation):
     """
