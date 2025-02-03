@@ -198,11 +198,16 @@ class TestGraphComposer(unittest.TestCase):
         x_data = np.random.rand(N, 2)
         y_data = 2 * x_data  # Elementwise multiplication.
 
-        graph_model.set_weights(vanilla_model.get_weights())  # Force identical weights
-
         # Print weights before training
         graph_weights = graph_model.get_weights()
         vanilla_weights = vanilla_model.get_weights()
+
+        print("\n=== Vanilla Model Summary ===")
+        vanilla_model.summary()
+
+        print("\n=== Graph Model Summary ===")
+        graph_model.summary()
+
 
         for i, (gw, vw) in enumerate(zip(graph_weights, vanilla_weights)):
             print(f"Layer {i}: max diff = {np.max(np.abs(gw - vw))}")
