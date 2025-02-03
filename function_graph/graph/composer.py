@@ -99,19 +99,32 @@ class GraphComposer:
         return self.keras_model
 
     def _topological_sort(self):
-        in_degree = {name: 0 for name in self.nodes}
-        for child, parents in self.connections.items():
-            in_degree[child] += len(parents)
-        queue = deque([name for name, deg in in_degree.items() if deg == 0])
-        order = []
+        """
+        Performs a topological sort on the graph to determine a valid computation order.
+        
+        This ensures that each node is processed only after all its dependencies (parents)
+        have been processed.
+        
+        Returns:
+            order (list): A list of node names sorted in topological order.
+
+        Raises:
+            ValueError: If a cycle is detected or the graph is disconnected.
+        """
+
+        in_degree = {name: 0 for name in self.nodes} # Initialize in-degree for each node.
+        for child, parents in self.connections.items(): # Count incoming edges for each node.
+            in_degree[child] += len(parents) 
+        queue = deque([name for name, deg in in_degree.items() if deg == 0])  # Nodes with no dependencies.
+        order = [] # Stores sorted nodes.
         while queue:
-            current = queue.popleft()
-            order.append(current)
+            current = queue.popleft()  # Process next node with no remaining dependencies.
+            order.append(current)  # Add it to the sorted order.
             for child, parents in self.connections.items():
                 if current in parents:
-                    in_degree[child] -= 1
+                    in_degree[child] -= 1 # Reduce child's in-degree.
                     if in_degree[child] == 0:
-                        queue.append(child)
+                        queue.append(child) # Add child if it has no more dependencies.
         if len(order) != len(self.nodes):
-            raise ValueError("Cycle detected or graph is disconnected.")
-        return order
+            raise ValueError("Cycle detected or graph is disconnected.")  # Ensure all nodes are processed.
+        return order  # Return nodes in topological order.
