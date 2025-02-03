@@ -30,19 +30,26 @@ class GraphComposer:
             raise ValueError(f"Node with name '{node.name}' already exists.")
         self.nodes[node.name] = node
 
-    def set_input_node(self, node_name):
+    def set_input_node(self, node_names):
         """
-        Designates the input node.
+        Designates the input node(s).
 
         Args:
-            node_name (str): The name of the node to use as the input.
+            node_names (str or list): The name of the input node, or a list of input node names.
             
         Raises:
-            ValueError: If the specified node is not found.
+            ValueError: If any specified node is not found.
         """
-        if node_name not in self.nodes:
-            raise ValueError(f"Input node '{node_name}' not found.")
-        self.input_node_name = node_name
+        if isinstance(node_names, list):
+            for n in node_names:
+                if n not in self.nodes:
+                    raise ValueError(f"Input node '{n}' not found.")
+            self.input_node_names = node_names
+        else:
+            if node_names not in self.nodes:
+                raise ValueError(f"Input node '{node_names}' not found.")
+            self.input_node_names = [node_names]
+
 
     def set_output_node(self, node_names):
         """
@@ -94,22 +101,24 @@ class GraphComposer:
         Raises:
             ValueError: If input and/or output nodes are not set.
         """
-        if self.input_node_name is None or self.output_node_names is None:
+        if self.input_node_names is None or self.output_node_names is None:
             raise ValueError("Both input and output nodes must be set before building the graph.")
 
         # Create the global input tensor.
         global_input = keras.layers.Input(shape=input_shape, name="global_input")
 
-        # Build and apply the input node.
-        input_node = self.nodes[self.input_node_name]
-        input_node.build_node(input_shape)
-        node_outputs = {self.input_node_name: input_node.apply(global_input)}
+        # For each designated input node, build its sub-model using the same global input.
+        node_outputs = {}
+        for in_name in self.input_node_names:
+            node = self.nodes[in_name]
+            node.build_node(input_shape)
+            node_outputs[in_name] = node.apply(global_input)
 
         # Process remaining nodes in topological order.
         order = self._topological_sort()
         for node_name in order:
+            # Skip if already processed (i.e., an input node).
             if node_name in node_outputs:
-                # Already processed (e.g., the designated input node).
                 continue
             node = self.nodes[node_name]
             parent_names = self.connections.get(node_name, [])
@@ -123,7 +132,7 @@ class GraphComposer:
                 parent_tensors = [node_outputs[p] for p in parent_names]
                 parent_tensor = keras.layers.Concatenate(name=f"{node_name}_concat")(parent_tensors)
 
-            # Infer input shape from the parent's output (excluding the batch dimension).
+            # Infer input shape from the parent's output (excluding batch dimension).
             if hasattr(parent_tensor.shape, "as_list"):
                 shape_list = parent_tensor.shape.as_list()
             else:
@@ -137,7 +146,7 @@ class GraphComposer:
         outputs = [node_outputs[name] for name in self.output_node_names]
         self.keras_model = keras.models.Model(
             inputs=global_input,
-            outputs=outputs,
+            outputs=outputs if len(outputs) > 1 else outputs[0],
             name="GraphModel"
         )
         return self.keras_model
