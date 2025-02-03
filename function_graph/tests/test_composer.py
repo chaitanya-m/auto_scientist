@@ -149,15 +149,16 @@ class TestGraphComposer(unittest.TestCase):
 
     def test_2x2_graph_vs_vanilla_keras(self):
         """
-        Builds a 2x2 graph from individual neurons and compares its performance on
-        a simple problem (y = 2*x) with that of a vanilla Keras model built using a Dense layer.
+        Builds a 2x2 graph from blueprint nodes (each representing a single neuron)
+        and compares its performance on a simple problem (y = 2*x) with that of a vanilla 
+        Keras model built using a single Dense layer.
         """
-
-        # Set a seed for reproducibility.
+        # Set seeds for reproducibility.
         np.random.seed(42)
         random.seed(42)
         keras.utils.set_random_seed(42)
 
+        # === Build the GraphComposer Model (2 input nodes, 2 output nodes) ===
         composer = GraphComposer()
 
         # Create two input neurons and two output neurons with linear activation.
@@ -197,25 +198,25 @@ class TestGraphComposer(unittest.TestCase):
         x_data = np.random.rand(N, 2)
         y_data = 2 * x_data  # Elementwise multiplication.
 
-        # Train both models for a sufficient number of epochs.
+        # Train both models.
+        # For the graph model, we provide targets as a list (one per output node).
         graph_model.fit(x_data, [y_data[:, [0]], y_data[:, [1]]], epochs=100, verbose=0)
         vanilla_model.fit(x_data, y_data, epochs=1000, verbose=0)
 
         # Evaluate both models.
-        # For the graph model, concatenate the two output arrays.
+        # For the graph model, if outputs are a list, concatenate them to form (N, 2).
         graph_pred = graph_model.predict(x_data)
         if isinstance(graph_pred, list):
             graph_pred = np.concatenate(graph_pred, axis=1)
         graph_loss = np.mean((y_data - graph_pred) ** 2)
-
         vanilla_loss = vanilla_model.evaluate(x_data, y_data, verbose=0)
 
-        # Check that both models achieve a low loss on the simple problem.
-
+        # Print losses for debugging.
         print("vanilla: " + str(vanilla_loss) + " graph: " + str(graph_loss))
+
+        # Assert that both models achieve low loss.
         self.assertLess(vanilla_loss, 0.1, "Vanilla model loss should be low on the simple problem.")
         self.assertLess(graph_loss, 0.2, "Graph model loss should be low on the simple problem.")
-
 
         # Also check that the losses are similar (within a tolerance).
         self.assertAlmostEqual(graph_loss, vanilla_loss, delta=0.05,
