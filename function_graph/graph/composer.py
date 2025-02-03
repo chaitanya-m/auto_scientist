@@ -6,8 +6,7 @@ class GraphComposer:
     """
     Assembles a final Keras model from blueprint nodes.
     Each node is a specification of a Keras transformation.
-    When build() is called, the composer either collapses a simple (dense) graph 
-    into a single Dense layer or wires together nodes via the Functional API.
+    When build() is called, the composer wires together nodes via the Functional API.
     """
     def __init__(self):
         self.nodes = {}         # Mapping from node name to GraphNode blueprint.
@@ -53,10 +52,7 @@ class GraphComposer:
     def build(self, input_shape):
         """
         Assembles and returns the final Keras model.
-        If the blueprint graph is "collapsible" (i.e. only input and output nodes,
-        all are SingleNeuron with linear activation, and each output node receives
-        input from all input nodes), then build a single Dense layer.
-        Otherwise, wire the graph using the Keras Functional API.
+        Wire the graph using the Keras Functional API.
         """
         if self.input_node_names is None or self.output_node_names is None:
             raise ValueError("Both input and output nodes must be set before building the graph.")
@@ -101,13 +97,10 @@ class GraphComposer:
     def _topological_sort(self):
         """
         Performs a topological sort on the graph to determine a valid computation order.
-        
         This ensures that each node is processed only after all its dependencies (parents)
         have been processed.
-        
         Returns:
             order (list): A list of node names sorted in topological order.
-
         Raises:
             ValueError: If a cycle is detected or the graph is disconnected.
         """
