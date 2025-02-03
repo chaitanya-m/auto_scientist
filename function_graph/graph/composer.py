@@ -61,36 +61,6 @@ class GraphComposer:
         if self.input_node_names is None or self.output_node_names is None:
             raise ValueError("Both input and output nodes must be set before building the graph.")
 
-        # # --- Check for collapsibility ---
-        # # We define the graph as collapsible if:
-        # # 1. The set of nodes equals the union of input and output nodes.
-        # # 2. Every node is an instance of SingleNeuron with activation "linear".
-        # # 3. For every output node, the list of parent connections exactly equals the list of input nodes.
-        # all_node_names = set(self.nodes.keys())
-        # blueprint_nodes = set(self.input_node_names) | set(self.output_node_names)
-        # if all_node_names == blueprint_nodes:
-        #     # Check that each node is a SingleNeuron with linear activation.
-        #     if all(isinstance(self.nodes[n], SingleNeuron) and self.nodes[n].activation == "linear" for n in all_node_names):
-        #         # Check that every output node receives connections from all input nodes.
-        #         collapsible = True
-        #         for out_node in self.output_node_names:
-        #             # If no connections are specified, assume that the blueprint intends the output node
-        #             # to use the global input. In that case, if there is more than one input node, we expect a full connection.
-        #             parents = self.connections.get(out_node, [])
-        #             if set(parents) != set(self.input_node_names):
-        #                 collapsible = False
-        #                 break
-        #         if collapsible:
-        #             # We can collapse the graph into a single Dense layer.
-        #             global_input = keras.layers.Input(shape=input_shape, name="global_input")
-        #             # Create a Dense layer with units equal to the number of output nodes.
-        #             dense = keras.layers.Dense(len(self.output_node_names), activation="linear", name="dense_collapse")(global_input)
-        #             self.keras_model = keras.models.Model(inputs=global_input, outputs=dense, name="CollapsedGraphModel")
-        #             return self.keras_model
-        # # --- End collapsibility check ---
-
-        # Fallback: build the full graph using the blueprint connections.
-
         print("\nBuilding blueprint graph\n")
         global_input = keras.layers.Input(shape=input_shape, name="global_input")
         node_outputs = {}
