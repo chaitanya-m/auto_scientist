@@ -1,12 +1,13 @@
 import keras
 from collections import deque
+from graph.node import SingleNeuron  # Import the blueprint node type
 
 class GraphComposer:
     """
-    Assembles a final Keras model from GraphNode blueprints.
-    Nodes and their connections are defined as blueprints (with no immediate instantiation).
-    When build() is called, the composer traverses the blueprint graph and
-    uses the Keras Functional API to build a unified, vanilla Keras model.
+    Assembles a final Keras model from blueprint nodes.
+    Each node is a specification of a Keras transformation.
+    When build() is called, the composer either collapses a simple (dense) graph 
+    into a single Dense layer or wires together nodes via the Functional API.
     """
     def __init__(self):
         self.nodes = {}         # Mapping from node name to GraphNode blueprint.
@@ -21,9 +22,6 @@ class GraphComposer:
         self.nodes[node.name] = node
 
     def set_input_node(self, node_names):
-        """
-        Designate the input node(s). Accepts either a string or a list of strings.
-        """
         if isinstance(node_names, list):
             for n in node_names:
                 if n not in self.nodes:
@@ -35,9 +33,6 @@ class GraphComposer:
             self.input_node_names = [node_names]
 
     def set_output_node(self, node_names):
-        """
-        Designate the output node(s). Accepts either a string or a list of strings.
-        """
         if isinstance(node_names, list):
             for n in node_names:
                 if n not in self.nodes:
@@ -49,9 +44,6 @@ class GraphComposer:
             self.output_node_names = [node_names]
 
     def connect(self, from_node, to_node):
-        """
-        Connects the output of one node to the input of another.
-        """
         if from_node not in self.nodes:
             raise ValueError(f"From-node '{from_node}' not found.")
         if to_node not in self.nodes:
@@ -61,41 +53,65 @@ class GraphComposer:
     def build(self, input_shape):
         """
         Assembles and returns the final Keras model.
-        This method creates a single global Input layer and then, based on the blueprint,
-        wires together all nodes via the Functional API.
+        If the blueprint graph is "collapsible" (i.e. only input and output nodes,
+        all are SingleNeuron with linear activation, and each output node receives
+        input from all input nodes), then build a single Dense layer.
+        Otherwise, wire the graph using the Keras Functional API.
         """
         if self.input_node_names is None or self.output_node_names is None:
             raise ValueError("Both input and output nodes must be set before building the graph.")
 
-        # Create the global input tensor.
-        global_input = keras.layers.Input(shape=input_shape, name="global_input")
+        # --- Check for collapsibility ---
+        # We define the graph as collapsible if:
+        # 1. The set of nodes equals the union of input and output nodes.
+        # 2. Every node is an instance of SingleNeuron with activation "linear".
+        # 3. For every output node, the list of parent connections exactly equals the list of input nodes.
+        all_node_names = set(self.nodes.keys())
+        blueprint_nodes = set(self.input_node_names) | set(self.output_node_names)
+        if all_node_names == blueprint_nodes:
+            # Check that each node is a SingleNeuron with linear activation.
+            if all(isinstance(self.nodes[n], SingleNeuron) and self.nodes[n].activation == "linear" for n in all_node_names):
+                # Check that every output node receives connections from all input nodes.
+                collapsible = True
+                for out_node in self.output_node_names:
+                    # If no connections are specified, assume that the blueprint intends the output node
+                    # to use the global input. In that case, if there is more than one input node, we expect a full connection.
+                    parents = self.connections.get(out_node, [])
+                    if set(parents) != set(self.input_node_names):
+                        collapsible = False
+                        break
+                if collapsible:
+                    # We can collapse the graph into a single Dense layer.
+                    global_input = keras.layers.Input(shape=input_shape, name="global_input")
+                    # Create a Dense layer with units equal to the number of output nodes.
+                    dense = keras.layers.Dense(len(self.output_node_names), activation="linear", name="dense_collapse")(global_input)
+                    self.keras_model = keras.models.Model(inputs=global_input, outputs=dense, name="CollapsedGraphModel")
+                    return self.keras_model
+        # --- End collapsibility check ---
 
-        # For each designated input node, build its branch using the global input.
+        # Fallback: build the full graph using the blueprint connections.
+        global_input = keras.layers.Input(shape=input_shape, name="global_input")
         node_outputs = {}
+        # For each designated input node, call its blueprint apply() using the global input.
         for in_name in self.input_node_names:
             node = self.nodes[in_name]
             node_outputs[in_name] = node.apply(global_input)
-
         # Process remaining nodes in topological order.
         order = self._topological_sort()
         for node_name in order:
             if node_name in node_outputs:
-                # Already processed (i.e. designated as an input node).
                 continue
             node = self.nodes[node_name]
             parent_names = self.connections.get(node_name, [])
             if not parent_names:
-                # If no parents are specified, default to using the global input.
                 parent_tensor = global_input
             elif len(parent_names) == 1:
                 parent_tensor = node_outputs[parent_names[0]]
             else:
-                # For multiple parent nodes, concatenate their outputs along the last axis.
                 parent_tensors = [node_outputs[p] for p in parent_names]
                 parent_tensor = keras.layers.Concatenate(name=f"{node_name}_concat")(parent_tensors)
             node_outputs[node_name] = node.apply(parent_tensor)
 
-        # Collect the outputs from the designated output nodes.
         outputs = [node_outputs[name] for name in self.output_node_names]
         self.keras_model = keras.models.Model(
             inputs=global_input,
@@ -105,10 +121,6 @@ class GraphComposer:
         return self.keras_model
 
     def _topological_sort(self):
-        """
-        Computes a topological ordering of the nodes based on the connections.
-        Raises an error if a cycle is detected.
-        """
         in_degree = {name: 0 for name in self.nodes}
         for child, parents in self.connections.items():
             in_degree[child] += len(parents)
