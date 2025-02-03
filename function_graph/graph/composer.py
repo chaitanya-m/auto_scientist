@@ -102,8 +102,9 @@ class GraphComposer:
         # Process remaining nodes in topological order.
         order = self._topological_sort()
         for node_name in order:
-            if node_name == self.input_node_name:
-                continue  # Already handled.
+            if node_name in node_outputs:
+                # Already processed (for example, the designated input node).
+                continue
             node = self.nodes[node_name]
             parent_names = self.connections.get(node_name, [])
             if not parent_names:
@@ -143,12 +144,15 @@ class GraphComposer:
             A list of node names in topological order.
             
         Raises:
-            ValueError: If a cycle is detected or the graph is disconnected.
+            ValueError: If a cycle is detected.
         """
+        # Compute in-degrees for each node.
         in_degree = {name: 0 for name in self.nodes}
         for child, parents in self.connections.items():
             in_degree[child] += len(parents)
-        queue = deque([self.input_node_name])
+        
+        # Start with all nodes that have zero in-degree.
+        queue = deque([name for name, deg in in_degree.items() if deg == 0])
         order = []
         while queue:
             current = queue.popleft()

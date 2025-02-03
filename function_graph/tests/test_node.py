@@ -2,7 +2,7 @@
 import unittest
 import numpy as np
 import keras
-from function_graph.node import GraphNode, SingleNeuron
+from graph.node import GraphNode, SingleNeuron
 
 class TestGraphNodeAbstract(unittest.TestCase):
     def test_cannot_instantiate_graphnode(self):
