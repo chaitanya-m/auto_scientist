@@ -90,6 +90,8 @@ class GraphComposer:
         # --- End collapsibility check ---
 
         # Fallback: build the full graph using the blueprint connections.
+
+        print("\nBuilding blueprint graph\n")
         global_input = keras.layers.Input(shape=input_shape, name="global_input")
         node_outputs = {}
         # For each designated input node, call its blueprint apply() using the global input.
