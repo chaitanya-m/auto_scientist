@@ -3,13 +3,10 @@ import tensorflow as tf
 from function_graph.node import (
     Trainable,
     TrainableNN,
-    FixedActivation,
-    FixedSigmoid,
-    FixedReLU,
     Sigmoid,
     ReLU
 )
-import numpy as np
+
 
 class TestFunctionNodes(unittest.TestCase):
     """
@@ -41,17 +38,6 @@ class TestFunctionNodes(unittest.TestCase):
         self.assertEqual(node.name, expected_name)
         self.assertIsInstance(node, Trainable)
 
-    def _test_fixed_activation_creation(self, node_class, expected_name):
-        """
-        Tests the creation of a fixed activation node, verifying name and FixedActivation interface.
-
-        Args:
-            node_class: The class of the fixed activation node to create.
-            expected_name: The expected name of the node.
-        """
-        node = node_class(expected_name)
-        self.assertEqual(node.name, expected_name)
-        self.assertIsInstance(node, FixedActivation)
 
     def _test_activation_build_and_call(self, activation_node, input_shape, expected_output_shape, extra_checks=None):
         """
@@ -95,9 +81,6 @@ class TestFunctionNodes(unittest.TestCase):
             self.assertTrue(tf.reduce_all(output >= 0))
             self.assertTrue(tf.reduce_all(output <= 1))   
 
-    def test_fixed_activation_creation(self):
-        """Tests the creation of FixedActivation nodes."""
-        self._test_fixed_activation_creation(FixedActivation, "fixed_activation") 
 
     def test_relu_build_and_call(self):
         """
@@ -157,27 +140,6 @@ class TestFunctionNodes(unittest.TestCase):
                             self.assertTrue(tf.reduce_all(output <= 1)))
         )
         self._test_call_with_multiple_inputs(Sigmoid("my_sigmoid"), (10, 2), (10, 3), 1)
-
-    def test_fixed_sigmoid_build_and_call(self):
-        """Tests the build and call methods of a FixedSigmoid node."""
-        self._test_activation_build_and_call(
-            FixedSigmoid("fixed_sigmoid"),
-            (10, 5),
-            (10, 5),
-            lambda output: (self.assertTrue(tf.reduce_all(output >= 0)) and
-                            self.assertTrue(tf.reduce_all(output <= 1)))
-        )
-        self._test_call_with_multiple_inputs(FixedSigmoid("fixed_sigmoid"), (10, 2), (10, 3), 5)
-
-    def test_fixed_relu_build_and_call(self):
-        """Tests the build and call methods of a FixedReLU node."""
-        self._test_activation_build_and_call(
-            FixedReLU("fixed_relu"),
-            (10, 5),
-            (10, 5),
-            lambda output: self.assertTrue(tf.reduce_all(output >= 0))
-        )
-        self._test_call_with_multiple_inputs(FixedReLU("fixed_relu"), (10, 2), (10, 3), 5)
 
 
     def test_trainable_nn_creation(self):
