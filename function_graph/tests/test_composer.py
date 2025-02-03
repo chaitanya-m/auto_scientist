@@ -2,6 +2,7 @@
 import unittest
 import numpy as np
 import keras
+import random
 from graph.composer import GraphComposer
 from graph.node import SingleNeuron
 
@@ -144,6 +145,84 @@ class TestGraphComposer(unittest.TestCase):
         self.assertEqual(len(predictions), 2)
         self.assertEqual(predictions[0].shape, (20, 1))
         self.assertEqual(predictions[1].shape, (20, 1))
+
+
+    def test_2x2_graph_vs_vanilla_keras(self):
+        """
+        Builds a 2x2 graph from individual neurons and compares its performance on
+        a simple problem (y = 2*x) with that of a vanilla Keras model built using a Dense layer.
+        """
+
+        # Set a seed for reproducibility.
+        np.random.seed(42)
+        random.seed(42)
+        keras.utils.set_random_seed(42)
+
+        composer = GraphComposer()
+
+        # Create two input neurons and two output neurons with linear activation.
+        in1 = SingleNeuron(name="in1", activation="linear")
+        in2 = SingleNeuron(name="in2", activation="linear")
+        out1 = SingleNeuron(name="out1", activation="linear")
+        out2 = SingleNeuron(name="out2", activation="linear")
+
+        # Add nodes to the composer.
+        composer.add_node(in1)
+        composer.add_node(in2)
+        composer.add_node(out1)
+        composer.add_node(out2)
+
+        # Designate both as input nodes and output nodes.
+        composer.set_input_node(["in1", "in2"])
+        composer.set_output_node(["out1", "out2"])
+
+        # Create dense connections: every input node feeds into every output node.
+        composer.connect("in1", "out1")
+        composer.connect("in1", "out2")
+        composer.connect("in2", "out1")
+        composer.connect("in2", "out2")
+
+        # Build the graph model with global input shape (2,).
+        graph_model = composer.build(input_shape=(2,))
+        graph_model.compile(optimizer="adam", loss="mse")
+
+        # === Build the Vanilla Keras Model (equivalent 2x2 dense layer) ===
+        inputs = keras.layers.Input(shape=(2,))
+        outputs = keras.layers.Dense(2, activation="linear")(inputs)
+        vanilla_model = keras.models.Model(inputs=inputs, outputs=outputs)
+        vanilla_model.compile(optimizer="adam", loss="mse")
+
+        # === Create a simple dataset: y = 2 * x ===
+        N = 200
+        x_data = np.random.rand(N, 2)
+        y_data = 2 * x_data  # Elementwise multiplication.
+
+        # Train both models for a sufficient number of epochs.
+        graph_model.fit(x_data, [y_data[:, [0]], y_data[:, [1]]], epochs=100, verbose=0)
+        vanilla_model.fit(x_data, y_data, epochs=1000, verbose=0)
+
+        # Evaluate both models.
+        # For the graph model, concatenate the two output arrays.
+        graph_pred = graph_model.predict(x_data)
+        if isinstance(graph_pred, list):
+            graph_pred = np.concatenate(graph_pred, axis=1)
+        graph_loss = np.mean((y_data - graph_pred) ** 2)
+
+        vanilla_loss = vanilla_model.evaluate(x_data, y_data, verbose=0)
+
+        # Check that both models achieve a low loss on the simple problem.
+
+        print("vanilla: " + str(vanilla_loss) + " graph: " + str(graph_loss))
+        self.assertLess(vanilla_loss, 0.1, "Vanilla model loss should be low on the simple problem.")
+        self.assertLess(graph_loss, 0.2, "Graph model loss should be low on the simple problem.")
+
+
+        # Also check that the losses are similar (within a tolerance).
+        self.assertAlmostEqual(graph_loss, vanilla_loss, delta=0.05,
+                            msg="Graph model and vanilla model losses should be similar.")
+
+
+
 
 
 if __name__ == "__main__":
