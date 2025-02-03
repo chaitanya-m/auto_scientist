@@ -33,7 +33,6 @@ class SingleNeuron(GraphNode):
         # Each time this blueprint is used, it creates a new Dense layer.
         return layers.Dense(1, activation=self.activation, name=self.name)(input_tensor)
 
-
 class InputNode(GraphNode):
     """
     A node that represents an input. It does not apply any transformations.
@@ -46,3 +45,31 @@ class InputNode(GraphNode):
         Input nodes do not modify input tensors—they simply pass them forward.
         """
         return input_tensor  # Directly return input without applying a layer
+
+class SubGraphNode(GraphNode):
+    """
+    Blueprint for a subgraph node. This allows a saved subgraph
+    to be integrated as a hidden node in any new graph without shape mismatches.
+    """
+    def __init__(self, name: str, model):
+        super().__init__(name)
+        self.model = model
+
+    def apply(self, input_tensor):
+        """
+        Given an input tensor, rebuild the subgraph so that its internal Input layer is
+        replaced by the provided tensor. We assume that self.model was saved so that its
+        first layer is an Input layer. Here we “skip” that layer and reapply the rest.
+        """
+        x = input_tensor
+        for layer in self.model.layers[1:]:
+            x = layer(x)
+        return x
+
+    @classmethod
+    def load(cls, filepath, name):
+        """
+        Loads a saved subgraph (a Keras model) from a file and returns a SubGraphNode instance.
+        """
+        loaded_model = keras.models.load_model(filepath)
+        return cls(name, loaded_model)

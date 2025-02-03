@@ -1,6 +1,6 @@
 import keras
 from collections import deque
-from graph.node import SingleNeuron, InputNode  # Import the blueprint node type
+from graph.node import SingleNeuron, InputNode  # Import the blueprint node types
 
 class GraphComposer:
     """
@@ -52,7 +52,7 @@ class GraphComposer:
     def build(self, input_shape):
         """
         Assembles and returns the final Keras model.
-        Wire the graph using the Keras Functional API.
+        Wires the graph using the Keras Functional API.
         """
         if self.input_node_names is None or self.output_node_names is None:
             raise ValueError("Both input and output nodes must be set before building the graph.")
@@ -60,15 +60,14 @@ class GraphComposer:
         print("\nBuilding blueprint graph\n")
         global_input = keras.layers.Input(shape=input_shape, name="global_input")
         node_outputs = {}
-        # For each designated input node, call its blueprint apply() using the global input.
 
-        # Input nodes pass inputs directly, without transformations
+        # For each designated input node, call its blueprint apply() using the global input.
         for in_name in self.input_node_names:
             node = self.nodes[in_name]
-            if isinstance(node, InputNode):  # Input nodes should not modify data
-                node_outputs[in_name] = global_input  # Directly forward input
+            if isinstance(node, InputNode):  # Input nodes pass inputs directly, without transformations
+                node_outputs[in_name] = global_input
             else:
-                node_outputs[in_name] = node.apply(global_input)  # Apply transformation
+                node_outputs[in_name] = node.apply(global_input)
 
         # Process remaining nodes in topological order.
         order = self._topological_sort()
@@ -104,20 +103,38 @@ class GraphComposer:
         Raises:
             ValueError: If a cycle is detected or the graph is disconnected.
         """
-
-        in_degree = {name: 0 for name in self.nodes} # Initialize in-degree for each node.
-        for child, parents in self.connections.items(): # Count incoming edges for each node.
-            in_degree[child] += len(parents) 
-        queue = deque([name for name, deg in in_degree.items() if deg == 0])  # Nodes with no dependencies.
-        order = [] # Stores sorted nodes.
+        in_degree = {name: 0 for name in self.nodes}
+        for child, parents in self.connections.items():
+            in_degree[child] += len(parents)
+        queue = deque([name for name, deg in in_degree.items() if deg == 0])
+        order = []
         while queue:
-            current = queue.popleft()  # Process next node with no remaining dependencies.
-            order.append(current)  # Add it to the sorted order.
+            current = queue.popleft()
+            order.append(current)
             for child, parents in self.connections.items():
                 if current in parents:
-                    in_degree[child] -= 1 # Reduce child's in-degree.
+                    in_degree[child] -= 1
                     if in_degree[child] == 0:
-                        queue.append(child) # Add child if it has no more dependencies.
+                        queue.append(child)
         if len(order) != len(self.nodes):
-            raise ValueError("Cycle detected or graph is disconnected.")  # Ensure all nodes are processed.
-        return order  # Return nodes in topological order.
+            raise ValueError("Cycle detected or graph is disconnected.")
+        return order
+
+    def save_subgraph(self, filepath):
+        """
+        Saves a subgraph as a standalone Keras model that can be reloaded later
+        and used as a hidden node in new graphs.
+        To avoid nested Input layers when reusing the subgraph, we create a new model that
+        begins with a fresh Input layer (with the same shape as the original global input)
+        and applies all the layers (i.e. blueprint nodes) except for the original Input node.
+        """
+        if self.keras_model is None:
+            raise ValueError("Build the model before saving subgraph.")
+
+        original_input_shape = self.keras_model.input.shape[1:]
+        new_input = keras.layers.Input(shape=original_input_shape, name="subgraph_input")
+        x = new_input
+        for layer in self.keras_model.layers[1:]:
+            x = layer(x)
+        sub_model = keras.models.Model(new_input, x, name="subgraph")
+        sub_model.save(filepath)
