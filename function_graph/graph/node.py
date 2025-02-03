@@ -67,9 +67,23 @@ class SubGraphNode(GraphNode):
         return x
 
     @classmethod
-    def load(cls, filepath, name):
+    def load(cls, filepath, name, compile_model=False, optimizer="adam", loss="mse"):
         """
         Loads a saved subgraph (a Keras model) from a file and returns a SubGraphNode instance.
+
+        Parameters:
+            filepath (str): Path to the saved subgraph model.
+            name (str): Name for the new SubGraphNode instance.
+            compile_model (bool): If True, the model is compiled for training. Default is False (Inference only).
+            optimizer (str): Optimizer to use if compiling the model.
+            loss (str): Loss function to use if compiling the model.
+
+        Returns:
+            SubGraphNode: A new instance containing the loaded model.
         """
-        loaded_model = keras.models.load_model(filepath)
+        loaded_model = keras.models.load_model(filepath.replace(".h5", ".keras"))
+        
+        if compile_model:
+            loaded_model.compile(optimizer=optimizer, loss=loss)
+        
         return cls(name, loaded_model)

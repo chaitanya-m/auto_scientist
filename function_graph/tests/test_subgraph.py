@@ -1,3 +1,4 @@
+#tests/test_subgraph.py
 import unittest
 import numpy as np
 import keras
@@ -31,18 +32,18 @@ class TestSubGraphNode(unittest.TestCase):
 
         # Build and save the subgraph (intermediate hidden layers)
         self.composer.build(input_shape=(5,))
-        self.composer.save_subgraph("test_subgraph.h5")
+        self.composer.save_subgraph("test_subgraph.keras")
 
     def test_subgraph_loading(self):
         """Tests if a saved subgraph can be loaded successfully."""
-        loaded_subgraph = SubGraphNode.load("test_subgraph.h5", name="loaded_subgraph")
+        loaded_subgraph = SubGraphNode.load("test_subgraph.keras", name="loaded_subgraph")
         self.assertIsInstance(loaded_subgraph, SubGraphNode)
         self.assertIsNotNone(loaded_subgraph.model)
-        print("✅ Subgraph loaded successfully.")
+        print("Subgraph loaded successfully.")
 
     def test_subgraph_output_consistency(self):
         """Ensures that the loaded subgraph produces the same output as the original."""
-        loaded_subgraph = SubGraphNode.load("test_subgraph.h5", name="loaded_subgraph")
+        loaded_subgraph = SubGraphNode.load("test_subgraph.keras", name="loaded_subgraph")
 
         # Generate dummy input
         x_dummy = np.random.rand(10, 5)  # 10 samples, 5 features
@@ -56,7 +57,7 @@ class TestSubGraphNode(unittest.TestCase):
 
         # Ensure the outputs are similar
         np.testing.assert_almost_equal(original_output, subgraph_output, decimal=5)
-        print("✅ Subgraph produces the same output as the original.")
+        print("Subgraph produces the same output as the original.")
 
     def test_subgraph_in_new_graph(self):
         """Tests if a loaded subgraph can be used as a node in a new graph."""
@@ -67,7 +68,7 @@ class TestSubGraphNode(unittest.TestCase):
         new_output = SingleNeuron(name="new_output", activation="linear")
 
         # Load the saved subgraph as a node
-        loaded_subgraph = SubGraphNode.load("test_subgraph.h5", name="reused_subgraph")
+        loaded_subgraph = SubGraphNode.load("test_subgraph.keras", name="reused_subgraph")
 
         # Add nodes to new graph
         new_composer.add_node(new_input)
@@ -83,7 +84,7 @@ class TestSubGraphNode(unittest.TestCase):
         # Build the new graph
         new_model = new_composer.build(input_shape=(5,))
         self.assertIsInstance(new_model, keras.models.Model)
-        print("✅ Subgraph successfully integrated into a new graph.")
+        print("Subgraph successfully integrated into a new graph.")
 
     def test_train_subgraph_in_new_graph(self):
         """Tests if a new graph containing a subgraph node can be trained."""
@@ -94,7 +95,7 @@ class TestSubGraphNode(unittest.TestCase):
         new_output = SingleNeuron(name="new_output", activation="linear")
 
         # Load the saved subgraph as a node
-        loaded_subgraph = SubGraphNode.load("test_subgraph.h5", name="reused_subgraph")
+        loaded_subgraph = SubGraphNode.load("test_subgraph.keras", name="reused_subgraph")
 
         # Add nodes to new graph
         new_composer.add_node(new_input)
@@ -121,7 +122,7 @@ class TestSubGraphNode(unittest.TestCase):
         # Ensure training loss is decreasing
         final_loss = history.history["loss"][-1]
         self.assertLess(final_loss, history.history["loss"][0])
-        print("✅ Subgraph successfully trained in a new graph.")
+        print("Subgraph successfully trained in a new graph.")
 
 if __name__ == "__main__":
     unittest.main()

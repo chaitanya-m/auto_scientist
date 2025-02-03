@@ -1,3 +1,4 @@
+# tests/test_composer.py
 import keras
 from collections import deque
 from graph.node import SingleNeuron, InputNode  # Import the blueprint node types
@@ -137,4 +138,4 @@ class GraphComposer:
         for layer in self.keras_model.layers[1:]:
             x = layer(x)
         sub_model = keras.models.Model(new_input, x, name="subgraph")
-        sub_model.save(filepath)
+        sub_model.save(filepath.replace(".h5", ".keras"))
