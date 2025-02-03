@@ -4,22 +4,22 @@ from collections import deque
 
 class GraphComposer:
     """
-    Builds a computation graph from GraphNode instances. 
+    Builds a computation graph from GraphNode instances.
     Nodes and their connections are specified independently of Keras.
     When build() is called, the composer assembles a complete Keras model
     using the Functional API.
     """
     def __init__(self):
-        self.nodes = {}         # Mapping from node name to GraphNode instance
-        self.connections = {}   # Mapping: node name -> list of parent node names
+        self.nodes = {}         # Mapping from node name to GraphNode instance.
+        self.connections = {}   # Mapping: node name -> list of parent node names.
         self.input_node_name = None
-        self.output_node_name = None
+        self.output_node_names = None  # Will hold a list of output node names.
         self.keras_model = None
 
     def add_node(self, node):
         """
         Adds a node to the graph.
-        
+
         Args:
             node: An instance of GraphNode.
             
@@ -33,7 +33,7 @@ class GraphComposer:
     def set_input_node(self, node_name):
         """
         Designates the input node.
-        
+
         Args:
             node_name (str): The name of the node to use as the input.
             
@@ -44,24 +44,30 @@ class GraphComposer:
             raise ValueError(f"Input node '{node_name}' not found.")
         self.input_node_name = node_name
 
-    def set_output_node(self, node_name):
+    def set_output_node(self, node_names):
         """
-        Designates the output node.
-        
+        Designates the output node(s).
+
         Args:
-            node_name (str): The name of the node to use as the output.
+            node_names (str or list): The name of the output node, or a list of output node names.
             
         Raises:
-            ValueError: If the specified node is not found.
+            ValueError: If any of the specified nodes are not found.
         """
-        if node_name not in self.nodes:
-            raise ValueError(f"Output node '{node_name}' not found.")
-        self.output_node_name = node_name
+        if isinstance(node_names, list):
+            for n in node_names:
+                if n not in self.nodes:
+                    raise ValueError(f"Output node '{n}' not found.")
+            self.output_node_names = node_names
+        else:
+            if node_names not in self.nodes:
+                raise ValueError(f"Output node '{node_names}' not found.")
+            self.output_node_names = [node_names]
 
     def connect(self, from_node, to_node):
         """
         Connects the output of one node to the input of another.
-        
+
         Args:
             from_node (str): The name of the node whose output is to be connected.
             to_node (str): The name of the node that receives the connection.
@@ -78,32 +84,32 @@ class GraphComposer:
     def build(self, input_shape):
         """
         Assembles the complete Keras model using the Functional API.
-        
+
         Args:
             input_shape (tuple): Global input shape (excluding the batch dimension).
-            
+
         Returns:
             A Keras model representing the assembled graph.
-            
+
         Raises:
             ValueError: If input and/or output nodes are not set.
         """
-        if self.input_node_name is None or self.output_node_name is None:
+        if self.input_node_name is None or self.output_node_names is None:
             raise ValueError("Both input and output nodes must be set before building the graph.")
-        
+
         # Create the global input tensor.
         global_input = keras.layers.Input(shape=input_shape, name="global_input")
-        
+
         # Build and apply the input node.
         input_node = self.nodes[self.input_node_name]
         input_node.build_node(input_shape)
         node_outputs = {self.input_node_name: input_node.apply(global_input)}
-        
+
         # Process remaining nodes in topological order.
         order = self._topological_sort()
         for node_name in order:
             if node_name in node_outputs:
-                # Already processed (for example, the designated input node).
+                # Already processed (e.g., the designated input node).
                 continue
             node = self.nodes[node_name]
             parent_names = self.connections.get(node_name, [])
@@ -116,22 +122,22 @@ class GraphComposer:
                 # For multiple parents, concatenate their outputs along the last axis.
                 parent_tensors = [node_outputs[p] for p in parent_names]
                 parent_tensor = keras.layers.Concatenate(name=f"{node_name}_concat")(parent_tensors)
-            
-            # Infer input shape from the parent's output (excluding batch dimension).
-            # Depending on the environment, parent_tensor.shape might be a tuple or a TensorShape.
+
+            # Infer input shape from the parent's output (excluding the batch dimension).
             if hasattr(parent_tensor.shape, "as_list"):
                 shape_list = parent_tensor.shape.as_list()
             else:
                 shape_list = parent_tensor.shape
             node_input_shape = tuple(shape_list[1:])
-            
+
             node.build_node(node_input_shape)
             node_outputs[node_name] = node.apply(parent_tensor)
-        
+
         # Assemble the final model.
+        outputs = [node_outputs[name] for name in self.output_node_names]
         self.keras_model = keras.models.Model(
             inputs=global_input,
-            outputs=node_outputs[self.output_node_name],
+            outputs=outputs,
             name="GraphModel"
         )
         return self.keras_model
@@ -139,10 +145,10 @@ class GraphComposer:
     def _topological_sort(self):
         """
         Computes a topological ordering of the nodes.
-        
+
         Returns:
             A list of node names in topological order.
-            
+
         Raises:
             ValueError: If a cycle is detected.
         """
@@ -150,7 +156,7 @@ class GraphComposer:
         in_degree = {name: 0 for name in self.nodes}
         for child, parents in self.connections.items():
             in_degree[child] += len(parents)
-        
+
         # Start with all nodes that have zero in-degree.
         queue = deque([name for name, deg in in_degree.items() if deg == 0])
         order = []

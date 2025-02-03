@@ -91,6 +91,61 @@ class TestGraphComposer(unittest.TestCase):
         # Regardless of the two upstream nodes, the final sigmoid produces one output per sample.
         self.assertEqual(predictions.shape, (20, 1))
 
+    def test_dense_graph_two_inputs_two_outputs(self):
+        """
+        Constructs a dense graph where two input ReLU SingleNeuron nodes feed into 
+        two output Sigmoid SingleNeuron nodes. Dense means that every input neuron 
+        is connected to every output neuron.
+        """
+        composer = GraphComposer()
+
+        # Create two ReLU neurons (input neurons) and two Sigmoid neurons (output neurons)
+        relu1 = SingleNeuron(name="relu1", activation="relu")
+        relu2 = SingleNeuron(name="relu2", activation="relu")
+        sigmoid1 = SingleNeuron(name="sigmoid1", activation="sigmoid")
+        sigmoid2 = SingleNeuron(name="sigmoid2", activation="sigmoid")
+
+        # Add all nodes to the composer.
+        composer.add_node(relu1)
+        composer.add_node(relu2)
+        composer.add_node(sigmoid1)
+        composer.add_node(sigmoid2)
+
+        # Designate one of the ReLU nodes as the input node.
+        # Note: Nodes without any parent connections will automatically receive the global input.
+        composer.set_input_node("relu1")
+        # Designate both sigmoid neurons as output nodes.
+        composer.set_output_node(["sigmoid1", "sigmoid2"])
+
+        # Dense connections: connect every ReLU to every Sigmoid.
+        composer.connect("relu1", "sigmoid1")
+        composer.connect("relu1", "sigmoid2")
+        composer.connect("relu2", "sigmoid1")
+        composer.connect("relu2", "sigmoid2")
+
+        # Build the overall Keras model.
+        # Assume a global input shape of (5,) i.e. each sample is a 5-element vector.
+        model = composer.build(input_shape=(5,))
+        model.compile(optimizer="adam", loss="mse")
+
+        # Create dummy data: 20 samples, each with 5 features.
+        x_dummy = np.random.rand(20, 5)
+        # For multiple outputs, provide a list of target arrays (each with 20 samples and 1 output).
+        y_dummy1 = np.random.rand(20, 1)
+        y_dummy2 = np.random.rand(20, 1)
+
+        # Train for one epoch.
+        history = model.fit(x_dummy, [y_dummy1, y_dummy2], epochs=1, verbose=0)
+        self.assertIn("loss", history.history)
+
+        # Forward pass: predictions should be a list of two arrays.
+        predictions = model.predict(x_dummy)
+        self.assertIsInstance(predictions, list)
+        self.assertEqual(len(predictions), 2)
+        self.assertEqual(predictions[0].shape, (20, 1))
+        self.assertEqual(predictions[1].shape, (20, 1))
+
+
 
 if __name__ == "__main__":
     unittest.main()
