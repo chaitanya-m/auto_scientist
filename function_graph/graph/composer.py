@@ -123,19 +123,34 @@ class GraphComposer:
 
     def save_subgraph(self, filepath):
         """
-        Saves a subgraph as a standalone Keras model that can be reloaded later
-        and used as a hidden node in new graphs.
-        To avoid nested Input layers when reusing the subgraph, we create a new model that
-        begins with a fresh Input layer (with the same shape as the original global input)
-        and applies all the layers (i.e. blueprint nodes) except for the original Input node.
+        Saves a subgraph as a standalone Keras model that can be reloaded later 
+        and used as a hidden node in other graphs without shape mismatches.
+
+        Problem:
+        - If we directly save and load the model, the saved model will include an Input layer.
+        - When inserted into another graph, this creates **nested Input layers**, 
+        causing shape mismatches when passing activations.
+
+        Solution:
+        - Instead of saving the model as-is, we rebuild it:
+        1. Extract the model's input shape.
+        2. Create a **new Input layer** with the same shape.
+        3. Apply all layers **except the original Input layer**.
+        - This allows the subgraph to be used as a hidden node anywhere.
+
+        Args:
+            filepath (str): Path where the subgraph model should be saved.
+
+        Raises:
+            ValueError: If the model has not been built before saving.
         """
         if self.keras_model is None:
             raise ValueError("Build the model before saving subgraph.")
 
-        original_input_shape = self.keras_model.input.shape[1:]
-        new_input = keras.layers.Input(shape=original_input_shape, name="subgraph_input")
+        original_input_shape = self.keras_model.input.shape[1:] # Extract input shape dynamically
+        new_input = keras.layers.Input(shape=original_input_shape, name="subgraph_input") # Create a new Input layer (to replace the original one)
         x = new_input
-        for layer in self.keras_model.layers[1:]:
-            x = layer(x)
+        for layer in self.keras_model.layers[1:]:  # Skips input layer to avoid nesting
+            x = layer(x) # Apply all layers **except the first Input layer**
         sub_model = keras.models.Model(new_input, x, name="subgraph")
         sub_model.save(filepath.replace(".h5", ".keras"))
