@@ -80,20 +80,11 @@ class SubGraphNode(GraphNode):
         super().__init__(name)
         self.model = model
 
+
     def apply(self, input_tensor):
         """
-        Applies the subgraph to an incoming tensor, ensuring that its internal Input layer 
-        is skipped. This allows the subgraph to be seamlessly integrated as a hidden node.
-
-        Problem:
-        - If we call `self.model(input_tensor)`, it would expect an input from raw data, 
-          not from a previous layer.
-        - Instead, we manually apply all layers **except the first Input layer**.
-
-        Solution:
-        - Skip `self.model.layers[0]` (the Input layer).
-        - Pass `input_tensor` to the remaining layers dynamically.
-        - This allows the subgraph to function like any other hidden layer.
+        Applies the subgraph to an incoming tensor, inserting a learned shape adapter
+        if the incoming feature dimension does not match the subgraph's expected input.
 
         Args:
             input_tensor (tf.Tensor): The tensor representing input activations from a previous layer.
@@ -101,10 +92,17 @@ class SubGraphNode(GraphNode):
         Returns:
             tf.Tensor: The transformed tensor after passing through the subgraph.
         """
-        x = input_tensor # Use the provided tensor instead of the saved Input layer
-        for layer in self.model.layers[1:]:  # Skips the input layer to avoid shape mismatches
+        x = input_tensor
+        # Expected input dimension is determined by the subgraph's input (ignoring the batch dimension)
+        expected_units = self.model.input.shape[1]
+        # If the incoming tensor does not have the expected feature dimension, adapt its shape.
+        if x.shape[1] != expected_units:
+            x = layers.Dense(units=expected_units, activation="linear", name=f"{self.name}_shape_adapter")(x)
+        # Apply all layers of the subgraph except its original Input layer.
+        for layer in self.model.layers[1:]:
             x = layer(x)
         return x
+
 
     @classmethod
     def load(cls, filepath, name, compile_model=False, optimizer="adam", loss="mse"):
