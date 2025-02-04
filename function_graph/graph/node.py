@@ -93,29 +93,28 @@ class SubGraphNode(GraphNode):
         Returns:
             tf.Tensor: The transformed tensor after passing through the subgraph.
         """
-        x = input_tensor
-        # Handle different input structures
+        # Get expected input structure from original model
         if isinstance(self.model.input, dict):
-            # Get first input's shape (assuming single input subgraph)
-            input_key = next(iter(self.model.input.keys()))
-            expected_units = self.model.input[input_key].shape[1]
-        elif isinstance(self.model.input, list):
-            # Get first input's shape
-            expected_units = self.model.input[0].shape[1]
+            # Handle dictionary input
+            input_name = next(iter(self.model.input.keys()))
+            expected_shape = self.model.input[input_name].shape[1]
+            x = {input_name: input_tensor}
         else:
-            # Single input tensor
-            expected_units = self.model.input.shape[1]
+            # Handle single tensor input
+            expected_shape = self.model.input.shape[1]
+            x = input_tensor
 
         # Add shape adapter if needed
-        if x.shape[1] != expected_units:
-            x = layers.Dense(expected_units, activation="linear", 
-                           name=f"{self.name}_shape_adapter")(x)
-        
-        # Apply all layers except original Input layers
-        for layer in self.model.layers[1:]:  # Skip input layer
-            x = layer(x)
-            
-        return x
+        if input_tensor.shape[1] != expected_shape:
+            input_tensor = layers.Dense(expected_shape, activation="linear",
+                                      name=f"{self.name}_adapter")(input_tensor)
+            if isinstance(x, dict):
+                x[input_name] = input_tensor
+            else:
+                x = input_tensor
+
+        # Apply model layers
+        return self.model(x)
 
 
     @classmethod
@@ -147,3 +146,5 @@ class SubGraphNode(GraphNode):
             loaded_model.compile(optimizer=optimizer, loss=loss)
         
         return cls(name, loaded_model)
+    
+    
