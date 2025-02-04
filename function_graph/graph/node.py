@@ -41,7 +41,7 @@ class InputNode(GraphNode):
     def __init__(self, name: str, input_shape):
         super().__init__(name)
         self.input_shape = input_shape
-        
+
     def apply(self, input_tensor):
         """
         Input nodes do not modify input tensors—they simply pass them forward.
@@ -94,14 +94,27 @@ class SubGraphNode(GraphNode):
             tf.Tensor: The transformed tensor after passing through the subgraph.
         """
         x = input_tensor
-        # Expected input dimension is determined by the subgraph's input (ignoring the batch dimension)
-        expected_units = self.model.input.shape[1]
-        # If the incoming tensor does not have the expected feature dimension, adapt its shape.
+        # Handle different input structures
+        if isinstance(self.model.input, dict):
+            # Get first input's shape (assuming single input subgraph)
+            input_key = next(iter(self.model.input.keys()))
+            expected_units = self.model.input[input_key].shape[1]
+        elif isinstance(self.model.input, list):
+            # Get first input's shape
+            expected_units = self.model.input[0].shape[1]
+        else:
+            # Single input tensor
+            expected_units = self.model.input.shape[1]
+
+        # Add shape adapter if needed
         if x.shape[1] != expected_units:
-            x = layers.Dense(units=expected_units, activation="linear", name=f"{self.name}_shape_adapter")(x)
-        # Apply all layers of the subgraph except its original Input layer.
-        for layer in self.model.layers[1:]:
+            x = layers.Dense(expected_units, activation="linear", 
+                           name=f"{self.name}_shape_adapter")(x)
+        
+        # Apply all layers except original Input layers
+        for layer in self.model.layers[1:]:  # Skip input layer
             x = layer(x)
+            
         return x
 
 

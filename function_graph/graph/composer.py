@@ -165,36 +165,45 @@ class GraphComposer:
         return order
 
     
+
     def save_subgraph(self, filepath):
         """
-        Saves a subgraph as a standalone Keras model that can be reloaded later 
-        and used as a hidden node in other graphs without shape mismatches.
-
-        Problem:
-        - If we directly save and load the model, the saved model will include an Input layer.
-        - When inserted into another graph, this creates **nested Input layers**, 
-        causing shape mismatches when passing activations.
-
-        Solution:
-        - Instead of saving the model as-is, we rebuild it:
-        1. Extract the model's input shape.
-        2. Create a **new Input layer** with the same shape.
-        3. Apply all layers **except the original Input layer**.
-        - This allows the subgraph to be used as a hidden node anywhere.
-
-        Args:
-            filepath (str): Path where the subgraph model should be saved.
-
-        Raises:
-            ValueError: If the model has not been built before saving.
+        Saves a subgraph as a standalone Keras model that can be reloaded later.
+        Handles input structure matching exactly with original model.
         """
         if self.keras_model is None:
             raise ValueError("Build the model before saving subgraph.")
 
-        original_input_shape = self.keras_model.input.shape[1:] # Extract input shape dynamically
-        new_input = keras.layers.Input(shape=original_input_shape, name="subgraph_input") # Create a new Input layer (to replace the original one)
-        x = new_input
-        for layer in self.keras_model.layers[1:]:  # Skips input layer to avoid nesting
-            x = layer(x) # Apply all layers **except the first Input layer**
-        sub_model = keras.models.Model(new_input, x, name="subgraph")
-        sub_model.save(filepath.replace(".h5", ".keras"))
+        # Get original input structure
+        original_inputs = self.keras_model.input
+
+        # Create matching new inputs
+        if isinstance(original_inputs, dict):
+            # Handle dictionary inputs
+            new_inputs = {
+                name: keras.layers.Input(shape=tensor.shape[1:], name=name)
+                for name, tensor in original_inputs.items()
+            }
+            tensor_map = new_inputs
+        elif isinstance(original_inputs, list):
+            # Handle list inputs
+            new_inputs = [
+                keras.layers.Input(shape=tensor.shape[1:])
+                for tensor in original_inputs
+            ]
+            tensor_map = dict(zip(original_inputs, new_inputs))
+        else:
+            # Handle single tensor input
+            new_inputs = keras.layers.Input(
+                shape=original_inputs.shape[1:], 
+                name=original_inputs.name.split(":")[0]  # Get base name
+            )
+            tensor_map = {original_inputs: new_inputs}
+
+        # Clone model with matching structure
+        cloned_model = keras.models.clone_model(
+            self.keras_model,
+            input_tensors=tensor_map
+        )
+        cloned_model.set_weights(self.keras_model.get_weights())
+        cloned_model.save(filepath.replace(".h5", ".keras"))
