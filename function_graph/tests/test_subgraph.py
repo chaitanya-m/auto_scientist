@@ -124,5 +124,99 @@ class TestSubGraphNode(unittest.TestCase):
         self.assertLess(final_loss, history.history["loss"][0])
         print("Subgraph successfully trained in a new graph.")
 
+
+    def test_subgraph_reuse_fewer_features(self):
+        """
+        Test reusing a stored subgraph in a new graph where the new input has fewer features
+        than the subgraph's original expected input (e.g., 3 instead of 5).
+        The shape adapter should adapt the 3-feature input to the expected 5 features.
+        """
+        # Create a simple model and train it on a trivial task (input shape 5)
+        composer = GraphComposer()
+        input_node = InputNode(name="input")
+        neuron1 = SingleNeuron(name="neuron1", activation="relu")
+        neuron2 = SingleNeuron(name="neuron2", activation="relu")
+        output_node = SingleNeuron(name="output", activation="linear")
+        composer.add_node(input_node)
+        composer.add_node(neuron1)
+        composer.add_node(neuron2)
+        composer.add_node(output_node)
+        composer.set_input_node("input")
+        composer.set_output_node("output")
+        composer.connect("input", "neuron1")
+        composer.connect("neuron1", "neuron2")
+        composer.connect("neuron2", "output")
+        model = composer.build(input_shape=(5,))
+        x_train = np.ones((10, 5))
+        y_train = np.ones((10, 1))
+        model.compile(optimizer="adam", loss="mse")
+        model.fit(x_train, y_train, epochs=2, verbose=0)
+        composer.save_subgraph("temp_subgraph.keras")
+
+        # Load the subgraph
+        loaded_subgraph = SubGraphNode.load("temp_subgraph.keras", name="reused_subgraph")
+        # Build a new graph with input shape (3,) -- fewer features
+        new_composer = GraphComposer()
+        new_input = InputNode(name="new_input")
+        new_output = SingleNeuron(name="new_output", activation="linear")
+        new_composer.add_node(new_input)
+        new_composer.add_node(loaded_subgraph)
+        new_composer.add_node(new_output)
+        new_composer.set_input_node("new_input")
+        new_composer.set_output_node("new_output")
+        new_composer.connect("new_input", "reused_subgraph")
+        new_composer.connect("reused_subgraph", "new_output")
+        new_model = new_composer.build(input_shape=(3,))
+        # Verify that the output shape is still (None, 1)
+        self.assertEqual(new_model.output_shape, (None, 1))
+        print("Subgraph reused with fewer features successfully.")
+
+    def test_subgraph_reuse_more_features(self):
+        """
+        Test reusing a stored subgraph in a new graph where the new input has more features
+        than the subgraph's original expected input (e.g., 7 instead of 5).
+        The shape adapter should adapt the 7-feature input to the expected 5 features.
+        """
+        # Create a simple model and train it on a trivial task (input shape 5)
+        composer = GraphComposer()
+        input_node = InputNode(name="input")
+        neuron1 = SingleNeuron(name="neuron1", activation="relu")
+        neuron2 = SingleNeuron(name="neuron2", activation="relu")
+        output_node = SingleNeuron(name="output", activation="linear")
+        composer.add_node(input_node)
+        composer.add_node(neuron1)
+        composer.add_node(neuron2)
+        composer.add_node(output_node)
+        composer.set_input_node("input")
+        composer.set_output_node("output")
+        composer.connect("input", "neuron1")
+        composer.connect("neuron1", "neuron2")
+        composer.connect("neuron2", "output")
+        model = composer.build(input_shape=(5,))
+        x_train = np.ones((10, 5))
+        y_train = np.ones((10, 1))
+        model.compile(optimizer="adam", loss="mse")
+        model.fit(x_train, y_train, epochs=2, verbose=0)
+        composer.save_subgraph("temp_subgraph.keras")
+
+        # Load the subgraph
+        loaded_subgraph = SubGraphNode.load("temp_subgraph.keras", name="reused_subgraph")
+        # Build a new graph with input shape (7,) -- more features
+        new_composer = GraphComposer()
+        new_input = InputNode(name="new_input")
+        new_output = SingleNeuron(name="new_output", activation="linear")
+        new_composer.add_node(new_input)
+        new_composer.add_node(loaded_subgraph)
+        new_composer.add_node(new_output)
+        new_composer.set_input_node("new_input")
+        new_composer.set_output_node("new_output")
+        new_composer.connect("new_input", "reused_subgraph")
+        new_composer.connect("reused_subgraph", "new_output")
+        new_model = new_composer.build(input_shape=(7,))
+        # Verify that the output shape is (None, 1)
+        self.assertEqual(new_model.output_shape, (None, 1))
+        print("Subgraph reused with more features successfully.")
+
+
 if __name__ == "__main__":
     unittest.main()
