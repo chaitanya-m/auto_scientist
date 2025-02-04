@@ -38,9 +38,10 @@ class InputNode(GraphNode):
     """
     A node that represents an input. It does not apply any transformations.
     """
-    def __init__(self, name: str):
+    def __init__(self, name: str, input_shape):
         super().__init__(name)
-
+        self.input_shape = input_shape
+        
     def apply(self, input_tensor):
         """
         Input nodes do not modify input tensors—they simply pass them forward.
