@@ -77,29 +77,26 @@ class SubGraphNode(GraphNode):
 
     def apply(self, input_tensor):
         """
-        Applies the subgraph to an incoming tensor, inserting a learned shape adapter
-        if the incoming feature dimension does not match the subgraph's expected input.
-        
+        Applies the subgraph to an incoming tensor, automatically adapting its feature dimension
+        to match the subgraph's expected input. A trainable Dense layer with linear activation is
+        inserted when the incoming tensor’s feature count differs from the expected value. This
+        mechanism adds minimal computational overhead while enhancing reusability, though larger
+        mismatches may require extra training to achieve optimal performance.
+
         Args:
             input_tensor (tf.Tensor): A single tensor representing activations from a previous layer.
         
         Returns:
-            tf.Tensor: The transformed tensor after passing through the subgraph.
+            tf.Tensor: The transformed tensor after shape adaptation (if needed) and processing
+                       through the subgraph.
         """
-        # # If input_tensor is somehow wrapped in a list, tuple, or dict, extract the first element.
-        # if isinstance(input_tensor, dict):
-        #     input_tensor = list(input_tensor.values())[0]
-        # elif isinstance(input_tensor, (list, tuple)):
-        #     input_tensor = input_tensor[0]
-
-        # Get expected feature dimension from the original model's Input layer.
-        expected_units = self.model.input.shape[1]
-        # Insert a shape adapter if needed.
-        if input_tensor.shape[1] != expected_units:
-            input_tensor = layers.Dense(expected_units,
+        expected_units = self.model.input.shape[1]  # Get expected feature dimension from the original model's Input layer.
+        if input_tensor.shape[1] != expected_units:    # Check if shape adaptation is needed.
+            input_tensor = layers.Dense(expected_units,   # Adapt input using a linear Dense layer.
                                         activation="linear",
                                         name=f"{self.name}_adapter")(input_tensor)
-        return self.bypass_model(input_tensor)
+        return self.bypass_model(input_tensor)         # Pass the adapted tensor through the bypass model.
+
 
     @classmethod
     def load(cls, filepath, name, compile_model=False, optimizer="adam", loss="mse"):
