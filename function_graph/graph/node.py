@@ -31,7 +31,6 @@ class SingleNeuron(GraphNode):
         self.activation = activation
 
     def apply(self, input_tensor):
-        # Each time this blueprint is used, it creates a new Dense layer.
         return layers.Dense(1, activation=self.activation, name=self.name)(input_tensor)
 
 class InputNode(GraphNode):
@@ -43,92 +42,62 @@ class InputNode(GraphNode):
         self.input_shape = input_shape
 
     def apply(self, input_tensor):
-        """
-        Input nodes do not modify input tensors—they simply pass them forward.
-        """
-        return input_tensor  # Directly return input without applying a layer
+        return input_tensor
 
 class SubGraphNode(GraphNode):
     """
-    Blueprint for a subgraph node. This allows a saved subgraph
-    to be integrated as a hidden node in any new graph without shape mismatches.
-
-    Problem:
-    - If a full saved model is used in a new graph, it expects raw input data, 
-      but in a new graph, it should receive activations from previous layers.
-    - Using `self.model(input_tensor)` directly would assume the subgraph's Input layer 
-      is still valid, leading to shape mismatches.
-
-    Solution:
-    - The `apply()` method **skips** the saved Input layer.
-    - Instead, it **takes an incoming tensor** and applies only the internal layers.
-    - This allows the subgraph to act as a hidden layer in any architecture.
-
-    Attributes:
-        name (str): Name of the subgraph node.
-        model (keras.Model): The Keras model representing the subgraph.
-
-
+    Blueprint for a subgraph node. This allows a saved subgraph to be integrated as a hidden node
+    in any new graph without shape mismatches. This version assumes a single input only,
+    eliminating multimodal/multi-input handling.
+    
+    The saved subgraph model is expected to have a single Input layer.
     """
     def __init__(self, name: str, model):
         """
-        Initializes a SubGraphNode with a pre-loaded Keras model.
+        Initializes a SubGraphNode with a pre-loaded Keras model and builds a bypass model.
 
         Args:
             name (str): Name of the subgraph node.
-            model (keras.Model): The pre-loaded subgraph model.
+            model (keras.Model): The pre-loaded subgraph model (with a single input).
         """
         super().__init__(name)
         self.model = model
-
+        # Build a bypass model by creating a new Input layer with the same shape as model.input (excluding batch dimension).
+        new_input = keras.layers.Input(shape=model.input.shape[1:], name=f"{name}_bypass_input")
+        x = self.model(new_input)
+        self.bypass_model = keras.models.Model(new_input, x)
 
     def apply(self, input_tensor):
         """
         Applies the subgraph to an incoming tensor, inserting a learned shape adapter
         if the incoming feature dimension does not match the subgraph's expected input.
-
+        
         Args:
-            input_tensor (tf.Tensor): The tensor representing input activations from a previous layer.
-
+            input_tensor (tf.Tensor): A single tensor representing activations from a previous layer.
+        
         Returns:
             tf.Tensor: The transformed tensor after passing through the subgraph.
         """
-        # Get expected input structure from original model
-        if isinstance(self.model.input, dict):
-            # Handle dictionary input
-            input_name = next(iter(self.model.input.keys()))
-            expected_shape = self.model.input[input_name].shape[1]
-            x = {input_name: input_tensor}
-        else:
-            # Handle single tensor input
-            expected_shape = self.model.input.shape[1]
-            x = input_tensor
+        # If input_tensor is somehow wrapped in a list, tuple, or dict, extract the first element.
+        if isinstance(input_tensor, dict):
+            input_tensor = list(input_tensor.values())[0]
+        elif isinstance(input_tensor, (list, tuple)):
+            input_tensor = input_tensor[0]
 
-        # Add shape adapter if needed
-        if input_tensor.shape[1] != expected_shape:
-            input_tensor = layers.Dense(expected_shape, activation="linear",
-                                      name=f"{self.name}_adapter")(input_tensor)
-            if isinstance(x, dict):
-                x[input_name] = input_tensor
-            else:
-                x = input_tensor
-
-        # Apply model layers
-        return self.model(x)
-
+        # Get expected feature dimension from the original model's Input layer.
+        expected_units = self.model.input.shape[1]
+        # Insert a shape adapter if needed.
+        if input_tensor.shape[1] != expected_units:
+            input_tensor = layers.Dense(expected_units,
+                                        activation="linear",
+                                        name=f"{self.name}_adapter")(input_tensor)
+        return self.bypass_model(input_tensor)
 
     @classmethod
     def load(cls, filepath, name, compile_model=False, optimizer="adam", loss="mse"):
         """
         Loads a saved subgraph model and returns it as a SubGraphNode.
-
-        Problem:
-        - The saved model should only be compiled if it will be used for training.
-        - If the model is already compiled, redundant compilation can cause issues.
-
-        Solution:
-        - Allow an option (`compile_model`) to decide if the model should be compiled.
-        - Check if the model already has an optimizer to avoid unnecessary recompilation.
+        Assumes the saved model has a single input.
 
         Args:
             filepath (str): Path to the saved subgraph model.
@@ -141,10 +110,6 @@ class SubGraphNode(GraphNode):
             SubGraphNode: A new instance containing the loaded model.
         """
         loaded_model = keras.models.load_model(filepath.replace(".h5", ".keras"))
-        
-        if compile_model: # Only compile if needed
+        if compile_model:
             loaded_model.compile(optimizer=optimizer, loss=loss)
-        
         return cls(name, loaded_model)
-    
-    
