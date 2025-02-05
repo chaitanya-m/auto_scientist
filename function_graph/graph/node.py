@@ -86,11 +86,11 @@ class SubGraphNode(GraphNode):
         Returns:
             tf.Tensor: The transformed tensor after passing through the subgraph.
         """
-        # If input_tensor is somehow wrapped in a list, tuple, or dict, extract the first element.
-        if isinstance(input_tensor, dict):
-            input_tensor = list(input_tensor.values())[0]
-        elif isinstance(input_tensor, (list, tuple)):
-            input_tensor = input_tensor[0]
+        # # If input_tensor is somehow wrapped in a list, tuple, or dict, extract the first element.
+        # if isinstance(input_tensor, dict):
+        #     input_tensor = list(input_tensor.values())[0]
+        # elif isinstance(input_tensor, (list, tuple)):
+        #     input_tensor = input_tensor[0]
 
         # Get expected feature dimension from the original model's Input layer.
         expected_units = self.model.input.shape[1]
