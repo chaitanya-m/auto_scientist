@@ -56,16 +56,24 @@ class SubGraphNode(GraphNode):
         """
         Initializes a SubGraphNode with a pre-loaded Keras model and builds a bypass model.
 
+        We need a bypass model because the saved subgraph model comes with its own predefined Input layer, 
+        which is set up for receiving raw data in isolation. When you integrate that saved model as a subgraph 
+        (or hidden node) into a larger, composed graph, you don't want to use its original Input layer — you want 
+        to feed it the activations coming from the previous layers of the new model. By creating a bypass model, 
+        we replace the original Input layer with a new one that matches the expected shape (excluding the batch 
+        dimension) but is part of the new overall graph. This allows the subgraph to operate seamlessly as a 
+        hidden component of the larger model while preserving its internal architecture and learned weights.
+
         Args:
             name (str): Name of the subgraph node.
             model (keras.Model): The pre-loaded subgraph model (with a single input).
         """
-        super().__init__(name)
-        self.model = model
-        # Build a bypass model by creating a new Input layer with the same shape as model.input (excluding batch dimension).
-        new_input = keras.layers.Input(shape=model.input.shape[1:], name=f"{name}_bypass_input")
-        x = self.model(new_input)
-        self.bypass_model = keras.models.Model(new_input, x)
+        super().__init__(name)  # Initialize the parent GraphNode with the given name
+        self.model = model  # Store the original subgraph model
+        new_input = keras.layers.Input(shape=model.input.shape[1:], name=f"{name}_bypass_input")  # Create a new Input layer matching the original model's input shape (excluding batch size)
+        x = self.model(new_input)  # Pass the new input through the original model to compute the output tensor
+        self.bypass_model = keras.models.Model(new_input, x)  # Build the bypass model using the new input and its computed output
+
 
     def apply(self, input_tensor):
         """
