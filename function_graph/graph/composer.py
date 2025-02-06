@@ -63,8 +63,6 @@ class GraphComposer:
         if self.input_node_name is None or self.output_node_names is None:
             raise ValueError("Both input and output nodes must be set before building the graph.")
 
-        print("\nBuilding blueprint graph\n")
-
         # Create the single input layer.
         input_node = self.nodes[self.input_node_name]
         input_layer = keras.layers.Input(shape=input_node.input_shape, name=self.input_node_name)
