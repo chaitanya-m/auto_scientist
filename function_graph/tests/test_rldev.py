@@ -2,22 +2,33 @@ import unittest
 import numpy as np
 from utils.rl_dev import RLEnvironment, DummyAgent, run_episode
 
-class TestAgentReuseTrend(unittest.TestCase):
-    def test_reuse_rate_increases(self):
+class TestRLEnvironmentDatasetReuse(unittest.TestCase):
+    def test_dataset_consistency_and_reuse(self):
         """
-        Hypothesis: Under a fixed data distribution, the agent's reuse rate trends upward.
-        Test: Run 1000 steps and verify that the reuse rate in the last 10% of steps
-        exceeds that in the first 10%.
+        Test that in a fixed-distribution episode, the environment provides the same dataset at each step.
         """
-        env = RLEnvironment(total_steps=1000)
-        agent = DummyAgent(total_steps=1000)
-        actions = run_episode(env, agent)
+        env = RLEnvironment(total_steps=1000, num_instances_per_step=100, seed=0)
+        agent = DummyAgent()
+        actions, rewards = run_episode(env, agent)
+
+        # Retrieve state at final step; the dataset should be identical to the initial one.
+        state_initial = env._get_state()  # After episode run, state remains at final step.
         
-        first_10_rate = actions[:100].count("reuse") / 100
-        last_10_rate = actions[-100:].count("reuse") / 100
+        # Reset environment to get the original dataset
+        env.reset()
+        state_reset = env._get_state()
+
+        # Check that the dataset remains constant.
+        # Here we compare the DataFrame shapes and first few rows.
+        dataset_initial = state_reset["dataset"]
+        dataset_final = state_initial["dataset"]
         
-        print(f"First 10% reuse rate: {first_10_rate:.3f}, Last 10% reuse rate: {last_10_rate:.3f}")
-        self.assertGreater(last_10_rate, first_10_rate)
+        self.assertEqual(dataset_initial.shape, dataset_final.shape,
+                         "Dataset shape should remain constant across steps")
+        # Compare a few values to ensure consistency.
+        for col in dataset_initial.columns:
+            np.testing.assert_array_equal(dataset_initial[col].values, dataset_final[col].values,
+                                          err_msg="Dataset values should be identical across steps")
 
 if __name__ == '__main__':
     unittest.main()
