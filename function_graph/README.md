@@ -1,3 +1,15 @@
+
+
+## Round:
+
+A single interaction cycle where agents receive data (generated from a fixed distribution using a specific seed), build/modify their function graph, classify the data, and receive rewards.
+## Episode:
+
+A series of rounds that use data generated from the same distribution and seed. At the end of an episode, performance is evaluated, and the environment can adjust internal parameters.
+
+## Experiment:
+A collection of episodes. In some experiments, the data distribution remains constant between episodes; in others, it varies between episodes to test robustness or adaptability.
+
 # Reinforcement Learning Strategies
 
 ---
