@@ -52,9 +52,9 @@ def visualize_graph(composer):
             for layer in node.model.layers:
                 print(f"    Layer {layer.name} weights: {layer.get_weights()}")
     print("\nConnections:")
-    for target, conns in composer.connections.items():
+    for target, connections in composer.connections.items():
         print(f"Node '{target}' has incoming connections:")
-        for parent, merge_mode in conns:
+        for parent, merge_mode in connections:
             print(f"  From: '{parent}', merge mode: {merge_mode}")
     print("=== End of Graph ===")
 
@@ -86,7 +86,29 @@ def train_learned_abstraction_model(env, epochs=1000):
     subgraph_node = SubGraphNode(name="learned_abstraction", model=abstraction_model)
     return subgraph_node
 
-class TestLearnedAbstractionTraining(unittest.TestCase):
+class VerboseTestCase(unittest.TestCase):
+    def assertGreaterVerbose(self, first, second, msg=None):
+        """Assert that first > second and print the provided message with a checkmark if it passes."""
+        # Call the built-in assertion. This will raise an error if the condition fails.
+        self.assertGreater(first, second, msg)
+        # If we get here, the assertion passed.
+        success_msg = msg if msg else f"assertGreater passed: {first} > {second}"
+        print(f"✓ {success_msg}")
+
+    def assertTrueVerbose(self, expr, msg=None):
+        """Assert that expr is True and print the provided message with a checkmark if it passes."""
+        self.assertTrue(expr, msg)
+        success_msg = msg if msg else "assertTrue passed"
+        print(f"✓ {success_msg}")
+
+def assert_allclose_verbose(a, b, atol=1e-7, err_msg=""):
+    try:
+        np.testing.assert_allclose(a, b, atol=atol, err_msg=err_msg)
+        print(f"✓ {err_msg if err_msg else 'assert_allclose passed'}")
+    except AssertionError as e:
+        raise e
+
+class TestLearnedAbstractionTraining(VerboseTestCase):
     def test_learned_abstraction_training(self):
         """
         This test:
@@ -125,17 +147,14 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         # Rebuild the Keras model from the updated composer.
         model = composer.build()
         model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-        
-        print("Weights before fine-tuning:")
-        for i, w in enumerate(model.get_weights()):
-            print(f"Layer {i} weights:\n{w}\n")
+
+        visualize_graph(composer)
 
         # Fine-tune the composed model; only the output neuron's weights should be updated.
-        model.fit(features, true_labels, epochs=100, verbose=0)
+        model.fit(features, true_labels, epochs=300, verbose=0)
 
-        print("Weights after fine-tuning:")
-        for i, w in enumerate(model.get_weights()):
-            print(f"Layer {i} weights:\n{w}\n")
+        visualize_graph(composer)
+
 
         # Evaluate the fine-tuned model.
         loss, acc = model.evaluate(features, true_labels, verbose=0)
@@ -146,14 +165,14 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
 
         # Assert that the learned abstraction's weights have not changed.
         for w_before, w_after in zip(weights_before, weights_after):
-            np.testing.assert_allclose(w_before, w_after, atol=1e-7,
+            assert_allclose_verbose(w_before, w_after, atol=1e-7,
                                        err_msg="Learned abstraction weights should remain unchanged after fine-tuning.")
         
         # Store the learned abstraction in the repository.
         env.repository["learned_abstraction"] = learned_abstraction
         
         # Assert that the final accuracy is above a chosen threshold (e.g., 0.9).
-        self.assertGreater(acc, 0.9, "Trained network accuracy should be above 0.9.")
+        self.assertGreaterVerbose(acc, 0.9, "Trained network accuracy should be above 0.9.")
 
 # class TestReuseAdvantage(unittest.TestCase):
 #     def test_reuse_advantage(self):
