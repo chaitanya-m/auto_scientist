@@ -1,3 +1,4 @@
+# data_gen/categorical_classification.py
 import numpy as np
 import pandas as pd
 from itertools import product
