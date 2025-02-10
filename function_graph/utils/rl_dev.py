@@ -191,7 +191,7 @@ class DummyAgent:
         self.actions_history[agent_id].append(action)
         return action
 
-def run_episode(env, agent0, agent1):
+def run_episode(env: RLEnvironment, agent0: DummyAgent, agent1: DummyAgent):
     state = env.reset()
     rewards_history = {0: [], 1: []}
     accuracies_history = {0: [], 1: []}

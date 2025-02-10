@@ -13,12 +13,91 @@ np.random.seed(42)
 tf.random.set_seed(42)
 
 import keras
-from keras import layers, initializers
+from keras import layers, initializers, utils
 from graph.node import SubGraphNode
 from utils.rl_dev import RLEnvironment, DummyAgent, run_episode, create_minimal_network
+from graphviz import Digraph
+
+import os
+from graphviz import Digraph
+from keras import utils
+from graph.node import SubGraphNode
+
+def visualize_graph(composer, output_file_base="graph_view", image_dir="graph_images"):
+    """
+    Visualizes the composed graph as a single image with subgraph images displayed
+    next to their corresponding nodes.
+
+    For each node in the composer:
+      - A text-only node is drawn with the node's name and type.
+      - If the node is a SubGraphNode, an SVG image of its internal Keras model is generated
+        (via keras.utils.plot_model), and a separate image node is added to the graph.
+    An invisible edge is created from the original subgraph node to its image node,
+    and a subgraph cluster is defined to force them onto the same rank.
+    
+    Each call increments a counter so that output filenames are unique.
+    The final composite graph is rendered as an SVG, automatically opened, and its DOT source is printed.
+    """
+    # Create directory for images if it does not exist.
+    if not os.path.exists(image_dir):
+        os.makedirs(image_dir)
+    
+    # Ensure unique file names by maintaining a counter.
+    if not hasattr(visualize_graph, "counter"):
+        visualize_graph.counter = 0
+    visualize_graph.counter += 1
+    output_file = f"{output_file_base}_{visualize_graph.counter}"
+    
+    dot = Digraph(comment="Neural Net Graph", format="svg")
+    
+    # Set general graph attributes for layout and font.
+    dot.attr(rankdir="LR")
+    dot.attr(fontname="Arial", fontsize="10")
+    dot.attr('node', fontname="Arial", fontsize="10", shape="box", style="filled", fillcolor="white")
+    
+    # Dictionary to store names of image nodes for each SubGraphNode.
+    subgraph_image_nodes = {}
+    
+    # Add each node in the composer.
+    for node_name, node in composer.nodes.items():
+        label = f"{node_name}\\n({node.__class__.__name__})"
+        dot.node(node_name, label=label)
+        if isinstance(node, SubGraphNode):
+            image_filename = os.path.join(image_dir, f"{node_name}_{visualize_graph.counter}.svg")
+            try:
+                # Generate an SVG image of the subgraph's internal Keras model.
+                utils.plot_model(node.model, to_file=image_filename, show_shapes=True, dpi=60)
+                # Create a separate node for the image.
+                image_node_name = f"{node_name}_img"
+                dot.node(image_node_name, label="", image=image_filename, shape="none")
+                # Add an invisible edge to force the image node to appear next to the original node.
+                dot.edge(node_name, image_node_name, style="dashed", constraint="false")
+                subgraph_image_nodes[node_name] = image_node_name
+            except Exception as e:
+                print(f"Error generating plot for node '{node_name}': {e}")
+    
+    # Add the edges from the composer.
+    for target, connections in composer.connections.items():
+        for parent, merge_mode in connections:
+            dot.edge(parent, target, label=merge_mode)
+    
+    # Create subgraph clusters for each SubGraphNode and its image node so that they appear in the same rank.
+    for node_name, image_node in subgraph_image_nodes.items():
+        with dot.subgraph() as s:
+            s.attr(rank="same")
+            s.node(node_name)
+            s.node(image_node)
+    
+    # Render the graph, save to file, and open it.
+    dot.render(output_file, view=True)
+    print(f"Graph visualized and saved to {output_file}.svg")
+    
+    # Print the DOT source for debugging.
+    print("\nGraph DOT source:")
+    print(dot.source)
 
 
-def visualize_graph(composer):
+def print_graph_nodes(composer):
     """
     Prints a visual summary of the graph constructed by the composer.
     For each node, it prints:
@@ -121,18 +200,21 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         composer.add_node(learned_abstraction)
         composer.connect("input", learned_abstraction.name)
         composer.connect(learned_abstraction.name, "output")
+        composer.remove_connection("input", "output")
+
         
         # Rebuild the Keras model from the updated composer.
         model = composer.build()
         model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
 
-        #visualize_graph(composer)
+        print_graph_nodes(composer)
+        visualize_graph(composer=composer)
 
         # Fine-tune the composed model; only the output neuron's weights should be updated.
         model.fit(features, true_labels, epochs=300, verbose=0)
 
-        #visualize_graph(composer)
-
+        print_graph_nodes(composer)
+        visualize_graph(composer=composer)
 
         # Evaluate the fine-tuned model.
         loss, acc = model.evaluate(features, true_labels, verbose=0)
@@ -156,45 +238,45 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         print(assertion)
         self.assertGreater(acc, 0.9, assertion)
 
-# class TestReuseAdvantage(unittest.TestCase):
-#     def test_reuse_advantage(self):
-#         """
-#         Hypothesis: When one agent adds the learned abstraction and the other does not,
-#         the agent that adds it will obtain higher accuracy and receive a reward advantage.
+class TestReuseAdvantage(unittest.TestCase):
+    def test_reuse_advantage(self):
+        """
+        Hypothesis: When one agent adds the learned abstraction and the other does not,
+        the agent that adds it will obtain higher accuracy and receive a reward advantage.
         
-#         Test: Pre-populate the repository with the learned abstraction.
-#         Run an episode where agent 0 chooses "add_abstraction" on the first step,
-#         while agent 1 always chooses "no_change". Print detailed step-by-step accuracies and rewards,
-#         and verify that agent 0's reward on the first step is higher than agent 1's.
-#         """
-#         env = RLEnvironment(total_steps=5, num_instances_per_step=100, seed=0)
-#         learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
-#         env.repository["learned_abstraction"] = learned_abstraction
+        Test: Pre-populate the repository with the learned abstraction.
+        Run an episode where agent 0 chooses "add_abstraction" on the first step,
+        while agent 1 always chooses "no_change". Print detailed step-by-step accuracies and rewards,
+        and verify that agent 0's reward on the first step is higher than agent 1's.
+        """
+        env = RLEnvironment(total_steps=5, num_instances_per_step=100, seed=0)
+        learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
+        env.repository["learned_abstraction"] = learned_abstraction
 
-#         # Define action plans.
-#         action_plan0 = ["add_abstraction"] + ["no_change"] * 4
-#         action_plan1 = ["no_change"] * 5
+        # Define policies
+        action_plan0 = ["add_abstraction"] + ["no_change"] * 4
+        action_plan1 = ["no_change"] * 5
 
-#         agent0 = DummyAgent(action_plan={0: action_plan0})
-#         agent1 = DummyAgent(action_plan={1: action_plan1})
+        agent0 = DummyAgent(action_plan={0: action_plan0})
+        agent1 = DummyAgent(action_plan={1: action_plan1})
         
-#         # run_episode returns three objects: actions_history, rewards_history, accuracies_history.
-#         actions, rewards, accuracies = run_episode(env, agent0, agent1)
+        # run_episode returns three objects: actions_history, rewards_history, accuracies_history.
+        actions, rewards, accuracies = run_episode(env, agent0, agent1)
         
-#         print("\nDetailed Step-by-Step Output:")
-#         for step in range(len(accuracies[0])):
-#             print(f"Step {step+1}:")
-#             print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
-#             print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
+        print("\nDetailed Step-by-Step Output:")
+        for step in range(len(accuracies[0])):
+            print(f"Step {step+1}:")
+            print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
+            print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
 
-#         reward0 = rewards[0][0]
-#         reward1 = rewards[1][0]
-#         diff = reward0 - reward1
-#         print(f"\nTest outcome: Agent 0's reward on step 1 = {reward0}, Agent 1's reward = {reward1}.")
-#         print(f"Agent 0 won by a margin of {diff} reward points on the first step.")
+        reward0 = rewards[0][0]
+        reward1 = rewards[1][0]
+        diff = reward0 - reward1
+        print(f"\nTest outcome: Agent 0's reward on step 1 = {reward0}, Agent 1's reward = {reward1}.")
+        print(f"Agent 0 won by a margin of {diff} reward points on the first step.")
         
-#         self.assertGreater(reward0, reward1,
-#                            "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction.")
+        self.assertGreater(reward0, reward1,
+                           "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction.")
 
 if __name__ == '__main__':
     unittest.main()

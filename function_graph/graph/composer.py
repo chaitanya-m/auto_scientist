@@ -54,6 +54,29 @@ class GraphComposer:
             raise ValueError(f"To-node '{to_node}' not found.")
         self.connections.setdefault(to_node, []).append((from_node, merge_mode))
 
+    def remove_connection(self, from_node, to_node, merge_mode=None):
+        """
+        Removes a connection from 'from_node' to 'to_node'.
+        If merge_mode is provided, only removes connections with that merge_mode.
+        Otherwise, it removes all connections from 'from_node' to 'to_node'.
+        """
+        if to_node not in self.connections:
+            raise ValueError(f"No connections found for target node '{to_node}'")
+        
+        original_length = len(self.connections[to_node])
+        if merge_mode is None:
+            self.connections[to_node] = [
+                connection for connection in self.connections[to_node] if connection[0] != from_node
+            ]
+        else:
+            self.connections[to_node] = [
+                connection for connection in self.connections[to_node]
+                if not (connection[0] == from_node and connection[1] == merge_mode)
+            ]
+        if len(self.connections[to_node]) == original_length:
+            raise ValueError(f"No connection found from '{from_node}' to '{to_node}' with merge mode '{merge_mode}'")
+
+
     def build(self):
         """
         Assembles and returns the final Keras model.
