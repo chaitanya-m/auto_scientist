@@ -1,84 +1,74 @@
-# data_gen/categorical_classification.py
 import numpy as np
 import pandas as pd
 from itertools import product
+from abc import ABC, abstractmethod
 
-class DataSchema:
-    def __init__(self, num_features, num_categories, num_classes, relationship_mapping):
+class SyntheticDataGenerator(ABC):
+    @abstractmethod
+    def generate_data(self, num_instances: int):
+        pass
+
+class DataSchema(SyntheticDataGenerator):
+    def __init__(self, num_features, num_categories, num_classes, relationship_mapping, rng=None):
         self.num_features = num_features
         self.num_categories = num_categories
         self.num_classes = num_classes
         self.relationship_mapping = relationship_mapping
+        # Store an RNG internally; if none provided, create one without a fixed seed.
+        self.rng = rng if rng is not None else np.random.default_rng()
 
     def assign_class(self, feature_vector):
         return self.relationship_mapping[tuple(feature_vector)]
 
-    def generate_dataset(self, num_instances, random_seed=None):
-        rng = np.random.default_rng(random_seed)
-
-        # 1. Get class distribution from schema
+    def generate_dataset(self, num_instances):
+        rng = self.rng
+        # 1. Get class distribution from schema.
         class_labels = list(self.relationship_mapping.values())
         unique_classes, class_counts = np.unique(class_labels, return_counts=True)
-        class_probs = class_counts / len(class_labels)  # P(Y)
-
-        # 2. Generate class labels based on P(Y)
+        class_probs = class_counts / len(class_labels)
+        # 2. Generate class labels.
         labels = rng.choice(unique_classes, size=num_instances, p=class_probs)
-
-        # 3. Sample feature vectors for each class
+        # 3. For each label, sample one feature vector.
         features = []
         for label in labels:
-            # Find feature vectors corresponding to this class
             possible_fvs = [fv for fv, cl in self.relationship_mapping.items() if cl == label]
-            # Sample a feature vector uniformly from possible options
-            fv = possible_fvs[rng.integers(0, len(possible_fvs))]  
+            fv = possible_fvs[rng.integers(0, len(possible_fvs))]
             features.append(fv)
-
-        # Combine features and labels into a DataFrame
-        data = np.concatenate((features, labels.reshape(-1, 1)), axis=1)  # Reshape labels to a column vector
+        data = np.concatenate((features, labels.reshape(-1, 1)), axis=1)
         df = pd.DataFrame(data, columns=[f"feature_{i}" for i in range(self.num_features)] + ["label"])
-
         return df
+
+    # For compatibility with the interface, alias generate_dataset as generate_data.
+    def generate_data(self, num_instances: int):
+        return self.generate_dataset(num_instances)
     
     def print_schema(self):
-        """Prints the schema information."""
         print(f"Number of Features: {self.num_features}")
         print(f"Number of Categories per Feature: {self.num_categories}")
         print(f"Number of Classes: {self.num_classes}")
         print("Relationship Mapping (limited to first 10 entries):")
-        for i, (feature_vector, class_label) in enumerate(self.relationship_mapping.items()):
+        for i, (fv, cl) in enumerate(self.relationship_mapping.items()):
             if i < 10:
-                print(f"  Feature Vector: {feature_vector}, Class Label: {class_label}")
+                print(f"  {fv}: {cl}")
             else:
                 break
 
 
 class DataSchemaFactory:
-    def create_schema(self, num_features, num_categories, num_classes, 
-                      flatness=1.0, random_seed=None):
-        
+    def create_schema(self, num_features, num_categories, num_classes, flatness=1.0, random_seed=None):
         rng = np.random.default_rng(random_seed)
-
         class_distribution = rng.dirichlet(np.ones(num_classes) * flatness)
-
         relationship_mapping = {}
         for feature_vector in product(range(num_categories), repeat=num_features):
             class_label = rng.choice(num_classes, p=class_distribution)
             relationship_mapping[feature_vector] = class_label
-
-        return DataSchema(num_features, num_categories, num_classes, relationship_mapping)
+        return DataSchema(num_features, num_categories, num_classes, relationship_mapping, rng=rng)
 
     def generate_schemas_and_datasets(self, schema_types, num_schemas_per_type, random_seed_start):
-        """Generates schemas and datasets one by one using a generator."""
-
         for schema_type in schema_types:
             for i in range(num_schemas_per_type):
-                random_seed = random_seed_start + i  
-                schema = self.create_schema(**schema_types[schema_type], random_seed=random_seed) 
-
-                df = schema.generate_dataset(num_instances=100, random_seed=123)  
-                
-                # Yield the schema and dataset as a tuple
-                yield schema_type, schema, df 
-
+                random_seed = random_seed_start + i
+                schema = self.create_schema(**schema_types[schema_type], random_seed=random_seed)
+                df = schema.generate_data(num_instances=100)
+                yield schema_type, schema, df
             random_seed_start += num_schemas_per_type
-
