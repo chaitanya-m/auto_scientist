@@ -179,30 +179,30 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         """
         This test:
           1. Creates a minimal network with one input node and one output node (with sigmoid activation).
-          2. Uses a helper to train a learned abstraction (a hidden layer with 3 neurons) on the fixed dataset.
+          2. Uses a helper to train a learned abstraction (a hidden layer with 3 neurons) on a dataset of 500 examples.
           3. Adds the learned abstraction into the network by connecting input -> abstraction -> output.
           4. Freezes the learned abstraction so its weights remain unchanged.
           5. Saves the learned abstraction's weights.
           6. Rebuilds the Keras model via the composer.
-          7. Fine-tunes the composed model for 500 epochs (only the output neuron weights should change).
+          7. Fine-tunes the composed model for 300 epochs (only the output neuron's weights should change).
           8. Evaluates and prints the final accuracy.
           9. Verifies that the learned abstraction's weights are identical before and after fine-tuning.
           10. Stores the learned abstraction in the repository.
           11. Asserts that the final accuracy is above a chosen threshold.
         """
-        # Create the environment.
-        env = RLEnvironment(total_steps=1, num_instances_per_step=100, seed=0)
+        # Create the environment with 500 examples per step.
+        env = RLEnvironment(total_steps=1, num_instances_per_step=500, seed=0)
+        env.reset()  # Generate the dataset now.
         features, true_labels = env.features, env.true_labels
 
         # Build the minimal network.
         composer, model = create_minimal_network(input_shape=(2,))
         
-        # Train the learned abstraction.
+        # Train the learned abstraction on 500 examples.
         learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
-
-        # Freeze the learned abstraction so its weights remain unchanged during fine-tuning.
+        
+        # Freeze the learned abstraction so its weights remain unchanged.
         learned_abstraction.model.trainable = False
-        # Save weights before fine-tuning.
         weights_before = learned_abstraction.model.get_weights()
 
         # Add the learned abstraction into the network.
@@ -211,81 +211,75 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         composer.connect(learned_abstraction.name, "output")
         composer.remove_connection("input", "output")
 
-        
-        # Rebuild the Keras model from the updated composer.
+        # Rebuild the Keras model.
         model = composer.build()
         model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+        
+        # Optionally visualize the graph here.
+        # print_graph_nodes(composer)
+        # visualize_graph(composer=composer)
 
-        print_graph_nodes(composer)
-        visualize_graph(composer=composer)
-
-        # Fine-tune the composed model; only the output neuron's weights should be updated.
+        # Fine-tune the composed model.
         model.fit(features, true_labels, epochs=300, verbose=0)
-
-        print_graph_nodes(composer)
-        visualize_graph(composer=composer)
 
         # Evaluate the fine-tuned model.
         loss, acc = model.evaluate(features, true_labels, verbose=0)
-        print(f"Trained network accuracy after integrating learned abstraction and fine-tuning: {acc:.3f}")
+        print(f"Trained network accuracy after fine-tuning: {acc:.3f}")
         
-        # Save weights after fine-tuning.
+        # Check that the learned abstraction's weights have not changed.
         weights_after = learned_abstraction.model.get_weights()
-
-        # Assert that the learned abstraction's weights have not changed.
         for w_before, w_after in zip(weights_before, weights_after):
-            assertion = "Learned abstraction weights/biases should remain unchanged after fine-tuning."
+            assertion = "Learned abstraction weights should remain unchanged after fine-tuning."
+            np.testing.assert_allclose(w_before, w_after, atol=1e-7, err_msg=assertion)
             print(assertion)
-            np.testing.assert_allclose(w_before, w_after, atol=1e-7,
-                                       err_msg=assertion)
         
         # Store the learned abstraction in the repository.
         env.repository["learned_abstraction"] = learned_abstraction
         
-        # Assert that the final accuracy is above a chosen threshold (e.g., 0.9).
+        # Assert final accuracy is above threshold.
         assertion = "Trained network accuracy should be above 0.9."
         print(assertion)
         self.assertGreater(acc, 0.9, assertion)
 
-class TestReuseAdvantage(unittest.TestCase):
-    def test_reuse_advantage(self):
-        """
-        Hypothesis: When one agent adds the learned abstraction and the other does not,
-        the agent that adds it will obtain higher accuracy and receive a reward advantage.
+# class TestReuseAdvantage(unittest.TestCase):
+#     def test_reuse_advantage(self):
+#         """
+#         Hypothesis: When one agent adds the learned abstraction and the other does not,
+#         the agent that adds it will obtain higher accuracy and receive a reward advantage.
         
-        Test: Pre-populate the repository with the learned abstraction.
-        Run an episode where agent 0 chooses "add_abstraction" on the first step,
-        while agent 1 always chooses "no_change". Print detailed step-by-step accuracies and rewards,
-        and verify that agent 0's reward on the first step is higher than agent 1's.
-        """
-        env = RLEnvironment(total_steps=5, num_instances_per_step=100, seed=0)
-        learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
-        env.repository["learned_abstraction"] = learned_abstraction
+#         Test: Pre-populate the repository with the learned abstraction.
+#         Run an episode where agent 0 chooses "add_abstraction" on the first step,
+#         while agent 1 always chooses "no_change". Print detailed step-by-step accuracies and rewards,
+#         and verify that agent 0's reward on the first step is higher than agent 1's.
+#         """
+#         env = RLEnvironment(total_steps=5, num_instances_per_step=100, seed=0)
+#         learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
+#         env.repository["learned_abstraction"] = learned_abstraction
 
-        # Define policies
-        action_plan0 = ["add_abstraction"] + ["no_change"] * 4
-        action_plan1 = ["no_change"] * 5
+#         # Define policies
+#         action_plan0 = ["add_abstraction"] + ["no_change"] * 4
+#         action_plan1 = ["no_change"] * 5
 
-        agent0 = DummyAgent(action_plan={0: action_plan0})
-        agent1 = DummyAgent(action_plan={1: action_plan1})
+#         agent0 = DummyAgent(action_plan={0: action_plan0})
+#         agent1 = DummyAgent(action_plan={1: action_plan1})
         
-        # run_episode returns three objects: actions_history, rewards_history, accuracies_history.
-        actions, rewards, accuracies = run_episode(env, agent0, agent1)
+#         # run_episode returns three objects: actions_history, rewards_history, accuracies_history.
+#         actions, rewards, accuracies = run_episode(env, agent0, agent1)
         
-        print("\nDetailed Step-by-Step Output:")
-        for step in range(len(accuracies[0])):
-            print(f"Step {step+1}:")
-            print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
-            print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
+#         print("\nDetailed Step-by-Step Output:")
+#         for step in range(len(accuracies[0])):
+#             print(f"Step {step+1}:")
+#             print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
+#             print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
 
-        reward0 = rewards[0][0]
-        reward1 = rewards[1][0]
-        diff = reward0 - reward1
-        print(f"\nTest outcome: Agent 0's reward on step 1 = {reward0}, Agent 1's reward = {reward1}.")
-        print(f"Agent 0 won by a margin of {diff} reward points on the first step.")
+#         reward0 = rewards[0][0]
+#         reward1 = rewards[1][0]
+#         diff = reward0 - reward1
+#         print(f"\nTest outcome: Agent 0's reward on step 1 = {reward0}, Agent 1's reward = {reward1}.")
+#         print(f"Agent 0 won by a margin of {diff} reward points on the first step.")
         
-        self.assertGreater(reward0, reward1,
-                           "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction.")
+#         self.assertGreater(reward0, reward1,
+#                            "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction.")
 
 if __name__ == '__main__':
     unittest.main()

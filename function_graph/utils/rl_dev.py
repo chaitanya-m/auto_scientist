@@ -37,22 +37,18 @@ class RLEnvironment:
         self.num_instances_per_step = num_instances_per_step
         self.seed = seed
 
-        # Fixed dataset from our classification data generator.
-        self.factory = DataSchemaFactory()
         # Create the schema once with a fixed seed so distribution parameters are fixed.
+        self.factory = DataSchemaFactory()
         self.schema = self.factory.create_schema(
             num_features=2,
             num_categories=2,
             num_classes=2,
             random_seed=self.seed
         )
-        # Generate the initial dataset (using the stored RNG in the schema).
-        self.dataset = self.schema.generate_dataset(
-            num_instances=self.num_instances_per_step
-        )
-        # Convert features to numpy array and labels to int.
-        self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
-        self.true_labels = self.dataset["label"].to_numpy(dtype=int)
+        # Do not generate data here.
+        self.dataset = None
+        self.features = None
+        self.true_labels = None
 
         # Initialize networks for two agents (agent IDs 0 and 1).
         self.agents_networks = {}
@@ -68,20 +64,22 @@ class RLEnvironment:
 
     def reset(self, seed: int = None, new_schema=None):
         """
-        Resets the environment state.
-
-        Optionally, if a new seed is provided, reinitialize the current schema's RNG with that seed.
-        If a new_schema (data generator object) is provided, replace the current schema with it.
-        Then, generate new examples from the (updated) schema.
+        Resets the environment.
+        
+        Optionally:
+         - If 'seed' is provided, the schema's RNG is reinitialized (but this would change distribution parameters).
+         - If 'new_schema' is provided, the schema is replaced.
+        
+        Otherwise, generate a new dataset using the stored schema's RNG (with no re-seeding) so that 
+        new samples are drawn from the fixed distribution.
         """
         self.current_step = 0
         if new_schema is not None:
-            # Replace the current schema with the provided one.
             self.schema = new_schema
         elif seed is not None:
-            # Reinitialize the RNG of the existing schema with the new seed.
+            # WARNING: Changing the seed will change distribution parameters.
             self.schema.rng = np.random.default_rng(seed)
-        # Generate new dataset from the current schema.
+        # Generate new examples.
         self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
         self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
         self.true_labels = self.dataset["label"].to_numpy(dtype=int)
@@ -111,7 +109,6 @@ class RLEnvironment:
         """
         import keras
         from keras import layers, initializers
-        # Use a fixed initializer.
         kernel_init = initializers.GlorotUniform(seed=42)
         input_shape = (2,)
         new_input = layers.Input(shape=input_shape, name="sub_input")
@@ -123,13 +120,11 @@ class RLEnvironment:
     def evaluate_learned_abstraction(self):
         """
         Runs the learned abstraction model on the environment's features and returns the accuracy.
-        This method assumes that the learned abstraction is stored in the repository.
         """
         if "learned_abstraction" not in self.repository:
             raise ValueError("Learned abstraction not found in repository.")
         model = self.repository["learned_abstraction"].model
         predictions = model.predict(self.features, verbose=0)
-        # For simplicity, assume a sigmoid output: threshold at 0.5.
         preds = (predictions.flatten() > 0.5).astype(int)
         accuracy = np.mean(preds == self.true_labels)
         return accuracy
