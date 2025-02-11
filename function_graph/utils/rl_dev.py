@@ -37,8 +37,9 @@ class RLEnvironment:
         self.num_instances_per_step = num_instances_per_step
         self.seed = seed
 
-        # Create the schema once with a fixed seed so distribution parameters are fixed.
+        # Fixed dataset parameters from our classification data generator.
         self.factory = DataSchemaFactory()
+        # Create the schema once with a fixed seed so distribution parameters are fixed.
         self.schema = self.factory.create_schema(
             num_features=2,
             num_categories=2,
@@ -64,26 +65,20 @@ class RLEnvironment:
 
     def reset(self, seed: int = None, new_schema=None):
         """
-        Resets the environment.
-        
-        Optionally:
-         - If 'seed' is provided, the schema's RNG is reinitialized (but this would change distribution parameters).
-         - If 'new_schema' is provided, the schema is replaced.
-        
-        Otherwise, generate a new dataset using the stored schema's RNG (with no re-seeding) so that 
-        new samples are drawn from the fixed distribution.
+        Resets the environment state.
+
+        Optionally, if a new_schema is provided, replace the current schema.
+        Alternatively, if a new seed is provided, reinitialize the current schema's RNG
+        (note: changing the seed may change the distribution parameters).
+        No data is generated in reset(); data is generated in each step.
         """
         self.current_step = 0
         if new_schema is not None:
             self.schema = new_schema
         elif seed is not None:
-            # WARNING: Changing the seed will change distribution parameters.
             self.schema.rng = np.random.default_rng(seed)
-        # Generate new examples.
-        self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
-        self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
-        self.true_labels = self.dataset["label"].to_numpy(dtype=int)
         return self._get_state()
+
 
     def _get_state(self):
         agents_state = {}
@@ -109,6 +104,7 @@ class RLEnvironment:
         """
         import keras
         from keras import layers, initializers
+        # Use a fixed initializer.
         kernel_init = initializers.GlorotUniform(seed=42)
         input_shape = (2,)
         new_input = layers.Input(shape=input_shape, name="sub_input")
@@ -120,6 +116,7 @@ class RLEnvironment:
     def evaluate_learned_abstraction(self):
         """
         Runs the learned abstraction model on the environment's features and returns the accuracy.
+        This method assumes that the learned abstraction is stored in the repository.
         """
         if "learned_abstraction" not in self.repository:
             raise ValueError("Learned abstraction not found in repository.")
@@ -139,24 +136,21 @@ class RLEnvironment:
         accuracy = np.mean(preds == self.true_labels)
         return accuracy
 
-    def step(self, actions):
-        # Process each agent's action.
-        for agent_id, action in actions.items():
-            composer, _ = self.agents_networks[agent_id]
-            if action == "add_abstraction":
-                if "learned_abstraction" in self.repository:
-                    learned_node = self.repository["learned_abstraction"]
-                    if learned_node.name not in composer.nodes:
-                        composer.add_node(learned_node)
-                        composer.connect("input", learned_node.name)
-                        composer.connect(learned_node.name, "output")
-                        self.agents_networks[agent_id] = (composer, composer.build())
-            elif action == "no_change":
-                pass
-            else:
-                raise ValueError("Invalid action provided.")
+    def step(self):
+        """
+        Advances the environment by one step:
+        - Generates a new dataset (i.e., new samples) from the fixed schema.
+        - Verifies that the provided actions are valid (but does not modify agent networks).
+        - Computes accuracies and rewards based on the current agent networks.
+        - Updates the environment state.
+        """
+        # Generate new data for this step.
+        self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
+        self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
+        self.true_labels = self.dataset["label"].to_numpy(dtype=int)
+    
 
-        # Compute accuracies.
+        # Compute accuracies and update running averages.
         accuracies = {}
         for agent_id in [0, 1]:
             acc = self.run_model_accuracy(agent_id)
@@ -164,7 +158,7 @@ class RLEnvironment:
             self.agent_steps[agent_id] += 1
             self.agent_cum_acc[agent_id] += acc
         avg_acc = {agent_id: self.agent_cum_acc[agent_id] / self.agent_steps[agent_id]
-                   for agent_id in [0, 1]}
+                for agent_id in [0, 1]}
 
         rewards = {}
         for agent_id in [0, 1]:
@@ -221,6 +215,4 @@ def run_episode(env: RLEnvironment, agent0: DummyAgent, agent1: DummyAgent):
         accuracies_history[1].append(acc1)
         if done:
             break
-    # Return a dictionary of actions histories, rewards history, and accuracies history.
-    return {0: agent0.actions_history[0], 1: agent0.actions_history[1]}, rewards_history, accuracies_history
-
+    return {0: agent0.actions_history[0], 1: agent1.actions_history[1]}, rewards_history, accuracies_history

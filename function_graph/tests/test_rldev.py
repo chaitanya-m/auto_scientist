@@ -192,7 +192,9 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         """
         # Create the environment with 500 examples per step.
         env = RLEnvironment(total_steps=1, num_instances_per_step=500, seed=0)
-        env.reset()  # Generate the dataset now.
+        env.reset() # Generate the dataset now.
+        env.step()
+
         features, true_labels = env.features, env.true_labels
 
         # Build the minimal network.
