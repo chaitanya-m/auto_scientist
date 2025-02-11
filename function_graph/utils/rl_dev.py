@@ -39,15 +39,16 @@ class RLEnvironment:
 
         # Fixed dataset from our classification data generator.
         self.factory = DataSchemaFactory()
+        # Create the schema once with a fixed seed so distribution parameters are fixed.
         self.schema = self.factory.create_schema(
             num_features=2,
             num_categories=2,
             num_classes=2,
             random_seed=self.seed
         )
+        # Generate the initial dataset (using the stored RNG in the schema).
         self.dataset = self.schema.generate_dataset(
-            num_instances=self.num_instances_per_step,
-            random_seed=123
+            num_instances=self.num_instances_per_step
         )
         # Convert features to numpy array and labels to int.
         self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
@@ -65,10 +66,25 @@ class RLEnvironment:
         # Global repository for learned abstractions.
         self.repository = {}
 
-    def reset(self):
+    def reset(self, seed: int = None, new_schema=None):
+        """
+        Resets the environment state.
+
+        Optionally, if a new seed is provided, reinitialize the current schema's RNG with that seed.
+        If a new_schema (data generator object) is provided, replace the current schema with it.
+        Then, generate new examples from the (updated) schema.
+        """
         self.current_step = 0
-        self.agent_cum_acc = {0: 0.0, 1: 0.0}
-        self.agent_steps = {0: 0, 1: 0}
+        if new_schema is not None:
+            # Replace the current schema with the provided one.
+            self.schema = new_schema
+        elif seed is not None:
+            # Reinitialize the RNG of the existing schema with the new seed.
+            self.schema.rng = np.random.default_rng(seed)
+        # Generate new dataset from the current schema.
+        self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
+        self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
+        self.true_labels = self.dataset["label"].to_numpy(dtype=int)
         return self._get_state()
 
     def _get_state(self):
