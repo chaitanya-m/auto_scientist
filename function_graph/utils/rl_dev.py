@@ -67,15 +67,18 @@ class RLEnvironment:
         """
         Resets the environment state.
 
+        Requires either a new_schema or a new seed to be provided.
         Optionally, if a new_schema is provided, replace the current schema.
         Alternatively, if a new seed is provided, reinitialize the current schema's RNG
         (note: changing the seed may change the distribution parameters).
         No data is generated in reset(); data is generated in each step.
         """
+        if new_schema is None and seed is None:
+            raise ValueError("Either a new_schema or a seed must be provided for reset()")
         self.current_step = 0
         if new_schema is not None:
             self.schema = new_schema
-        elif seed is not None:
+        else:
             self.schema.rng = np.random.default_rng(seed)
         return self._get_state()
 
