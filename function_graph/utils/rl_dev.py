@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from data_gen.categorical_classification import DataSchemaFactory
 from graph.node import InputNode, SingleNeuron, SubGraphNode
-from graph.composer import GraphComposer
+from graph.composer import GraphComposer, GraphTransformer
 
 # -----------------------
 # Environment for Two Agents
@@ -213,36 +213,31 @@ def run_episode(env: RLEnvironment, agent0: DummyAgent, agent1: DummyAgent, seed
         action0 = agent0.choose_action(0, state, valid)
         action1 = agent1.choose_action(1, state, valid)
         
-        # -- Minimal "apply abstraction" logic --
         if action0 == "add_abstraction":
-            # Retrieve the learned abstraction from env.repository.
+            # Use the GraphTransformer
             learned_abstraction = env.repository["learned_abstraction"]
-            
-            # Insert it into agent 0's composer.
             composer0, model0 = env.agents_networks[0]
-            composer0.add_node(learned_abstraction)
-            composer0.connect("input", learned_abstraction.name)
-            composer0.connect(learned_abstraction.name, "output")
-            composer0.remove_connection("input", "output")
-            
-            # Rebuild & recompile agent 0's updated model.
-            model0 = composer0.build()
-            model0.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-            env.agents_networks[0] = (composer0, model0)
+            gt0 = GraphTransformer(composer0)
+            new_model0 = gt0.add_abstraction_node(
+                abstraction_node=learned_abstraction,
+                chosen_subset=["input"],   # or any subset you prefer
+                outputs=["output"],
+                remove_prob=1.0           # remove direct connections from subset to output
+            )
+            env.agents_networks[0] = (composer0, new_model0)
         
         if action1 == "add_abstraction":
-            # Same logic, if you want to allow agent 1 to add abstractions
             learned_abstraction = env.repository["learned_abstraction"]
-            
             composer1, model1 = env.agents_networks[1]
-            composer1.add_node(learned_abstraction)
-            composer1.connect("input", learned_abstraction.name)
-            composer1.connect(learned_abstraction.name, "output")
-            composer1.remove_connection("input", "output")
-            
-            model1 = composer1.build()
-            model1.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-            env.agents_networks[1] = (composer1, model1)
+            gt1 = GraphTransformer(composer1)
+            new_model1 = gt1.add_abstraction_node(
+                abstraction_node=learned_abstraction,
+                chosen_subset=["input"],
+                outputs=["output"],
+                remove_prob=1.0
+            )
+            env.agents_networks[1] = (composer1, new_model1)
+
         
         # Now each agent trains/evaluates on the new dataset.
         acc0 = agent0.evaluate_accuracy(env.agents_networks[0][1], env.dataset)

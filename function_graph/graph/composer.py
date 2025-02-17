@@ -2,6 +2,7 @@
 import keras
 from collections import deque
 from graph.node import SingleNeuron, InputNode  # Import blueprint node types
+import random
 
 class GraphComposer:
     """
@@ -175,3 +176,62 @@ class GraphComposer:
         new_model = keras.models.Model(new_input, new_output)
         new_model.set_weights(self.keras_model.get_weights())
         new_model.save(filepath.replace(".h5", ".keras"))
+
+
+class GraphTransformer:
+    """
+    Provides high-level transformations on a GraphComposer,
+    such as inserting a learned abstraction node in the graph.
+    """
+    def __init__(self, composer: GraphComposer):
+        self.composer = composer
+
+    def add_abstraction_node(
+        self,
+        abstraction_node,
+        chosen_subset: list[str],
+        outputs: list[str],
+        remove_prob: float = 1.0
+    ):
+        """
+        Adds a learned abstraction node to the graph. For each node in chosen_subset,
+        connect it to the new abstraction node, then connect the abstraction node to
+        all output nodes. Finally, remove direct connections from chosen_subset to
+        each output node with probability remove_prob, then rebuild the Keras model.
+
+        Parameters
+        ----------
+        abstraction_node : SubGraphNode
+            The learned abstraction node to be inserted (must have a unique name).
+        chosen_subset : list of str
+            Names of nodes (excluding output nodes) to feed into the abstraction node.
+        outputs : list of str
+            Names of the current output nodes in the graph.
+        remove_prob : float
+            Probability (0 to 1) of removing the direct node→output connection for each
+            (node in chosen_subset, output) pair:
+            - 1.0 => remove all direct connections
+            - 0.0 => keep all direct connections
+            - 0.5 => remove about half on average
+        """
+        composer = self.composer
+        # 1. Add the new node.
+        composer.add_node(abstraction_node)
+        # 2. Connect chosen subset -> abstraction node.
+        for node_name in chosen_subset:
+            composer.connect(node_name, abstraction_node.name, merge_mode='concat')
+        # 3. Connect abstraction node -> output nodes.
+        for out_name in outputs:
+            composer.connect(abstraction_node.name, out_name, merge_mode='concat')
+        # 4. Remove direct connections with probability remove_prob.
+        for node_name in chosen_subset:
+            for out_name in outputs:
+                if random.random() < remove_prob:
+                    try:
+                        composer.remove_connection(node_name, out_name)
+                    except ValueError:
+                        pass
+        # 5. Rebuild and compile.
+        new_model = composer.build()
+        new_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+        return new_model
