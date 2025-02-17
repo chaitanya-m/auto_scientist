@@ -254,7 +254,7 @@ class TestReuseAdvantage(unittest.TestCase):
         and verify that agent 0's reward on the first step is higher than agent 1's.
         """
 
-        num_steps = 10
+        num_steps = 5
         env = RLEnvironment(total_steps=num_steps, num_instances_per_step=100, seed=0)
         learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
         env.repository["learned_abstraction"] = learned_abstraction

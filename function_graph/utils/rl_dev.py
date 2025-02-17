@@ -220,7 +220,8 @@ def run_episode(env: RLEnvironment, agent0: DummyAgent, agent1: DummyAgent, seed
     
     # Ensure that both agent networks are compiled.
     for agent_id in [0, 1]:
-        _, model = env.agents_networks[agent_id]
+        composer, model = env.agents_networks[agent_id]
+        # The simplest check: if model hasn't been compiled at all, compile now.
         if not hasattr(model, "optimizer"):
             model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
     
@@ -229,20 +230,52 @@ def run_episode(env: RLEnvironment, agent0: DummyAgent, agent1: DummyAgent, seed
     
     # Run exactly env.total_steps iterations.
     for _ in range(env.total_steps):
-        state, _ = env.step()  # Update environment; now env.dataset, env.features, env.true_labels are updated.
+        state, _ = env.step()  # Now env.dataset, env.features, env.true_labels are updated.
         
         valid = env.valid_actions()
-        # Agents choose their actions. (Actions might affect network composition, etc.)
-        agent0.choose_action(0, state, valid)
-        agent1.choose_action(1, state, valid)
         
-        # Each agent evaluates its own model on the current dataset.
+        # Agents choose their actions.
+        action0 = agent0.choose_action(0, state, valid)
+        action1 = agent1.choose_action(1, state, valid)
+        
+        # -- Minimal "apply abstraction" logic --
+        if action0 == "add_abstraction":
+            # Retrieve the learned abstraction from env.repository.
+            learned_abstraction = env.repository["learned_abstraction"]
+            
+            # Insert it into agent 0's composer.
+            composer0, model0 = env.agents_networks[0]
+            composer0.add_node(learned_abstraction)
+            composer0.connect("input", learned_abstraction.name)
+            composer0.connect(learned_abstraction.name, "output")
+            composer0.remove_connection("input", "output")
+            
+            # Rebuild & recompile agent 0's updated model.
+            model0 = composer0.build()
+            model0.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+            env.agents_networks[0] = (composer0, model0)
+        
+        if action1 == "add_abstraction":
+            # Same logic, if you want to allow agent 1 to add abstractions
+            learned_abstraction = env.repository["learned_abstraction"]
+            
+            composer1, model1 = env.agents_networks[1]
+            composer1.add_node(learned_abstraction)
+            composer1.connect("input", learned_abstraction.name)
+            composer1.connect(learned_abstraction.name, "output")
+            composer1.remove_connection("input", "output")
+            
+            model1 = composer1.build()
+            model1.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+            env.agents_networks[1] = (composer1, model1)
+        
+        # Now each agent trains/evaluates on the new dataset.
         acc0 = agent0.evaluate_accuracy(env.agents_networks[0][1], env.dataset)
         acc1 = agent1.evaluate_accuracy(env.agents_networks[1][1], env.dataset)
         accuracies_history[0].append(acc0)
         accuracies_history[1].append(acc1)
         
-        # Environment computes rewards using the reported accuracies.
+        # Compute rewards for both agents based on their accuracies.
         rewards = env.compute_rewards({0: acc0, 1: acc1})
         rewards_history[0].append(rewards[0])
         rewards_history[1].append(rewards[1])
