@@ -27,39 +27,41 @@ def create_minimal_network(input_shape):
     return composer, model
 
 class RLEnvironment:
-    def __init__(self, total_steps=100, num_instances_per_step=100, seed=0):
+    def __init__(self, total_steps=100, num_instances_per_step=100, seed=0, n_agents=2):
         """
         total_steps: Total steps (interactions) in the episode.
         num_instances_per_step: Number of data points provided at each step.
         seed: Seed for generating the fixed data distribution.
+        n_agents: Number of agents in the environment (default 2).
         """
         self.total_steps = total_steps
         self.current_step = 0
         self.num_instances_per_step = num_instances_per_step
         self.seed = seed
 
-        # Fixed dataset parameters from our classification data generator.
-        self.factory = DataSchemaFactory()
         # Create the schema once with a fixed seed so distribution parameters are fixed.
+        self.factory = DataSchemaFactory()
         self.schema = self.factory.create_schema(
             num_features=2,
             num_categories=2,
             num_classes=2,
             random_seed=self.seed
         )
-        # Do not generate data here.
+        
+        # Initialize environment data placeholders.
         self.dataset = None
         self.features = None
         self.true_labels = None
 
-        # Initialize networks for two agents (agent IDs 0 and 1).
+        # Dynamically create networks for n_agents rather than hardcoding 0 and 1.
+        self.n_agents = n_agents
         self.agents_networks = {}
-        self.agents_networks[0] = create_minimal_network(input_shape=(2,))
-        self.agents_networks[1] = create_minimal_network(input_shape=(2,))
-
-        # Running average accuracy for each agent.
-        self.agent_cum_acc = {0: 0.0, 1: 0.0}
-        self.agent_steps = {0: 0, 1: 0}
+        self.agent_cum_acc = {}
+        self.agent_steps = {}
+        for agent_id in range(self.n_agents):
+            self.agents_networks[agent_id] = create_minimal_network(input_shape=(2,))
+            self.agent_cum_acc[agent_id] = 0.0
+            self.agent_steps[agent_id] = 0
 
         # Global repository for learned abstractions.
         self.repository = {}
@@ -67,12 +69,7 @@ class RLEnvironment:
     def reset(self, seed: int = None, new_schema=None):
         """
         Resets the environment state.
-
-        Requires either a new_schema or a new seed to be provided.
-        Optionally, if a new_schema is provided, replace the current schema.
-        Alternatively, if a new seed is provided, reinitialize the current schema's RNG
-        (note: changing the seed may change the distribution parameters).
-        No data is generated in reset(); data is generated in each step.
+        Either supply a new_schema or a new seed to reinitialize the distribution.
         """
         if new_schema is None and seed is None:
             raise ValueError("Either a new_schema or a seed must be provided for reset()")
@@ -84,6 +81,7 @@ class RLEnvironment:
         return self._get_state()
 
     def _get_state(self):
+        # Build a state dictionary for each agent’s composer connections etc.
         agents_state = {}
         for agent_id, (composer, _) in self.agents_networks.items():
             agents_state[agent_id] = {
@@ -97,60 +95,33 @@ class RLEnvironment:
         }
 
     def valid_actions(self):
-        # Valid actions: "add_abstraction", "no_change".
+        # If you add new actions, just include them here.
         return ["add_abstraction", "no_change"]
-
-    def train_subgraph_model(self):
-        """
-        Builds a learned abstraction: a hidden layer with 3 neurons.
-        Uses Keras functionality via our node and composer modules.
-        """
-        import keras
-        from keras import layers, initializers
-        # Use a fixed initializer.
-        kernel_init = initializers.GlorotUniform(seed=42)
-        input_shape = (2,)
-        new_input = layers.Input(shape=input_shape, name="sub_input")
-        x = layers.Dense(3, activation='relu', name="hidden_layer", kernel_initializer=kernel_init)(new_input)
-        model = keras.models.Model(new_input, x, name="learned_abstraction_model")
-        subgraph_node = SubGraphNode(name="learned_abstraction", model=model)
-        return subgraph_node
-
-    def evaluate_learned_abstraction(self):
-        """
-        Runs the learned abstraction model on the environment's features and returns the accuracy.
-        This method assumes that the learned abstraction is stored in the repository.
-        """
-        if "learned_abstraction" not in self.repository:
-            raise ValueError("Learned abstraction not found in repository.")
-        model = self.repository["learned_abstraction"].model
-        predictions = model.predict(self.features, verbose=0)
-        preds = (predictions.flatten() > 0.5).astype(int)
-        accuracy = np.mean(preds == self.true_labels)
-        return accuracy
 
     def step(self):
         # Generate new data for this step.
         self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
-        # Ensure features and true_labels are set for tests that require them.
+        # Optionally store features/labels for tests that need them.
         self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
         self.true_labels = self.dataset["label"].to_numpy(dtype=int)
         
         self.current_step += 1
-        state = self._get_state()  # State includes the new dataset.
+        state = self._get_state()
         done = self.current_step >= self.total_steps
         return state, done
 
-
     def compute_rewards(self, accuracies):
         """
-        Given a dictionary of agent accuracies (e.g., {0: acc0, 1: acc1}),
-        update the running averages and return the rewards for each agent.
+        Update each agent's cumulative accuracy and assign base reward.
+        If exactly two agents are present, apply difference-based bonus/penalty.
         """
-        rewards = {}
+        # Update running average accuracy.
         for agent_id, acc in accuracies.items():
             self.agent_steps[agent_id] += 1
             self.agent_cum_acc[agent_id] += acc
+        
+        rewards = {}
+        for agent_id, acc in accuracies.items():
             avg_acc = self.agent_cum_acc[agent_id] / self.agent_steps[agent_id]
             if acc > avg_acc:
                 rewards[agent_id] = 1
@@ -159,12 +130,16 @@ class RLEnvironment:
             else:
                 rewards[agent_id] = -1
 
-        # Optionally, add a bonus based on the difference between agent accuracies.
-        diff = accuracies[0] - accuracies[1]
-        if diff > 0:
-            rewards[0] += diff * 10
-        elif diff < 0:
-            rewards[1] += (-diff) * 10
+        # If exactly 2 agents, replicate the old difference-based bonus approach.
+        if self.n_agents == 2:
+            # For convenience, just get their IDs from the dict:
+            agent_list = list(self.agents_networks.keys())
+            agent_a, agent_b = agent_list[0], agent_list[1]
+            diff = accuracies[agent_a] - accuracies[agent_b]
+            if diff > 0:
+                rewards[agent_a] += diff * 10
+            elif diff < 0:
+                rewards[agent_b] += (-diff) * 10
 
         return rewards
 
