@@ -1,3 +1,4 @@
+#rl_dev.py
 import numpy as np
 import pandas as pd
 from data_gen.categorical_classification import DataSchemaFactory
@@ -82,7 +83,6 @@ class RLEnvironment:
             self.schema.rng = np.random.default_rng(seed)
         return self._get_state()
 
-
     def _get_state(self):
         agents_state = {}
         for agent_id, (composer, _) in self.agents_networks.items():
@@ -129,59 +129,45 @@ class RLEnvironment:
         accuracy = np.mean(preds == self.true_labels)
         return accuracy
 
-    def run_model_accuracy(self, agent_id):
-        """
-        Runs the agent's network on the dataset to compute accuracy.
-        """
-        _, model = self.agents_networks[agent_id]
-        predictions = model.predict(self.features, verbose=0)
-        preds = (predictions.flatten() > 0.5).astype(int)
-        accuracy = np.mean(preds == self.true_labels)
-        return accuracy
-
     def step(self):
-        """
-        Advances the environment by one step:
-        - Generates a new dataset (i.e., new samples) from the fixed schema.
-        - Verifies that the provided actions are valid (but does not modify agent networks).
-        - Computes accuracies and rewards based on the current agent networks.
-        - Updates the environment state.
-        """
         # Generate new data for this step.
         self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
+        # Ensure features and true_labels are set for tests that require them.
         self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
         self.true_labels = self.dataset["label"].to_numpy(dtype=int)
-    
+        
+        self.current_step += 1
+        state = self._get_state()  # State includes the new dataset.
+        done = self.current_step >= self.total_steps
+        return state, done
 
-        # Compute accuracies and update running averages.
-        accuracies = {}
-        for agent_id in [0, 1]:
-            acc = self.run_model_accuracy(agent_id)
-            accuracies[agent_id] = acc
+
+    def compute_rewards(self, accuracies):
+        """
+        Given a dictionary of agent accuracies (e.g., {0: acc0, 1: acc1}),
+        update the running averages and return the rewards for each agent.
+        """
+        rewards = {}
+        for agent_id, acc in accuracies.items():
             self.agent_steps[agent_id] += 1
             self.agent_cum_acc[agent_id] += acc
-        avg_acc = {agent_id: self.agent_cum_acc[agent_id] / self.agent_steps[agent_id]
-                for agent_id in [0, 1]}
-
-        rewards = {}
-        for agent_id in [0, 1]:
-            if accuracies[agent_id] > avg_acc[agent_id]:
+            avg_acc = self.agent_cum_acc[agent_id] / self.agent_steps[agent_id]
+            if acc > avg_acc:
                 rewards[agent_id] = 1
-            elif np.isclose(accuracies[agent_id], avg_acc[agent_id]):
+            elif np.isclose(acc, avg_acc):
                 rewards[agent_id] = 0
             else:
                 rewards[agent_id] = -1
 
+        # Optionally, add a bonus based on the difference between agent accuracies.
         diff = accuracies[0] - accuracies[1]
         if diff > 0:
             rewards[0] += diff * 10
         elif diff < 0:
             rewards[1] += (-diff) * 10
 
-        self.current_step += 1
-        next_state = self._get_state()
-        done = self.current_step >= self.total_steps
-        return next_state, rewards, done
+        return rewards
+
 
 # -----------------------
 # Dummy Agent
@@ -199,23 +185,66 @@ class DummyAgent:
         self.actions_history[agent_id].append(action)
         return action
 
-def run_episode(env: RLEnvironment, agent0: DummyAgent, agent1: DummyAgent):
-    state = env.reset()
+    def evaluate_accuracy(self, model, dataset):
+            # Assume dataset is a DataFrame.
+            split_idx = len(dataset) // 2
+            train_df = dataset.iloc[:split_idx]
+            test_df = dataset.iloc[split_idx:]
+            
+            # Extract features and labels for training.
+            train_features = train_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
+            train_labels = train_df["label"].to_numpy(dtype=int)
+            # Extract features and labels for testing.
+            test_features = test_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
+            test_labels = test_df["label"].to_numpy(dtype=int)
+            
+            # Optionally train/fine-tune the model on training data.
+            model.fit(train_features, train_labels, epochs=1, verbose=0)
+            
+            # Evaluate on test data.
+            predictions = model.predict(test_features, verbose=0)
+            preds = (predictions.flatten() > 0.5).astype(int)
+            accuracy = np.mean(preds == test_labels)
+            return accuracy
+
+def split_dataset(dataset):
+    split_idx = len(dataset) // 2
+    train_df = dataset.iloc[:split_idx]
+    test_df = dataset.iloc[split_idx:]
+    return train_df, test_df
+
+
+def run_episode(env: RLEnvironment, agent0: DummyAgent, agent1: DummyAgent, seed=0, schema=None):
+    # Reset the environment and generate an initial state.
+    state = env.reset(seed=seed, new_schema=schema)
+    
+    # Ensure that both agent networks are compiled.
+    for agent_id in [0, 1]:
+        _, model = env.agents_networks[agent_id]
+        if not hasattr(model, "optimizer"):
+            model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+    
     rewards_history = {0: [], 1: []}
     accuracies_history = {0: [], 1: []}
-    while True:
+    
+    # Run exactly env.total_steps iterations.
+    for _ in range(env.total_steps):
+        state, _ = env.step()  # Update environment; now env.dataset, env.features, env.true_labels are updated.
+        
         valid = env.valid_actions()
-        actions = {
-            0: agent0.choose_action(0, state, valid),
-            1: agent1.choose_action(1, state, valid)
-        }
-        state, rewards, done = env.step(actions)
-        rewards_history[0].append(rewards[0])
-        rewards_history[1].append(rewards[1])
-        acc0 = env.run_model_accuracy(0)
-        acc1 = env.run_model_accuracy(1)
+        # Agents choose their actions. (Actions might affect network composition, etc.)
+        agent0.choose_action(0, state, valid)
+        agent1.choose_action(1, state, valid)
+        
+        # Each agent evaluates its own model on the current dataset.
+        acc0 = agent0.evaluate_accuracy(env.agents_networks[0][1], env.dataset)
+        acc1 = agent1.evaluate_accuracy(env.agents_networks[1][1], env.dataset)
         accuracies_history[0].append(acc0)
         accuracies_history[1].append(acc1)
-        if done:
-            break
+        
+        # Environment computes rewards using the reported accuracies.
+        rewards = env.compute_rewards({0: acc0, 1: acc1})
+        rewards_history[0].append(rewards[0])
+        rewards_history[1].append(rewards[1])
+    
     return {0: agent0.actions_history[0], 1: agent1.actions_history[1]}, rewards_history, accuracies_history

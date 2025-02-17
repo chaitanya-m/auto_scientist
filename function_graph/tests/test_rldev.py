@@ -1,3 +1,4 @@
+#test_rldev.py
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""         # Force CPU usage.
 os.environ["TF_DETERMINISTIC_OPS"] = "1"          # Request deterministic operations.
@@ -137,8 +138,6 @@ def print_graph_nodes(composer):
             print(f"  From: '{parent}', merge mode: {merge_mode}")
     print("=== End of Graph ===")
 
-
-
 def train_learned_abstraction_model(env, epochs=1000):
     """
     Helper function to build and train a learned abstraction model.
@@ -192,8 +191,8 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         """
         # Create the environment with 500 examples per step.
         env = RLEnvironment(total_steps=1, num_instances_per_step=500, seed=0)
-        env.reset() # Generate the dataset now.
-        env.step()
+        env.reset(seed=0)
+        env.step() # Generate the dataset now.
 
         features, true_labels = env.features, env.true_labels
 
@@ -243,45 +242,49 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         print(assertion)
         self.assertGreater(acc, 0.9, assertion)
 
-# class TestReuseAdvantage(unittest.TestCase):
-#     def test_reuse_advantage(self):
-#         """
-#         Hypothesis: When one agent adds the learned abstraction and the other does not,
-#         the agent that adds it will obtain higher accuracy and receive a reward advantage.
+class TestReuseAdvantage(unittest.TestCase):
+    def test_reuse_advantage(self):
+        """
+        Hypothesis: When one agent adds the learned abstraction and the other does not,
+        the agent that adds it will obtain higher accuracy and receive a reward advantage.
         
-#         Test: Pre-populate the repository with the learned abstraction.
-#         Run an episode where agent 0 chooses "add_abstraction" on the first step,
-#         while agent 1 always chooses "no_change". Print detailed step-by-step accuracies and rewards,
-#         and verify that agent 0's reward on the first step is higher than agent 1's.
-#         """
-#         env = RLEnvironment(total_steps=5, num_instances_per_step=100, seed=0)
-#         learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
-#         env.repository["learned_abstraction"] = learned_abstraction
+        Test: Pre-populate the repository with the learned abstraction.
+        Run an episode where agent 0 chooses "add_abstraction" on the first step,
+        while agent 1 always chooses "no_change". Print detailed step-by-step accuracies and rewards,
+        and verify that agent 0's reward on the first step is higher than agent 1's.
+        """
 
-#         # Define policies
-#         action_plan0 = ["add_abstraction"] + ["no_change"] * 4
-#         action_plan1 = ["no_change"] * 5
+        num_steps = 10
+        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=100, seed=0)
+        learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
+        env.repository["learned_abstraction"] = learned_abstraction
 
-#         agent0 = DummyAgent(action_plan={0: action_plan0})
-#         agent1 = DummyAgent(action_plan={1: action_plan1})
-        
-#         # run_episode returns three objects: actions_history, rewards_history, accuracies_history.
-#         actions, rewards, accuracies = run_episode(env, agent0, agent1)
-        
-#         print("\nDetailed Step-by-Step Output:")
-#         for step in range(len(accuracies[0])):
-#             print(f"Step {step+1}:")
-#             print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
-#             print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
+        # Define policies
+        action_plan0 = ["add_abstraction"] + ["no_change"] * (num_steps-1)
+        action_plan1 = ["no_change"] * num_steps
 
-#         reward0 = rewards[0][0]
-#         reward1 = rewards[1][0]
-#         diff = reward0 - reward1
-#         print(f"\nTest outcome: Agent 0's reward on step 1 = {reward0}, Agent 1's reward = {reward1}.")
-#         print(f"Agent 0 won by a margin of {diff} reward points on the first step.")
+        agent0 = DummyAgent(action_plan={0: action_plan0})
+        agent1 = DummyAgent(action_plan={1: action_plan1})
         
-#         self.assertGreater(reward0, reward1,
-#                            "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction.")
+        # run_episode returns three objects: actions_history, rewards_history, accuracies_history.
+        actions, rewards, accuracies = run_episode(env, agent0, agent1, seed = 0)
+        
+        print("\nDetailed Step-by-Step Output:")
+        for step in range(len(accuracies[0])):
+            print(f"Step {step+1}:")
+            print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
+            print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
+
+        reward0 = sum(rewards[0][i] for i in range(num_steps))
+        reward1 = sum(rewards[1][i] for i in range(num_steps))
+ 
+        diff = reward0 - reward1
+        print(f"\nTest outcome: Agent 0's reward = {reward0}, Agent 1's reward = {reward1}.")
+        print(f"Agent 0 won by a margin of {diff} reward points on the first step.")
+        print(actions)
+        
+        self.assertGreater(reward0, reward1,
+                           "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction.")
 
 if __name__ == '__main__':
     unittest.main()
