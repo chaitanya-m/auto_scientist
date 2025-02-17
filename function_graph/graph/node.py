@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 import keras
 from keras import layers
+import uuid
 
 class GraphNode(ABC):
     """
@@ -70,7 +71,11 @@ class SubGraphNode(GraphNode):
         """
         super().__init__(name)  # Initialize the parent GraphNode with the given name
         self.model = model  # Store the original subgraph model
-        new_input = keras.layers.Input(shape=model.input.shape[1:], name=f"{name}_bypass_input")  # Create a new Input layer matching the original model's input shape (excluding batch size)
+
+        # Create a unique input layer name to avoid conflicts.
+        unique_input_name = f"{name}_bypass_input_{uuid.uuid4().hex[:6]}"
+
+        new_input = keras.layers.Input(shape=model.input.shape[1:], name=unique_input_name)  # Create a new Input layer matching the original model's input shape (excluding batch size)
         x = self.model(new_input)  # Pass the new input through the original model to compute the output tensor
         self.bypass_model = keras.models.Model(new_input, x)  # Build the bypass model using the new input and its computed output
 
@@ -90,12 +95,14 @@ class SubGraphNode(GraphNode):
             tf.Tensor: The transformed tensor after shape adaptation (if needed) and processing
                        through the subgraph.
         """
-        expected_units = self.model.input.shape[1]  # Get expected feature dimension from the original model's Input layer.
+        expected_units = self.model.input.shape[1]     # Get expected feature dimension from the original model's Input layer.
         if input_tensor.shape[1] != expected_units:    # Check if shape adaptation is needed.
+            # Generate a unique adapter layer name.
+            adapter_name = f"{self.name}_adapter_{uuid.uuid4().hex[:6]}"
             input_tensor = layers.Dense(expected_units,   # Adapt input using a linear Dense layer.
                                         activation="linear",
-                                        name=f"{self.name}_adapter")(input_tensor)
-        return self.bypass_model(input_tensor)         # Pass the adapted tensor through the bypass model.
+                                        name=adapter_name)(input_tensor)
+        return self.bypass_model(input_tensor)     # Pass the adapted tensor through the bypass model.
 
 
     @classmethod

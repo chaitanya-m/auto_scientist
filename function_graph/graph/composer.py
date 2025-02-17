@@ -3,6 +3,8 @@ import keras
 from collections import deque
 from graph.node import SingleNeuron, InputNode  # Import blueprint node types
 import random
+import copy
+import uuid
 
 class GraphComposer:
     """
@@ -123,11 +125,13 @@ class GraphComposer:
         outputs = [node_output_tensors[name] for name in self.output_node_names]
 
         # Build the final model with a single input.
+        unique_model_name = "GraphModel_" + str(uuid.uuid4())
         self.keras_model = keras.models.Model(
             inputs=input_layer,
             outputs=outputs if len(outputs) > 1 else outputs[0],
-            name="GraphModel"
+            name=unique_model_name
         )
+
         return self.keras_model
 
     def _topological_sort(self):
@@ -214,16 +218,28 @@ class GraphTransformer:
             - 0.0 => keep all direct connections
             - 0.5 => remove about half on average
         """
+
         composer = self.composer
         # 1. Add the new node.
-        composer.add_node(abstraction_node)
-        # 2. Connect chosen subset -> abstraction node.
+        # To avoid duplicate node names, deep-copy and rename if needed.
+        if abstraction_node.name in composer.nodes:
+            unique_suffix = str(uuid.uuid4())
+            new_abstraction = copy.deepcopy(abstraction_node)
+            new_abstraction.name = f"{abstraction_node.name}_{unique_suffix}"
+            # Update internal layer names to ensure uniqueness.
+            for layer in new_abstraction.model.layers:
+                layer._name = f"{layer.name}_{unique_suffix}"
+        else:
+            new_abstraction = abstraction_node
+
+        composer.add_node(new_abstraction)
+        # Connect each node in the chosen subset to the new abstraction node.
         for node_name in chosen_subset:
-            composer.connect(node_name, abstraction_node.name, merge_mode='concat')
-        # 3. Connect abstraction node -> output nodes.
+            composer.connect(node_name, new_abstraction.name, merge_mode='concat')
+        # Connect the new abstraction node to each output.
         for out_name in outputs:
-            composer.connect(abstraction_node.name, out_name, merge_mode='concat')
-        # 4. Remove direct connections with probability remove_prob.
+            composer.connect(new_abstraction.name, out_name, merge_mode='concat')
+        # Remove direct connections from chosen_subset to outputs with probability remove_prob.
         for node_name in chosen_subset:
             for out_name in outputs:
                 if random.random() < remove_prob:
@@ -231,7 +247,21 @@ class GraphTransformer:
                         composer.remove_connection(node_name, out_name)
                     except ValueError:
                         pass
-        # 5. Rebuild and compile.
-        new_model = composer.build()
+
+        # Clear any previously built model to start fresh.
+        composer.keras_model = None
+
+        # Monkey-patch keras.models.Model to force a unique model name.
+        unique_model_name = "GraphModel_" + str(uuid.uuid4())
+        original_Model = keras.models.Model
+        def unique_Model(*args, **kwargs):
+            kwargs['name'] = unique_model_name
+            return original_Model(*args, **kwargs)
+        keras.models.Model = unique_Model
+        try:
+            new_model = composer.build()
+        finally:
+            keras.models.Model = original_Model
+
         new_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
         return new_model
