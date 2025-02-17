@@ -189,65 +189,94 @@ def split_dataset(dataset):
     return train_df, test_df
 
 
-def run_episode(env: RLEnvironment, agent0: DummyAgent, agent1: DummyAgent, seed=0, schema=None):
-    # Reset the environment and generate an initial state.
+from graph.composer import GraphTransformer
+
+def run_episode(env, agents, seed=0, schema=None):
+    """
+    Runs an episode of the environment for exactly env.total_steps steps,
+    for one or more agents. Each agent can choose actions (including
+    "add_abstraction") at each step.
+
+    Parameters
+    ----------
+    env : RLEnvironment
+        The environment instance, which must contain a repository
+        with any learned abstraction(s) for "add_abstraction" to work.
+    agents : dict[int, DummyAgent or similar]
+        A dictionary mapping agent IDs to agent instances that have
+        choose_action(...) and evaluate_accuracy(...).
+    seed : int, optional
+        Seed for resetting the environment, by default 0.
+    schema : optional
+        Optional new schema for environment reset, by default None.
+
+    Returns
+    -------
+    actions_history : dict[int, list[str]]
+        The sequence of actions each agent took, keyed by agent ID.
+    rewards_history : dict[int, list[float]]
+        The sequence of rewards each agent received over env.total_steps, keyed by agent ID.
+    accuracies_history : dict[int, list[float]]
+        The sequence of accuracies each agent achieved at each step, keyed by agent ID.
+    """
+
+    # 1. Reset environment to a fresh state
     state = env.reset(seed=seed, new_schema=schema)
     
-    # Ensure that both agent networks are compiled.
-    for agent_id in [0, 1]:
-        composer, model = env.agents_networks[agent_id]
-        # The simplest check: if model hasn't been compiled at all, compile now.
+    # 2. Compile models for each agent if needed
+    for agent_id, (composer, model) in env.agents_networks.items():
         if not hasattr(model, "optimizer"):
             model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
     
-    rewards_history = {0: [], 1: []}
-    accuracies_history = {0: [], 1: []}
+    # Prepare history dicts, one list per agent
+    actions_history = {agent_id: [] for agent_id in env.agents_networks}
+    rewards_history = {agent_id: [] for agent_id in env.agents_networks}
+    accuracies_history = {agent_id: [] for agent_id in env.agents_networks}
     
-    # Run exactly env.total_steps iterations.
+    # 3. Main loop over total_steps
     for _ in range(env.total_steps):
-        state, _ = env.step()  # Now env.dataset, env.features, env.true_labels are updated.
-        
-        valid = env.valid_actions()
-        
-        # Agents choose their actions.
-        action0 = agent0.choose_action(0, state, valid)
-        action1 = agent1.choose_action(1, state, valid)
-        
-        if action0 == "add_abstraction":
-            # Use the GraphTransformer
-            learned_abstraction = env.repository["learned_abstraction"]
-            composer0, model0 = env.agents_networks[0]
-            gt0 = GraphTransformer(composer0)
-            new_model0 = gt0.add_abstraction_node(
-                abstraction_node=learned_abstraction,
-                chosen_subset=["input"],   # or any subset you prefer
-                outputs=["output"],
-                remove_prob=1.0           # remove direct connections from subset to output
-            )
-            env.agents_networks[0] = (composer0, new_model0)
-        
-        if action1 == "add_abstraction":
-            learned_abstraction = env.repository["learned_abstraction"]
-            composer1, model1 = env.agents_networks[1]
-            gt1 = GraphTransformer(composer1)
-            new_model1 = gt1.add_abstraction_node(
-                abstraction_node=learned_abstraction,
-                chosen_subset=["input"],
-                outputs=["output"],
-                remove_prob=1.0
-            )
-            env.agents_networks[1] = (composer1, new_model1)
+        # Generate new data and update environment
+        state, done = env.step()
 
+        # Each agent picks an action and we record it
+        chosen_actions = {}
+        valid = env.valid_actions()
+        for agent_id in agents:
+            action = agents[agent_id].choose_action(agent_id, state, valid)
+            chosen_actions[agent_id] = action
+            actions_history[agent_id].append(action)
+
+        # 4. Apply any "add_abstraction" actions
+        #    (i.e., insert the learned abstraction node, then rebuild & recompile)
+        for agent_id, action in chosen_actions.items():
+            if action == "add_abstraction":
+                learned_abstraction = env.repository["learned_abstraction"]
+                composer, model = env.agents_networks[agent_id]
+                transformer = GraphTransformer(composer)
+                
+                # Example: always connect "input" -> abstraction -> "output", removing direct input->output
+                new_model = transformer.add_abstraction_node(
+                    abstraction_node=learned_abstraction,
+                    chosen_subset=["input"],
+                    outputs=["output"],
+                    remove_prob=1.0
+                )
+                env.agents_networks[agent_id] = (composer, new_model)
+
+        # 5. Now each agent trains/evaluates on the newly generated dataset
+        accuracies = {}
+        for agent_id in agents:
+            _, model = env.agents_networks[agent_id]
+            acc = agents[agent_id].evaluate_accuracy(model, env.dataset)
+            accuracies_history[agent_id].append(acc)
+            accuracies[agent_id] = acc
         
-        # Now each agent trains/evaluates on the new dataset.
-        acc0 = agent0.evaluate_accuracy(env.agents_networks[0][1], env.dataset)
-        acc1 = agent1.evaluate_accuracy(env.agents_networks[1][1], env.dataset)
-        accuracies_history[0].append(acc0)
-        accuracies_history[1].append(acc1)
+        # 6. Compute rewards using the environment's logic
+        rewards = env.compute_rewards(accuracies)
+        for agent_id in agents:
+            rewards_history[agent_id].append(rewards[agent_id])
         
-        # Compute rewards for both agents based on their accuracies.
-        rewards = env.compute_rewards({0: acc0, 1: acc1})
-        rewards_history[0].append(rewards[0])
-        rewards_history[1].append(rewards[1])
-    
-    return {0: agent0.actions_history[0], 1: agent1.actions_history[1]}, rewards_history, accuracies_history
+        if done:
+            break
+
+    return actions_history, rewards_history, accuracies_history

@@ -242,6 +242,7 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         print(assertion)
         self.assertGreater(acc, 0.9, assertion)
 
+
 class TestReuseAdvantage(unittest.TestCase):
     def test_reuse_advantage(self):
         """
@@ -256,35 +257,51 @@ class TestReuseAdvantage(unittest.TestCase):
 
         num_steps = 5
         env = RLEnvironment(total_steps=num_steps, num_instances_per_step=100, seed=0)
+        
+        # Train an abstraction, store it in the environment's repository.
         learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
         env.repository["learned_abstraction"] = learned_abstraction
 
-        # Define policies
-        action_plan0 = ["add_abstraction"] + ["no_change"] * (num_steps-1)
+        # Define policies: Agent 0 uses add_abstraction once, then no_change;
+        # Agent 1 always uses no_change.
+        action_plan0 = ["add_abstraction"] + ["no_change"] * (num_steps - 1)
         action_plan1 = ["no_change"] * num_steps
 
+        # Create DummyAgents that follow those plans.
         agent0 = DummyAgent(action_plan={0: action_plan0})
         agent1 = DummyAgent(action_plan={1: action_plan1})
         
-        # run_episode returns three objects: actions_history, rewards_history, accuracies_history.
-        actions, rewards, accuracies = run_episode(env, agent0, agent1, seed = 0)
+        # run_episode now accepts a dictionary {agent_id: agent_instance}
+        agents_dict = {
+            0: agent0,
+            1: agent1
+        }
+
+        # run_episode returns (actions_history, rewards_history, accuracies_history),
+        # each keyed by agent ID.
+        actions, rewards, accuracies = run_episode(env, agents_dict, seed=0)
         
         print("\nDetailed Step-by-Step Output:")
-        for step in range(len(accuracies[0])):
+        # Each step, we display the accuracy & reward for both agents.
+        for step in range(num_steps):
             print(f"Step {step+1}:")
             print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
             print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
 
-        reward0 = sum(rewards[0][i] for i in range(num_steps))
-        reward1 = sum(rewards[1][i] for i in range(num_steps))
+        # Compute total reward for each agent across all steps.
+        reward0 = sum(rewards[0])
+        reward1 = sum(rewards[1])
  
         diff = reward0 - reward1
         print(f"\nTest outcome: Agent 0's reward = {reward0}, Agent 1's reward = {reward1}.")
-        print(f"Agent 0 won by a margin of {diff} reward points on the first step.")
-        print(actions)
+        print(f"Agent 0 won by a margin of {diff} reward points.")
+        print("Actions taken:", actions)
         
-        self.assertGreater(reward0, reward1,
-                           "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction.")
+        self.assertGreater(
+            reward0,
+            reward1,
+            "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction."
+        )
 
 if __name__ == '__main__':
     unittest.main()
