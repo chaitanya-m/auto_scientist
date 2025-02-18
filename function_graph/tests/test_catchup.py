@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 from utils.rl_dev import RLEnvironment, run_episode
 from tests.test_rldev import train_learned_abstraction_model
-from utils.rl_dev import create_minimal_network, DummyAgent
+from utils.rl_dev import create_minimal_network
+from agents.deterministic import DeterministicAgent
 from agents.qlearning import QLearningAgent
 
 class TestRLAgentCatchUp(unittest.TestCase):
@@ -18,14 +19,10 @@ class TestRLAgentCatchUp(unittest.TestCase):
         # 1. Create environment
         num_steps = 1
         env = RLEnvironment(total_steps=num_steps, num_instances_per_step=500, seed=0)
-        
-        # 2. Train or load an abstraction, store it in the repository
-        learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
-        env.repository["learned_abstraction"] = learned_abstraction
 
         # 3. Agent0 (fixed policy) always chooses "no_change" (or some known good sequence).
-        action_plan0 = ["add_abstraction"] + ["no_change"] * (num_steps-1)
-        agent0 = DummyAgent(action_plan={0: action_plan0})
+        fixed_action_plan = ["add_abstraction"] + ["no_change"] * (num_steps-1)
+        agent0 = DeterministicAgent(action_plan=fixed_action_plan)
 
         # 4. Agent1 (Q-learning) can choose from ["add_abstraction", "no_change"].
         #    We'll let it discover when "add_abstraction" is beneficial.
@@ -37,12 +34,21 @@ class TestRLAgentCatchUp(unittest.TestCase):
         for ep in range(n_episodes):
             # Reset environment each episode for a fresh start.
             env.reset(seed=ep)
+
+            # Train an abstraction on new dataset, store it in the repository
+            learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
+            env.repository["learned_abstraction"] = learned_abstraction
+
             # Reset each agent's model so that previous episodes do not interfere.
-            from utils.rl_dev import create_minimal_network
+
             env.agents_networks[0] = create_minimal_network(input_shape=(2,))
             env.agents_networks[1] = create_minimal_network(input_shape=(2,))
             
             agents_dict = {0: agent0, 1: agent1}
+
+            # Reset agent 0's fixed action plan
+            agent0.action_plan = fixed_action_plan
+
             actions, rewards, accuracies = run_episode(env, agents_dict, seed=ep)
             # (Additional Q-learning updates could be performed here, if needed.)
 

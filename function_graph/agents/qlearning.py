@@ -22,9 +22,9 @@ class QLearningAgent:
         self.last_action = None
 
         # For storing actions history if needed
-        self.actions_history = {}
+        self.actions_history = []
 
-    def choose_action(self, agent_id, state, valid_actions):
+    def choose_action(self, state, valid_actions):
         """
         1. Convert 'state' (or relevant parts) to a discrete representation or key.
         2. With probability self.epsilon, pick a random action from valid_actions.
@@ -32,7 +32,7 @@ class QLearningAgent:
         3. Store (state, action) in self.last_state/last_action for later Q-update.
         """
         # Example pseudo-logic. Adjust as needed for your environment’s state info.
-        state_key = self._make_state_key(state, agent_id)
+        state_key = self._make_state_key(state)
         
         if np.random.random() < self.epsilon:
             # Explore
@@ -51,13 +51,11 @@ class QLearningAgent:
         self.epsilon *= self.epsilon_decay
         
         # Also store for logging if needed
-        if agent_id not in self.actions_history:
-            self.actions_history[agent_id] = []
-        self.actions_history[agent_id].append(action)
+        self.actions_history.append(action)
         
         return action
     
-    def update_q(self, reward, next_state, agent_id, done=False):
+    def update_q(self, reward, next_state, done=False):
         """
         Called after we receive a reward and observe next_state.
         next_state can be used to do the Q-learning update:
@@ -68,7 +66,7 @@ class QLearningAgent:
 
         state_key = self.last_state
         action = self.last_action
-        next_state_key = self._make_state_key(next_state, agent_id)
+        next_state_key = self._make_state_key(next_state)
         
         old_q = self.q_table.get((state_key, action), 0.0)
         
@@ -113,7 +111,7 @@ class QLearningAgent:
         accuracy = np.mean(preds == test_labels)
         return accuracy
 
-    def _make_state_key(self, state, agent_id):
+    def _make_state_key(self, state):
         """
         Converts the environment state into a simplified representation to be used
         as a key for the Q-table. In this example, we use a tuple consisting of:
@@ -123,14 +121,14 @@ class QLearningAgent:
              starts with "learned_abstraction".)
         """
         # Get the current step number from the state dictionary (default to 0 if not present).
-        step_num = state.get("step", 0)
+        # step_num = state.get("step", 0)
         
         # Extract the list of node names for the given agent.
-        agent_nodes = state["agents_networks"][agent_id]["nodes"]
+        #agent_nodes = str(state)
         
         # Determine if an abstraction node has been added by checking if any node name
         # starts with "learned_abstraction". This works even if a unique suffix was appended.
-        has_abstraction = any(node_name.startswith("learned_abstraction") for node_name in agent_nodes)
+        # has_abstraction = any(node_name.startswith("learned_abstraction") for node_name in agent_nodes)
         
         # Return the state key as a tuple: (step number, presence of an abstraction node)
-        return (step_num, has_abstraction)
+        return (str(state))

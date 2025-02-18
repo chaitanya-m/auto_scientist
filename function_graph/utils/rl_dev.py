@@ -144,43 +144,6 @@ class RLEnvironment:
         return rewards
 
 
-# -----------------------
-# Dummy Agent
-# -----------------------
-class DummyAgent:
-    def __init__(self, action_plan=None):
-        self.actions_history = {0: [], 1: []}
-        self.action_plan = action_plan or {0: [], 1: []}
-
-    def choose_action(self, agent_id, state, valid_actions):
-        if self.action_plan[agent_id]:
-            action = self.action_plan[agent_id].pop(0)
-        else:
-            action = np.random.choice(valid_actions)
-        self.actions_history[agent_id].append(action)
-        return action
-
-    def evaluate_accuracy(self, model, dataset):
-            # Assume dataset is a DataFrame.
-            split_idx = len(dataset) // 2
-            train_df = dataset.iloc[:split_idx]
-            test_df = dataset.iloc[split_idx:]
-            
-            # Extract features and labels for training.
-            train_features = train_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
-            train_labels = train_df["label"].to_numpy(dtype=int)
-            # Extract features and labels for testing.
-            test_features = test_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
-            test_labels = test_df["label"].to_numpy(dtype=int)
-            
-            # Optionally train/fine-tune the model on training data.
-            model.fit(train_features, train_labels, epochs=1, verbose=0)
-            
-            # Evaluate on test data.
-            predictions = model.predict(test_features, verbose=0)
-            preds = (predictions.flatten() > 0.5).astype(int)
-            accuracy = np.mean(preds == test_labels)
-            return accuracy
 
 def split_dataset(dataset):
     split_idx = len(dataset) // 2
@@ -243,7 +206,8 @@ def run_episode(env, agents, seed=0, schema=None):
         chosen_actions = {}
         valid = env.valid_actions()
         for agent_id in agents:
-            action = agents[agent_id].choose_action(agent_id, state, valid)
+            agent_state = env.agents_networks[agent_id][0] # the agents composer object
+            action = agents[agent_id].choose_action(agent_state, valid)
             chosen_actions[agent_id] = action
             actions_history[agent_id].append(action)
 
@@ -258,7 +222,7 @@ def run_episode(env, agents, seed=0, schema=None):
                 composer, model = env.agents_networks[agent_id]
                 transformer = GraphTransformer(composer)
                 
-                # Example: always connect "input" -> abstraction -> "output", removing direct input->output
+                # For simplicity, always connect "input" -> abstraction -> "output", removing direct input->output
                 new_model = transformer.add_abstraction_node(
                     abstraction_node=learned_abstraction,
                     chosen_subset=["input"],
@@ -284,3 +248,42 @@ def run_episode(env, agents, seed=0, schema=None):
             break
 
     return actions_history, rewards_history, accuracies_history
+
+
+# -----------------------
+# Dummy Agent
+# -----------------------
+class DummyAgent:
+    def __init__(self, action_plan=None):
+        self.actions_history = {0: [], 1: []}
+        self.action_plan = action_plan or {0: [], 1: []}
+
+    def choose_action(self, agent_id, state, valid_actions):
+        if self.action_plan[agent_id]:
+            action = self.action_plan[agent_id].pop(0)
+        else:
+            action = np.random.choice(valid_actions)
+        self.actions_history[agent_id].append(action)
+        return action
+
+    def evaluate_accuracy(self, model, dataset):
+            # Assume dataset is a DataFrame.
+            split_idx = len(dataset) // 2
+            train_df = dataset.iloc[:split_idx]
+            test_df = dataset.iloc[split_idx:]
+            
+            # Extract features and labels for training.
+            train_features = train_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
+            train_labels = train_df["label"].to_numpy(dtype=int)
+            # Extract features and labels for testing.
+            test_features = test_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
+            test_labels = test_df["label"].to_numpy(dtype=int)
+            
+            # Optionally train/fine-tune the model on training data.
+            model.fit(train_features, train_labels, epochs=1, verbose=0)
+            
+            # Evaluate on test data.
+            predictions = model.predict(test_features, verbose=0)
+            preds = (predictions.flatten() > 0.5).astype(int)
+            accuracy = np.mean(preds == test_labels)
+            return accuracy
