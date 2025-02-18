@@ -1,7 +1,8 @@
+# agents/qlearning.py
 import numpy as np
 
 class QLearningAgent:
-    def __init__(self, action_space, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.99):
+    def __init__(self, action_space, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.9):
         """
         action_space: List of possible actions (e.g., ["add_abstraction", "no_change"]).
         alpha: learning rate

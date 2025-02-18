@@ -232,6 +232,7 @@ def run_episode(env, agents, seed=0, schema=None):
     actions_history = {agent_id: [] for agent_id in env.agents_networks}
     rewards_history = {agent_id: [] for agent_id in env.agents_networks}
     accuracies_history = {agent_id: [] for agent_id in env.agents_networks}
+    debug_counter = {agent_id: 0 for agent_id in env.agents_networks}
     
     # 3. Main loop over total_steps
     for _ in range(env.total_steps):
@@ -248,8 +249,11 @@ def run_episode(env, agents, seed=0, schema=None):
 
         # 4. Apply any "add_abstraction" actions
         #    (i.e., insert the learned abstraction node, then rebuild & recompile)
+
         for agent_id, action in chosen_actions.items():
             if action == "add_abstraction":
+                debug_counter[agent_id] += 1
+                print(f"DEBUG: {agent_id} adds abstraction {debug_counter[agent_id]} times")
                 learned_abstraction = env.repository["learned_abstraction"]
                 composer, model = env.agents_networks[agent_id]
                 transformer = GraphTransformer(composer)

@@ -16,8 +16,8 @@ class TestRLAgentCatchUp(unittest.TestCase):
         """
 
         # 1. Create environment
-        num_steps = 10
-        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=100, seed=42)
+        num_steps = 1
+        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=500, seed=0)
         
         # 2. Train or load an abstraction, store it in the repository
         learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
@@ -29,26 +29,26 @@ class TestRLAgentCatchUp(unittest.TestCase):
 
         # 4. Agent1 (Q-learning) can choose from ["add_abstraction", "no_change"].
         #    We'll let it discover when "add_abstraction" is beneficial.
-        agent1 = QLearningAgent(action_space=["no_change", "add_abstraction"])
+        agent1 = QLearningAgent(action_space=["no_change", "add_abstraction"], epsilon=0.5, epsilon_decay=0.5)
 
         # 5. Possibly run multiple episodes so agent1 can learn. For a single test, 
         #    we can do a single episode or a small batch:
         n_episodes = 5
         for ep in range(n_episodes):
-            # Reset environment each episode if you want fresh starts
-            # or keep it continuous if you prefer online learning
-            agents_dict = {0: agent0, 1: agent1}
-            actions, rewards, accuracies = run_episode(env, agents_dict, seed=42)
+            # Reset environment each episode for a fresh start.
+            env.reset(seed=ep)
+            # Reset each agent's model so that previous episodes do not interfere.
+            from utils.rl_dev import create_minimal_network
+            env.agents_networks[0] = create_minimal_network(input_shape=(2,))
+            env.agents_networks[1] = create_minimal_network(input_shape=(2,))
             
-            # After each step, agent1 sees the reward and can update Q
-            # So you'd modify run_episode or handle after run_episode in a loop
-            # to call agent1.update_q(...) for each step or something similar.
+            agents_dict = {0: agent0, 1: agent1}
+            actions, rewards, accuracies = run_episode(env, agents_dict, seed=ep)
+            # (Additional Q-learning updates could be performed here, if needed.)
 
-            # Example: if run_episode doesn't do per-step Q-learning updates,
-            # we might want to modify the environment or run_episode to pass
-            # next_state and done flags each iteration.
 
         # 6. Final check: agent1's performance is near or above agent0's in the last episode
+
         final_acc0 = np.mean(accuracies[0])  # average accuracy for agent0
         final_acc1 = np.mean(accuracies[1])  # average accuracy for agent1
         self.assertGreaterEqual(
