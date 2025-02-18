@@ -73,11 +73,17 @@ class SubGraphNode(GraphNode):
         self.model = model  # Store the original subgraph model
 
         # Create a unique input layer name to avoid conflicts.
-        unique_input_name = f"{name}_bypass_input_{uuid.uuid4().hex[:6]}"
+        unique_input_name = f"{name}_bypass_input_{uuid.uuid4().hex[:3]}"
 
         new_input = keras.layers.Input(shape=model.input.shape[1:], name=unique_input_name)  # Create a new Input layer matching the original model's input shape (excluding batch size)
         x = self.model(new_input)  # Pass the new input through the original model to compute the output tensor
-        self.bypass_model = keras.models.Model(new_input, x)  # Build the bypass model using the new input and its computed output
+
+        # Force the bypass model to have a unique name instead of the default "functional".
+        bypass_name = f"{name}_bypass_model_{uuid.uuid4()}"
+        self.bypass_model = keras.models.Model(new_input, x, name=bypass_name) # Build the bypass model using the new input and its computed output
+
+        for layer in self.bypass_model.layers:
+            layer._name = f"{layer.name}_{uuid.uuid4().hex[:3]}"
 
 
     def apply(self, input_tensor):
@@ -98,7 +104,7 @@ class SubGraphNode(GraphNode):
         expected_units = self.model.input.shape[1]     # Get expected feature dimension from the original model's Input layer.
         if input_tensor.shape[1] != expected_units:    # Check if shape adaptation is needed.
             # Generate a unique adapter layer name.
-            adapter_name = f"{self.name}_adapter_{uuid.uuid4().hex[:6]}"
+            adapter_name = f"{self.name}_adapter_{uuid.uuid4()}"
             input_tensor = layers.Dense(expected_units,   # Adapt input using a linear Dense layer.
                                         activation="linear",
                                         name=adapter_name)(input_tensor)

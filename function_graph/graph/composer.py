@@ -114,12 +114,15 @@ class GraphComposer:
             if len(parent_tensors) == 1:
                 combined = parent_tensors[0]
             else:
+                unique_suffix = uuid.uuid4().hex[:6]
+                print(f"DEBUG: Merging node '{node_name}' with merge_modes: {merge_modes} and unique_suffix: {unique_suffix}")
                 if all(m == "add" for m in merge_modes):
-                    combined = keras.layers.Add(name=f"{node_name}_add")(parent_tensors)
+                    combined = keras.layers.Add(name=f"{node_name}_add_{unique_suffix}")(parent_tensors)
                 elif all(m == "concat" for m in merge_modes):
-                    combined = keras.layers.Concatenate(name=f"{node_name}_concat")(parent_tensors)
+                    combined = keras.layers.Concatenate(name=f"{node_name}_concat_{unique_suffix}")(parent_tensors)
                 else:
                     raise ValueError(f"Mixed merge modes for node '{node_name}'")
+
             node_output_tensors[node_name] = node.apply(combined)
 
         outputs = [node_output_tensors[name] for name in self.output_node_names]
@@ -131,6 +134,17 @@ class GraphComposer:
             outputs=outputs if len(outputs) > 1 else outputs[0],
             name=unique_model_name
         )
+        
+        # Debug: Print all operations (nodes) in the final model.
+        print("DEBUG: Final model operations:")
+        for depth, nodes in self.keras_model._nodes_by_depth.items():
+            for node in nodes:
+                try:
+                    # Try printing the layer name associated with this node.
+                    print("DEBUG: Operation from layer:", node.layer.name)
+                except Exception as e:
+                    print("DEBUG: Operation has no layer name; type:", type(node), "Error:", e)
+
 
         return self.keras_model
 
@@ -219,19 +233,56 @@ class GraphTransformer:
             - 0.5 => remove about half on average
         """
 
-        composer = self.composer
-        # 1. Add the new node.
-        # To avoid duplicate node names, deep-copy and rename if needed.
-        if abstraction_node.name in composer.nodes:
-            unique_suffix = str(uuid.uuid4())
-            new_abstraction = copy.deepcopy(abstraction_node)
-            new_abstraction.name = f"{abstraction_node.name}_{unique_suffix}"
-            # Update internal layer names to ensure uniqueness.
-            for layer in new_abstraction.model.layers:
-                layer._name = f"{layer.name}_{unique_suffix}"
-        else:
-            new_abstraction = abstraction_node
 
+        composer = self.composer
+
+        # Always deep-copy the abstraction node to ensure a fresh instance.
+        new_abstraction = copy.deepcopy(abstraction_node)
+
+        # Generate a short random suffix (e.g. 4 hex characters).
+        unique_suffix = str(uuid.uuid4().hex[:4])
+
+        print("====================\nDEBUG: Generating random suffix:", unique_suffix)
+
+        # Rename the top-level node
+        print("DEBUG: Top level subgraph node was:", new_abstraction.name)
+        new_abstraction.name = f"{abstraction_node.name}_{unique_suffix}"
+        print("DEBUG: Top level subgraph node name updated to:", new_abstraction.name)
+
+
+
+        # # Rename the bypass model to enforce a unique name.
+        # new_abstraction.bypass_model._name = f"{abstraction_node.name}_bypass_model_{unique_suffix}"
+        # print("DEBUG: Reused layer name updated to:", new_abstraction.bypass_model._name)
+
+
+
+        # Rebuild the bypass model from scratch so that all internal layer names are freshly generated.
+        new_input = keras.layers.Input(
+            shape=abstraction_node.model.input.shape[1:], 
+            name=f"{new_abstraction.name}_bypass_input"
+        )
+        # Pass the new input through the original model to get the output.
+        x = abstraction_node.model(new_input)
+        new_bypass_model_name = f"{new_abstraction.name}_bypass_model"
+        new_abstraction.bypass_model = keras.models.Model(new_input, x, name=new_bypass_model_name)
+        print("DEBUG: Rebuilt bypass model name:", new_abstraction.bypass_model.name)
+
+
+        # Rename all keras layers in the bypass model
+        for layer in new_abstraction.bypass_model.layers:
+            if isinstance(layer, keras.layers.InputLayer):
+                print("DEBUG: Skipping renaming for InputLayer:", layer.name)
+                continue
+            print("DEBUG: Previous keras layer name:", layer.name)
+            unique_layer_name = f"{layer.name}_{unique_suffix}"
+            try:
+                layer._name = unique_layer_name
+                print("DEBUG: Updated keras layer name:", layer._name)
+            except Exception as e:
+                print(f"DEBUG: Could not update layer name for {layer.name} due to {e}")
+
+        # Add the new, uniquely-named abstraction node.
         composer.add_node(new_abstraction)
         # Connect each node in the chosen subset to the new abstraction node.
         for node_name in chosen_subset:
@@ -251,17 +302,12 @@ class GraphTransformer:
         # Clear any previously built model to start fresh.
         composer.keras_model = None
 
-        # Monkey-patch keras.models.Model to force a unique model name.
-        unique_model_name = "GraphModel_" + str(uuid.uuid4())
-        original_Model = keras.models.Model
-        def unique_Model(*args, **kwargs):
-            kwargs['name'] = unique_model_name
-            return original_Model(*args, **kwargs)
-        keras.models.Model = unique_Model
-        try:
-            new_model = composer.build()
-        finally:
-            keras.models.Model = original_Model
+
+        new_model = composer.build()
+        print("DEBUG: composer.build() returned model with name:", new_model.name)
+        print("DEBUG: Final model layer names after build:")
+        for layer in new_model.layers:
+            print("DEBUG: Final model layer:", layer.name)
 
         new_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
         return new_model
