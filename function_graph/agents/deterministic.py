@@ -13,7 +13,7 @@ class DeterministicAgent:
         If the action plan is exhausted, the agent selects actions randomly.
         """
         self.actions_history = []
-        self.action_plan = action_plan or []
+        self.action_plan = action_plan
 
     def choose_action(self, state, valid_actions):
         """

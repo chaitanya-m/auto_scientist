@@ -278,11 +278,7 @@ class GraphTransformer:
         # Clear any previously built model to start fresh.
         composer.keras_model = None
 
-
         new_model = composer.build()
-
-        for layer in new_model.layers:
-            print("DEBUG: Final model layer:", layer.name)
 
         new_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
         return new_model

@@ -1,4 +1,5 @@
 #tests/test_catchup.py
+import copy
 import unittest
 import numpy as np
 from utils.environment import RLEnvironment, run_episode, create_minimal_network
@@ -17,11 +18,12 @@ class TestRLAgentCatchUp(unittest.TestCase):
 
         # 1. Create environment
         num_steps = 1
-        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=500, seed=0)
+        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=300, seed=0)
 
         # 3. Agent0 (fixed policy) always chooses "no_change" (or some known good sequence).
-        fixed_action_plan = ["add_abstraction"] + ["no_change"] * (num_steps-1)
-        agent0 = DeterministicAgent(action_plan=fixed_action_plan)
+        #fixed_action_plan = ["add_abstraction"] + ["no_change"] * (num_steps-1)
+        fixed_action_plan = ["no_change"] * (num_steps)        
+        agent0 = DeterministicAgent(action_plan=copy.deepcopy(fixed_action_plan))
 
         # 4. Agent1 (Q-learning) can choose from ["add_abstraction", "no_change"].
         #    We'll let it discover when "add_abstraction" is beneficial.
@@ -29,13 +31,15 @@ class TestRLAgentCatchUp(unittest.TestCase):
 
         # 5. Possibly run multiple episodes so agent1 can learn. For a single test, 
         #    we can do a single episode or a small batch:
-        n_episodes = 5
+        n_episodes = 10
         for ep in range(n_episodes):
             # Reset environment each episode for a fresh start.
             env.reset(seed=ep)
 
+            agent0.action_plan = copy.deepcopy(fixed_action_plan)
+
             # Train an abstraction on new dataset, store it in the repository
-            learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
+            learned_abstraction = train_learned_abstraction_model(env, epochs=500)
             env.repository["learned_abstraction"] = learned_abstraction
 
             # Reset each agent's model so that previous episodes do not interfere.
@@ -45,11 +49,15 @@ class TestRLAgentCatchUp(unittest.TestCase):
             
             agents_dict = {0: agent0, 1: agent1}
 
-            # Reset agent 0's fixed action plan
-            agent0.action_plan = fixed_action_plan
-
-            actions, rewards, accuracies = run_episode(env, agents_dict, seed=ep)
+            actions_history, rewards, accuracies = run_episode(env, agents_dict, seed=ep)
             # (Additional Q-learning updates could be performed here, if needed.)
+
+            # Print stepwise and episode-wise accuracies for each agent.
+            for agent_id in sorted(accuracies.keys()):
+                print(f"Agent {agent_id} stepwise accuracies: {accuracies[agent_id]}")
+                print(actions_history[agent_id])
+                #avg_acc = np.mean(accuracies[agent_id])
+                #print(f"Agent {agent_id} average accuracy for episode {ep}: {avg_acc:.4f}")
 
 
         # 6. Final check: agent1's performance is near or above agent0's in the last episode
