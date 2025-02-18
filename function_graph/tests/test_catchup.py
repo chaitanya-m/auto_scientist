@@ -1,9 +1,8 @@
 #tests/test_catchup.py
 import unittest
 import numpy as np
-from utils.rl_dev import RLEnvironment, run_episode
+from utils.environment import RLEnvironment, run_episode, create_minimal_network
 from tests.test_rldev import train_learned_abstraction_model
-from utils.rl_dev import create_minimal_network
 from agents.deterministic import DeterministicAgent
 from agents.qlearning import QLearningAgent
 

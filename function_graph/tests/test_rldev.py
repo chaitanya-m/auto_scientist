@@ -16,7 +16,7 @@ tf.random.set_seed(42)
 import keras
 from keras import layers, initializers, utils
 from graph.node import SubGraphNode
-from utils.rl_dev import RLEnvironment, DummyAgent, run_episode, create_minimal_network
+from utils.environment import RLEnvironment, DummyAgent, run_episode, create_minimal_network
 from graphviz import Digraph
 
 import os

@@ -6,7 +6,7 @@ from graph.node import InputNode, SingleNeuron, SubGraphNode
 from graph.composer import GraphComposer, GraphTransformer
 
 # -----------------------
-# Environment for Two Agents
+# Environment for multiple agents
 # -----------------------
 
 def create_minimal_network(input_shape):
@@ -25,6 +25,44 @@ def create_minimal_network(input_shape):
     composer.connect("input", "output")
     model = composer.build()
     return composer, model
+
+
+import numpy as np
+
+# Assume these functions/classes are defined elsewhere:
+# DataSchemaFactory, create_minimal_network
+
+class AgentState:
+    def __init__(self, nodes, connections):
+        """
+        Represents the state of an individual agent.
+        
+        :param nodes: List of node identifiers from the agent's composer.
+        :param connections: The connection structure from the agent's composer.
+        """
+        self.nodes = nodes
+        self.connections = connections
+
+    def __repr__(self):
+        return f"AgentState(nodes={self.nodes}, connections={self.connections})"
+
+
+class State:
+    def __init__(self, step, dataset, agents_states):
+        """
+        Represents the overall environment state.
+        
+        :param step: The current step in the environment.
+        :param dataset: The dataset generated at the current step.
+        :param agents_states: A dictionary mapping external agent IDs to their AgentState.
+        """
+        self.step = step
+        self.dataset = dataset
+        self.agents_states = agents_states
+
+    def __repr__(self):
+        return f"State(step={self.step}, dataset=DataFrame(...), agents_states={self.agents_states})"
+
 
 class RLEnvironment:
     def __init__(self, total_steps=100, num_instances_per_step=100, seed=0, n_agents=2):
@@ -81,18 +119,22 @@ class RLEnvironment:
         return self._get_state()
 
     def _get_state(self):
-        # Build a state dictionary for each agent’s composer connections etc.
-        agents_state = {}
+        """
+        Constructs and returns the current environment state as a State object,
+        with each agent's state represented by an AgentState instance.
+        """
+        agents_states = {}
         for agent_id, (composer, _) in self.agents_networks.items():
-            agents_state[agent_id] = {
-                "nodes": list(composer.nodes.keys()),
-                "connections": composer.connections
-            }
-        return {
-            "step": self.current_step,
-            "dataset": self.dataset,
-            "agents_networks": agents_state
-        }
+            agent_state = AgentState(
+                nodes=list(composer.nodes.keys()),
+                connections=composer.connections
+            )
+            agents_states[agent_id] = agent_state
+        return State(
+            step=self.current_step,
+            dataset=self.dataset,
+            agents_states=agents_states
+        )
 
     def valid_actions(self):
         # If you add new actions, just include them here.
@@ -132,7 +174,6 @@ class RLEnvironment:
 
         # If exactly 2 agents, replicate the old difference-based bonus approach.
         if self.n_agents == 2:
-            # For convenience, just get their IDs from the dict:
             agent_list = list(self.agents_networks.keys())
             agent_a, agent_b = agent_list[0], agent_list[1]
             diff = accuracies[agent_a] - accuracies[agent_b]
@@ -144,7 +185,6 @@ class RLEnvironment:
         return rewards
 
 
-
 def split_dataset(dataset):
     split_idx = len(dataset) // 2
     train_df = dataset.iloc[:split_idx]
@@ -152,7 +192,7 @@ def split_dataset(dataset):
     return train_df, test_df
 
 
-from graph.composer import GraphTransformer
+
 
 def run_episode(env, agents, seed=0, schema=None):
     """
@@ -182,38 +222,36 @@ def run_episode(env, agents, seed=0, schema=None):
     accuracies_history : dict[int, list[float]]
         The sequence of accuracies each agent achieved at each step, keyed by agent ID.
     """
-
-    # 1. Reset environment to a fresh state
+    # 1. Reset environment to a fresh state. Note that the returned state is a State instance.
     state = env.reset(seed=seed, new_schema=schema)
     
-    # 2. Compile models for each agent if needed
+    # 2. Compile models for each agent if needed.
     for agent_id, (composer, model) in env.agents_networks.items():
         if not hasattr(model, "optimizer"):
             model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
     
-    # Prepare history dicts, one list per agent
+    # Prepare history dictionaries.
     actions_history = {agent_id: [] for agent_id in env.agents_networks}
     rewards_history = {agent_id: [] for agent_id in env.agents_networks}
     accuracies_history = {agent_id: [] for agent_id in env.agents_networks}
     debug_counter = {agent_id: 0 for agent_id in env.agents_networks}
     
-    # 3. Main loop over total_steps
+    # 3. Main loop over total_steps.
     for _ in range(env.total_steps):
-        # Generate new data and update environment
+        # Generate new data and update the environment state.
         state, done = env.step()
 
-        # Each agent picks an action and we record it
+        # Each agent picks an action based on its AgentState from the overall State object.
         chosen_actions = {}
         valid = env.valid_actions()
         for agent_id in agents:
-            agent_state = env.agents_networks[agent_id][0] # the agents composer object
+            # Use the AgentState from the new State object.
+            agent_state = state.agents_states[agent_id]
             action = agents[agent_id].choose_action(agent_state, valid)
             chosen_actions[agent_id] = action
             actions_history[agent_id].append(action)
 
-        # 4. Apply any "add_abstraction" actions
-        #    (i.e., insert the learned abstraction node, then rebuild & recompile)
-
+        # 4. Apply any "add_abstraction" actions.
         for agent_id, action in chosen_actions.items():
             if action == "add_abstraction":
                 debug_counter[agent_id] += 1
@@ -222,7 +260,7 @@ def run_episode(env, agents, seed=0, schema=None):
                 composer, model = env.agents_networks[agent_id]
                 transformer = GraphTransformer(composer)
                 
-                # For simplicity, always connect "input" -> abstraction -> "output", removing direct input->output
+                # For simplicity, always connect "input" -> abstraction -> "output", removing direct input->output.
                 new_model = transformer.add_abstraction_node(
                     abstraction_node=learned_abstraction,
                     chosen_subset=["input"],
@@ -231,15 +269,15 @@ def run_episode(env, agents, seed=0, schema=None):
                 )
                 env.agents_networks[agent_id] = (composer, new_model)
 
-        # 5. Now each agent trains/evaluates on the newly generated dataset
+        # 5. Each agent trains/evaluates on the newly generated dataset.
         accuracies = {}
         for agent_id in agents:
             _, model = env.agents_networks[agent_id]
             acc = agents[agent_id].evaluate_accuracy(model, env.dataset)
             accuracies_history[agent_id].append(acc)
             accuracies[agent_id] = acc
-        
-        # 6. Compute rewards using the environment's logic
+
+        # 6. Compute rewards using the environment's logic.
         rewards = env.compute_rewards(accuracies)
         for agent_id in agents:
             rewards_history[agent_id].append(rewards[agent_id])
