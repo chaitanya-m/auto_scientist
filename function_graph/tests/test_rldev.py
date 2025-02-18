@@ -16,8 +16,9 @@ tf.random.set_seed(42)
 import keras
 from keras import layers, initializers, utils
 from graph.node import SubGraphNode
-from utils.environment import RLEnvironment, DummyAgent, run_episode, create_minimal_network
-from graphviz import Digraph
+from utils.environment import RLEnvironment, run_episode, create_minimal_network
+from agents.deterministic import DeterministicAgent
+from graphviz import Digraph    
 
 import os
 from graphviz import Digraph
@@ -267,9 +268,9 @@ class TestReuseAdvantage(unittest.TestCase):
         action_plan0 = ["add_abstraction"] + ["no_change"] * (num_steps - 1)
         action_plan1 = ["no_change"] * num_steps
 
-        # Create DummyAgents that follow those plans.
-        agent0 = DummyAgent(action_plan={0: action_plan0})
-        agent1 = DummyAgent(action_plan={1: action_plan1})
+        # Create DeterministicAgents that follow those plans.
+        agent0 = DeterministicAgent(action_plan=action_plan0)
+        agent1 = DeterministicAgent(action_plan=action_plan1)
         
         # run_episode now accepts a dictionary {agent_id: agent_instance}
         agents_dict = {
