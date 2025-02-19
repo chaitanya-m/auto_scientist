@@ -7,35 +7,34 @@ import numpy as np
 # Deterministic Agent
 # -----------------------
 class DeterministicAgent(AgentInterface):
-    def __init__(self):
+    def __init__(self, policy=None):
         """
         Initializes an agent with a predetermined sequence of actions.
         The action plan is a list of actions to be performed in sequence.
         If the action plan is exhausted, the agent selects actions randomly.
         """
         super().__init__()
+        # Use the provided policy, or fall back to a default one that picks randomly.
+        self.policy = policy if policy is not None else self.default_policy
 
+    def default_policy(self, state, step, valid_actions):
+        """
+        A simple policy that chooses randomly among whatever valid_actions are provided.
+        """
+        import numpy as np
+        return np.random.choice(valid_actions) if valid_actions else None
+
+    def set_policy(self, new_policy):
+        """
+        Setter to update the policy callable at runtime.
+        """
+        self.policy = new_policy
 
     def choose_action(self, state, step):
         """
-        Chooses an action based on the predetermined action plan if available;
-        otherwise, picks a random action from valid_actions.
-
-        Args:
-            state: The current state of the environment (unused in this deterministic agent).
-            valid_actions (list): List of valid actions.
-
-        Returns:
-            The chosen action.
+        Invoke the policy function to select an action from self.valid_actions.
         """
-        print(f"==============={step}=============")
-        if step > 0:
-            self.update_valid_actions(["no_change"])
-        else:
-            print("=================================")
-            self.update_valid_actions(["add_abstraction"])
-
-        action = np.random.choice(self.valid_actions)
+        action = self.policy(state, step, self.valid_actions)
         self.actions_history.append(action)
         return action
 

@@ -8,9 +8,9 @@ from agents.deterministic import DeterministicAgent
 from agents.qlearning import QLearningAgent
 
 class TestRLAgentCatchUp(unittest.TestCase):
-    def test_basic_abstraction_use(self):
+    def test_deterministic_reuse_catchup_to_baseline(self):
         """
-        Agent 0 always uses the abstraction. It should be able to match the pretrained accuracy, 
+        Agent 0 always reuses a learned abstraction. It should be able to match the pretrained accuracy, 
         which on this dataset is always 1.
 
         1 step per episode.
@@ -19,7 +19,7 @@ class TestRLAgentCatchUp(unittest.TestCase):
         the initial weights' randomness shouldn't factor into the ability of the agents to learn, given
         sufficient epochs.
 
-        We want the number of epochs to be lower than taken by the learned abstraction.
+        We want the number of learning epochs for reuse to be lower.
         """
 
         # 1. Create environment
@@ -34,7 +34,7 @@ class TestRLAgentCatchUp(unittest.TestCase):
             # Reset environment each episode for a fresh start.
             env.reset(seed=ep)
 
-            # Train an abstraction on new dataset, store it in the repository
+            # Train an abstraction on new dataset, store it in the repository, replacing any existing model
             learned_abstraction = train_learned_abstraction_model(env, epochs=500)
             env.repository["learned_abstraction"] = learned_abstraction
 

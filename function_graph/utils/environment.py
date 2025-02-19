@@ -61,6 +61,29 @@ def train_learned_abstraction_model(env, epochs=1000):
     subgraph_node = SubGraphNode(name="learned_abstraction", model=abstraction_model)
     return subgraph_node
 
+
+def my_step_callback(step_idx, state, agents, env):
+    for agent_id, agent in agents.items():
+        # 1) Compute some new set of valid actions for this step
+        if step_idx == 0:
+            new_valid_actions = ["add_abstraction"]
+        else:
+            new_valid_actions = ["no_change", "some_other_action"]
+        
+        # 2) Update the agent’s valid actions
+        agent.update_valid_actions(new_valid_actions)
+
+        # 3) Optionally change policy mid-episode
+        if step_idx == 5:
+            def new_policy(state, step, valid_actions):
+                # Always pick 'some_other_action' if it exists
+                if "some_other_action" in valid_actions:
+                    return "some_other_action"
+                return np.random.choice(valid_actions)
+            agent.set_policy(new_policy)
+
+
+
 import numpy as np
 
 # Assume these functions/classes are defined elsewhere:
@@ -193,22 +216,23 @@ class RLEnvironment:
         rewards = {}
         for agent_id, acc in accuracies.items():
             avg_acc = self.agent_cum_acc[agent_id] / self.agent_steps[agent_id]
-            if acc > avg_acc:
-                rewards[agent_id] = 1
-            elif np.isclose(acc, avg_acc):
-                rewards[agent_id] = 0
-            else:
-                rewards[agent_id] = -1
+            rewards[agent_id] = avg_acc
+            # if acc > avg_acc:
+            #     rewards[agent_id] = 1
+            # elif np.isclose(acc, avg_acc):
+            #     rewards[agent_id] = 0
+            # else:
+            #     rewards[agent_id] = -1
 
-        # If exactly 2 agents, replicate the old difference-based bonus approach.
-        if self.n_agents == 2:
-            agent_list = list(self.agents_networks.keys())
-            agent_a, agent_b = agent_list[0], agent_list[1]
-            diff = accuracies[agent_a] - accuracies[agent_b]
-            if diff > 0:
-                rewards[agent_a] += diff * 10
-            elif diff < 0:
-                rewards[agent_b] += (-diff) * 10
+        # # If exactly 2 agents, use a difference-based bonus approach.
+        # if self.n_agents == 2:
+        #     agent_list = list(self.agents_networks.keys())
+        #     agent_a, agent_b = agent_list[0], agent_list[1]
+        #     diff = accuracies[agent_a] - accuracies[agent_b]
+        #     if diff >= 0:
+        #         rewards[agent_a] += diff * 10
+        #     elif diff < 0:
+        #         rewards[agent_b] += (-diff) * 10
 
         return rewards
 
@@ -222,7 +246,7 @@ def split_dataset(dataset):
 
 
 
-def run_episode(env, agents, seed=0, schema=None):
+def run_episode(env, agents, seed=0, schema=None, step_callback=None):
     """
     Runs an episode of the environment for exactly env.total_steps steps,
     for one or more agents. Each agent can choose actions (including
@@ -233,13 +257,22 @@ def run_episode(env, agents, seed=0, schema=None):
     env : RLEnvironment
         The environment instance, which must contain a repository
         with any learned abstraction(s) for "add_abstraction" to work.
-    agents : dict[int, DummyAgent or similar]
+    agents : dict[int, AgentInterface]
         A dictionary mapping agent IDs to agent instances that have
-        choose_action(...) and evaluate_accuracy(...).
+        choose_action(...), evaluate_accuracy(...), etc.
     seed : int, optional
         Seed for resetting the environment, by default 0.
     schema : optional
         Optional new schema for environment reset, by default None.
+    step_callback : callable, optional
+        A function that is invoked at each step before agents choose actions.
+        Its signature should be: step_callback(current_step, state, agents, env)
+        - current_step (int): The current step index in the environment.
+        - state (State): The current State object from env.
+        - agents (dict[int, AgentInterface]): The mapping of agent IDs to agent instances.
+        - env (RLEnvironment): The environment instance.
+        This callback can be used to update valid actions, change agent policies,
+        or log data at each step.
 
     Returns
     -------
@@ -268,6 +301,10 @@ def run_episode(env, agents, seed=0, schema=None):
     for _ in range(env.total_steps):
         # Generate new data and update the environment state.
         state, done = env.step()
+
+        # Optional: give the test code a chance to modify agents, valid actions, etc.
+        if step_callback is not None:
+            step_callback(env.current_step, state, agents, env)
 
         # Each agent picks an action based on its AgentState from the overall State object.
         chosen_actions = {}
@@ -313,4 +350,3 @@ def run_episode(env, agents, seed=0, schema=None):
             break
 
     return actions_history, rewards_history, accuracies_history
-

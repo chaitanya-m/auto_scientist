@@ -92,6 +92,22 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         self.assertGreater(acc, 0.9, assertion)
 
 
+def my_custom_policy(state, step, valid_actions):
+    """
+    A custom policy that tries to pick 'add_abstraction' at step 0 if it's
+    in the valid_actions list, otherwise fallback to random selection.
+    """
+    import numpy as np
+    
+    if step == 0 and "add_abstraction" in valid_actions:
+        return "add_abstraction"
+    elif "no_change" in valid_actions:
+        return "no_change"
+    else:
+        # fallback: pick randomly among whatever is valid
+        return np.random.choice(valid_actions) if valid_actions else None
+
+
 class TestReuseAdvantage(unittest.TestCase):
     def test_reuse_advantage(self):
         """
@@ -117,8 +133,11 @@ class TestReuseAdvantage(unittest.TestCase):
         action_plan1 = ["no_change"] * num_steps
 
         # Create DeterministicAgents that follow those plans.
-        agent0 = DeterministicAgent()
+        agent0 = DeterministicAgent(policy=my_custom_policy)
+        agent0.update_valid_actions(["add_abstraction", "no_change"])
+
         agent1 = DeterministicAgent()
+        agent1.update_valid_actions(["no_change"])
 
         # run_episode now accepts a dictionary {agent_id: agent_instance}
         agents_dict = {
