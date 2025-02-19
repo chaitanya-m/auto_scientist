@@ -54,7 +54,7 @@ class DeterministicAgent(AgentInterface):
         test_features = test_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
         test_labels = test_df["label"].to_numpy(dtype=int)
         
-        model.fit(train_features, train_labels, epochs=1, verbose=0)
+        model.fit(train_features, train_labels, epochs=self.training_params["epochs"], verbose=self.training_params["verbose"])
         predictions = model.predict(test_features, verbose=0)
         preds = (predictions.flatten() > 0.5).astype(int)
         accuracy = np.mean(preds == test_labels)
