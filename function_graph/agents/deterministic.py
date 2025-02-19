@@ -16,7 +16,7 @@ class DeterministicAgent(AgentInterface):
         super().__init__()
 
 
-    def choose_action(self, state):
+    def choose_action(self, state, step):
         """
         Chooses an action based on the predetermined action plan if available;
         otherwise, picks a random action from valid_actions.
@@ -28,6 +28,13 @@ class DeterministicAgent(AgentInterface):
         Returns:
             The chosen action.
         """
+        print(f"==============={step}=============")
+        if step > 0:
+            self.update_valid_actions(["no_change"])
+        else:
+            print("=================================")
+            self.update_valid_actions(["add_abstraction"])
+
         action = np.random.choice(self.valid_actions)
         self.actions_history.append(action)
         return action
@@ -54,7 +61,12 @@ class DeterministicAgent(AgentInterface):
         test_features = test_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
         test_labels = test_df["label"].to_numpy(dtype=int)
         
-        model.fit(train_features, train_labels, epochs=self.training_params["epochs"], verbose=self.training_params["verbose"])
+        model.fit(train_features, 
+                  train_labels, 
+                  epochs=self.training_params["epochs"], 
+                  verbose=self.training_params["verbose"]
+                  )
+        
         predictions = model.predict(test_features, verbose=0)
         preds = (predictions.flatten() > 0.5).astype(int)
         accuracy = np.mean(preds == test_labels)

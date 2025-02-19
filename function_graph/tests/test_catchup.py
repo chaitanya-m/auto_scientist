@@ -3,7 +3,7 @@ import copy
 import unittest
 import numpy as np
 from utils.environment import RLEnvironment, run_episode, create_minimal_network
-from tests.test_rldev import train_learned_abstraction_model
+from utils.environment import train_learned_abstraction_model
 from agents.deterministic import DeterministicAgent
 from agents.qlearning import QLearningAgent
 

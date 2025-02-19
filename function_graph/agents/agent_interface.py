@@ -10,7 +10,7 @@ class AgentInterface(ABC):
 
 
     @abstractmethod
-    def choose_action(self, state):
+    def choose_action(self, state, step):
         """
         Choose an action based on the current state and internal logic.
         """

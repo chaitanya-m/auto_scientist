@@ -26,7 +26,7 @@ class QLearningAgent(AgentInterface):
         self.last_action = None
 
 
-    def choose_action(self, state):
+    def choose_action(self, state, step):
         """
         1. Convert 'state' (or relevant parts) to a discrete representation or key.
         2. With probability self.epsilon, pick a random action from valid_actions.

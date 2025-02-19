@@ -27,6 +27,40 @@ def create_minimal_network(input_shape):
     return composer, model
 
 
+def train_learned_abstraction_model(env, epochs=1000):
+    """
+    Helper function to build and train a learned abstraction model.
+    This model consists of:
+      - an input layer (matching env.features, i.e. 2 features),
+      - a hidden dense layer with 3 neurons (ReLU activation),
+      - an output dense layer with 1 neuron and sigmoid activation.
+    It trains the full model on 500 instances generated from the environment's schema,
+    prints the full-model accuracy, then extracts the hidden layer model and wraps it in a SubGraphNode.
+    """
+    from keras import layers, initializers, models
+    kernel_init = initializers.GlorotUniform(seed=42)
+    input_shape = (2,)
+    new_input = layers.Input(shape=input_shape, name="sub_input")
+    hidden = layers.Dense(3, activation='relu', name="hidden_layer", kernel_initializer=kernel_init)(new_input)
+    output = layers.Dense(1, activation='sigmoid', name="output_layer", kernel_initializer=kernel_init)(hidden)
+    full_model = models.Model(new_input, output, name="learned_abstraction_model_full")
+    full_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+    
+    # Generate a new dataset of 500 examples from the fixed schema.
+    df = env.schema.generate_dataset(num_instances=500)
+    features = df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
+    true_labels = df["label"].to_numpy(dtype=int)
+    
+    full_model.fit(features, true_labels, epochs=epochs, verbose=0)
+    loss, acc = full_model.evaluate(features, true_labels, verbose=0)
+    print(f"Learned abstraction full model accuracy after {epochs} epochs on 500 instances: {acc:.3f}")
+    
+    # Create a model that outputs the hidden layer.
+    abstraction_model = models.Model(new_input, hidden, name="learned_abstraction_model_extracted")
+    from graph.node import SubGraphNode
+    subgraph_node = SubGraphNode(name="learned_abstraction", model=abstraction_model)
+    return subgraph_node
+
 import numpy as np
 
 # Assume these functions/classes are defined elsewhere:
@@ -48,7 +82,7 @@ class AgentState:
 
 
 class State:
-    def __init__(self, step, dataset, agents_states):
+    def __init__(self, dataset, agents_states):
         """
         Represents the overall environment state.
         
@@ -56,12 +90,11 @@ class State:
         :param dataset: The dataset generated at the current step.
         :param agents_states: A dictionary mapping external agent IDs to their AgentState.
         """
-        self.step = step
         self.dataset = dataset
         self.agents_states = agents_states
 
     def __repr__(self):
-        return f"State(step={self.step}, dataset=DataFrame(...), agents_states={self.agents_states})"
+        return f"State(agents_states={self.agents_states})"
 
 
 class RLEnvironment:
@@ -111,7 +144,7 @@ class RLEnvironment:
         """
         if new_schema is None and seed is None:
             raise ValueError("Either a new_schema or a seed must be provided for reset()")
-        self.current_step = 0
+        self.current_step = -1
         if new_schema is not None:
             self.schema = new_schema
         else:
@@ -131,7 +164,6 @@ class RLEnvironment:
             )
             agents_states[agent_id] = agent_state
         return State(
-            step=self.current_step,
             dataset=self.dataset,
             agents_states=agents_states
         )
@@ -242,7 +274,7 @@ def run_episode(env, agents, seed=0, schema=None):
         for agent_id in agents:
             # Use the AgentState from the new State object.
             agent_state = state.agents_states[agent_id]
-            action = agents[agent_id].choose_action(agent_state)
+            action = agents[agent_id].choose_action(agent_state, env.current_step)
             chosen_actions[agent_id] = action
             actions_history[agent_id].append(action)
 
