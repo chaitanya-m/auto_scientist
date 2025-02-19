@@ -1,21 +1,22 @@
 # agents/deterministic.py
 
+from agents.agent_interface import AgentInterface
 import numpy as np
 
 # -----------------------
 # Deterministic Agent
 # -----------------------
-class DeterministicAgent:
-    def __init__(self, action_plan=None):
+class DeterministicAgent(AgentInterface):
+    def __init__(self):
         """
         Initializes an agent with a predetermined sequence of actions.
         The action plan is a list of actions to be performed in sequence.
         If the action plan is exhausted, the agent selects actions randomly.
         """
-        self.actions_history = []
-        self.action_plan = action_plan
+        super().__init__()
 
-    def choose_action(self, state, valid_actions):
+
+    def choose_action(self, state):
         """
         Chooses an action based on the predetermined action plan if available;
         otherwise, picks a random action from valid_actions.
@@ -27,10 +28,7 @@ class DeterministicAgent:
         Returns:
             The chosen action.
         """
-        if self.action_plan:
-            action = self.action_plan.pop(0)
-        else:
-            action = np.random.choice(valid_actions)
+        action = np.random.choice(self.valid_actions)
         self.actions_history.append(action)
         return action
 
@@ -61,3 +59,12 @@ class DeterministicAgent:
         preds = (predictions.flatten() > 0.5).astype(int)
         accuracy = np.mean(preds == test_labels)
         return accuracy
+
+    def get_actions_history(self):
+        """
+        Returns the history of the actions taken by the agent.
+        
+        Returns:
+            list: A list of actions taken by the agent.
+        """
+        return self.actions_history

@@ -1,7 +1,8 @@
 # agents/qlearning.py
+from agents.agent_interface import AgentInterface
 import numpy as np
 
-class QLearningAgent:
+class QLearningAgent(AgentInterface):
     def __init__(self, action_space, alpha=0.1, gamma=0.95, epsilon=1.0, epsilon_decay=0.9):
         """
         action_space: List of possible actions (e.g., ["add_abstraction", "no_change"]).
@@ -10,7 +11,10 @@ class QLearningAgent:
         epsilon: initial exploration rate
         epsilon_decay: factor by which epsilon is multiplied each step/episode
         """
+
+        super().__init__()
         self.action_space = action_space
+        self.valid_actions = action_space.copy()  # Initialize valid actions to the given action space.
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
@@ -21,10 +25,8 @@ class QLearningAgent:
         self.last_state = None
         self.last_action = None
 
-        # For storing actions history if needed
-        self.actions_history = []
 
-    def choose_action(self, state, valid_actions):
+    def choose_action(self, state):
         """
         1. Convert 'state' (or relevant parts) to a discrete representation or key.
         2. With probability self.epsilon, pick a random action from valid_actions.
@@ -36,12 +38,12 @@ class QLearningAgent:
         
         if np.random.random() < self.epsilon:
             # Explore
-            action = np.random.choice(valid_actions)
+            action = np.random.choice(self.valid_actions)
         else:
             # Exploit
-            q_values_for_state = [self.q_table.get((state_key, a), 0.0) for a in valid_actions]
+            q_values_for_state = [self.q_table.get((state_key, a), 0.0) for a in self.valid_actions]
             best_idx = int(np.argmax(q_values_for_state))
-            action = valid_actions[best_idx]
+            action = self.valid_actions[best_idx]
         
         # Store for Q-update
         self.last_state = state_key

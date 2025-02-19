@@ -23,11 +23,13 @@ class TestRLAgentCatchUp(unittest.TestCase):
         # 3. Agent0 (fixed policy) always chooses "no_change" (or some known good sequence).
         #fixed_action_plan = ["add_abstraction"] + ["no_change"] * (num_steps-1)
         fixed_action_plan = ["no_change"] * (num_steps)        
-        agent0 = DeterministicAgent(action_plan=copy.deepcopy(fixed_action_plan))
+        agent0 = DeterministicAgent()
+        agent0.update_valid_actions(["no_change"])
 
         # 4. Agent1 (Q-learning) can choose from ["add_abstraction", "no_change"].
         #    We'll let it discover when "add_abstraction" is beneficial.
         agent1 = QLearningAgent(action_space=["no_change", "add_abstraction"], epsilon=0.5, epsilon_decay=0.5)
+        agent1.update_valid_actions(["no_change", "add_abstraction"])
 
         # 5. Possibly run multiple episodes so agent1 can learn. For a single test, 
         #    we can do a single episode or a small batch:
@@ -35,8 +37,6 @@ class TestRLAgentCatchUp(unittest.TestCase):
         for ep in range(n_episodes):
             # Reset environment each episode for a fresh start.
             env.reset(seed=ep)
-
-            agent0.action_plan = copy.deepcopy(fixed_action_plan)
 
             # Train an abstraction on new dataset, store it in the repository
             learned_abstraction = train_learned_abstraction_model(env, epochs=500)

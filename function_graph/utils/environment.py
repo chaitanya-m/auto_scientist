@@ -1,4 +1,4 @@
-#rl_dev.py
+# utils/environment.py
 import numpy as np
 import pandas as pd
 from data_gen.categorical_classification import DataSchemaFactory
@@ -136,10 +136,6 @@ class RLEnvironment:
             agents_states=agents_states
         )
 
-    def valid_actions(self):
-        # If you add new actions, just include them here.
-        return ["add_abstraction", "no_change"]
-
     def step(self):
         # Generate new data for this step.
         self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
@@ -243,11 +239,10 @@ def run_episode(env, agents, seed=0, schema=None):
 
         # Each agent picks an action based on its AgentState from the overall State object.
         chosen_actions = {}
-        valid = env.valid_actions()
         for agent_id in agents:
             # Use the AgentState from the new State object.
             agent_state = state.agents_states[agent_id]
-            action = agents[agent_id].choose_action(agent_state, valid)
+            action = agents[agent_id].choose_action(agent_state)
             chosen_actions[agent_id] = action
             actions_history[agent_id].append(action)
 
