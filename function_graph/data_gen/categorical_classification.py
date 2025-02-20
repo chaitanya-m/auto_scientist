@@ -56,12 +56,59 @@ class DataSchema(SyntheticDataGenerator):
 
 class DataSchemaFactory:
     def create_schema(self, num_features, num_categories, num_classes, flatness=1.0, random_seed=None):
+        """
+        Creates a DataSchema object based on the specified parameters.
+        
+        Parameters:
+        -----------
+        num_features : int
+            The number of features in each data instance.
+        num_categories : int
+            The number of possible categories for each feature.
+        num_classes : int
+            The total number of classes to choose from.
+        flatness : float, optional (default=1.0)
+            Controls the concentration of the Dirichlet distribution used to generate
+            class probabilities. Higher values lead to more uniform distributions.
+        random_seed : int, optional
+            The seed for the random number generator. Using the same seed across multiple
+            calls ensures that the same random numbers (and therefore the same schema) are produced.
+        
+        Returns:
+        --------
+        DataSchema
+            A DataSchema object containing:
+              - num_features, num_categories, and num_classes,
+              - a relationship mapping that assigns a class label to each possible feature vector,
+              - a random number generator (rng) initialized with the given seed.
+        
+        Behavior with the same seed:
+        -----------------------------
+        When create_schema is called multiple times with the same random_seed, the underlying
+        np.random.default_rng(random_seed) creates a new random generator that is initialized to 
+        the same state. Therefore, the Dirichlet distribution (used to generate class_distribution)
+        and the subsequent calls to rng.choice() will produce identical outputs. As a result, the 
+        'relationship_mapping' generated will be the same in every call with the same seed.
+        This ensures reproducibility in experiments: the schema is deterministic when the seed is fixed.
+        """
+        # Initialize a new random number generator with the provided seed.
         rng = np.random.default_rng(random_seed)
+        
+        # Generate a class probability distribution using a Dirichlet distribution.
+        # The flatness parameter controls the concentration: a flatness of 1.0 leads to a uniform-like distribution.
         class_distribution = rng.dirichlet(np.ones(num_classes) * flatness)
+        
+        # Initialize an empty mapping from feature vectors to class labels.
         relationship_mapping = {}
+        
+        # For each possible feature vector (using Cartesian product of categories for each feature),
+        # randomly assign a class label based on the generated class distribution.
         for feature_vector in product(range(num_categories), repeat=num_features):
+            # rng.choice with the same seed and same probability distribution will always choose the same class label.
             class_label = rng.choice(num_classes, p=class_distribution)
             relationship_mapping[feature_vector] = class_label
+        
+        # Create and return a DataSchema object with the generated parameters and relationship mapping.
         return DataSchema(num_features, num_categories, num_classes, relationship_mapping, rng=rng)
 
     def generate_schemas_and_datasets(self, schema_types, num_schemas_per_type, random_seed_start):
