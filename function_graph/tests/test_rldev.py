@@ -17,7 +17,7 @@ import keras
 from keras import layers, initializers, utils
 from graph.node import SubGraphNode
 from envs.environment import RLEnvironment
-from utils.nn import create_minimal_network, train_learned_abstraction_model
+from utils.nn import create_minimal_graphmodel, train_learned_abstraction_model
 from utils.visualize import visualize_graph, print_graph_nodes
 from agents.deterministic import DeterministicAgent
 from graphviz import Digraph    
@@ -60,7 +60,7 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         dataset = env._get_state().dataset
 
         # Build the minimal network.
-        composer, model = create_minimal_network(input_shape=(2,))
+        composer, model = create_minimal_graphmodel(input_shape=(2,))
         
         # Train the learned abstraction on 500 examples.
         learned_abstraction = train_learned_abstraction_model(dataset, epochs=1000)

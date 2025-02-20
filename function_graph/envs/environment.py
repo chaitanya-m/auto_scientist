@@ -1,6 +1,6 @@
 # utils/environment.py
 import numpy as np
-from utils.nn import create_minimal_network
+from utils.nn import create_minimal_graphmodel
 
 
 # -----------------------
@@ -57,11 +57,11 @@ class RLEnvironment:
 
         # Dynamically create networks for n_agents rather than hardcoding 0 and 1.
         self.n_agents = n_agents
-        self.agents_networks = {}
+        self.agents_graphmodels = {}
         self.agent_cum_acc = {}
         self.agent_steps = {}
         for agent_id in range(self.n_agents):
-            self.agents_networks[agent_id] = create_minimal_network(input_shape=(2,))
+            self.agents_graphmodels[agent_id] = create_minimal_graphmodel(input_shape=(2,))
             self.agent_cum_acc[agent_id] = 0.0
             self.agent_steps[agent_id] = 0
 
@@ -88,7 +88,7 @@ class RLEnvironment:
         with each agent's state represented by an AgentState instance.
         """
         agents_states = {}
-        for agent_id, (composer, _) in self.agents_networks.items():
+        for agent_id, (composer, _) in self.agents_graphmodels.items():
             agent_state = AgentState(
                 nodes=list(composer.nodes.keys()),
                 connections=composer.connections

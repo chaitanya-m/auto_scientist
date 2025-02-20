@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from envs.environment import RLEnvironment
 from utils.rl import run_episode
-from utils.nn import create_minimal_network, train_learned_abstraction_model
+from utils.nn import create_minimal_graphmodel, train_learned_abstraction_model
 from agents.deterministic import DeterministicAgent
 from agents.qlearning import QLearningAgent
 from data_gen.categorical_classification import DataSchemaFactory
@@ -51,7 +51,7 @@ class TestRLAgentCatchUp(unittest.TestCase):
             env.repository["learned_abstraction"] = learned_abstraction
 
             # Reset the agent's network so that previous episodes do not interfere.
-            env.agents_networks[0] = create_minimal_network(input_shape=(2,))
+            env.agents_graphmodels[0] = create_minimal_graphmodel(input_shape=(2,))
             
             agents_dict = {0: agent0}
 

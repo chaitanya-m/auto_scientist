@@ -42,7 +42,7 @@ def train_and_evaluate(model, dataset, train_ratio=0.5, epochs=1, verbose=0):
     return accuracy
 
 
-def create_minimal_network(input_shape):
+def create_minimal_graphmodel(input_shape):
     """
     Builds a minimal valid network using our node and composer framework.
     The network has an InputNode (with the given input_shape) and a SingleNeuron output node with sigmoid activation.
