@@ -43,15 +43,15 @@ def run_episode(env, agents, seed=0, steps = 0, schema=None, step_callback=None)
     state = env.reset(seed=seed, new_schema=schema)
     
     # 2. Compile models for each agent if needed.
-    for agent_id, (composer, model) in env.agents_networks.items():
+    for agent_id, (composer, model) in env.agents_graphmodels.items():
         if not hasattr(model, "optimizer"):
             model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
     
     # Prepare history dictionaries.
-    actions_history = {agent_id: [] for agent_id in env.agents_networks}
-    rewards_history = {agent_id: [] for agent_id in env.agents_networks}
-    accuracies_history = {agent_id: [] for agent_id in env.agents_networks}
-    debug_counter = {agent_id: 0 for agent_id in env.agents_networks}
+    actions_history = {agent_id: [] for agent_id in env.agents_graphmodels}
+    rewards_history = {agent_id: [] for agent_id in env.agents_graphmodels}
+    accuracies_history = {agent_id: [] for agent_id in env.agents_graphmodels}
+    debug_counter = {agent_id: 0 for agent_id in env.agents_graphmodels}
     
     # 3. Main loop over total_steps.
     for step_count in range(steps):
@@ -77,7 +77,7 @@ def run_episode(env, agents, seed=0, steps = 0, schema=None, step_callback=None)
                 debug_counter[agent_id] += 1
                 print(f"DEBUG: {agent_id} adds abstraction {debug_counter[agent_id]} times")
                 learned_abstraction = env.repository["learned_abstraction"]
-                composer, model = env.agents_networks[agent_id]
+                composer, model = env.agents_graphmodels[agent_id]
                 transformer = GraphTransformer(composer)
                 
                 # For simplicity, always connect "input" -> abstraction -> "output", removing direct input->output.
@@ -87,12 +87,12 @@ def run_episode(env, agents, seed=0, steps = 0, schema=None, step_callback=None)
                     outputs=["output"],
                     remove_prob=1.0
                 )
-                env.agents_networks[agent_id] = (composer, new_model)
+                env.agents_graphmodels[agent_id] = (composer, new_model)
 
         # 5. Each agent trains/evaluates on the newly generated dataset.
         accuracies = {}
         for agent_id in agents:
-            _, model = env.agents_networks[agent_id]
+            _, model = env.agents_graphmodels[agent_id]
             acc = agents[agent_id].evaluate_accuracy(model, env.dataset)
             accuracies_history[agent_id].append(acc)
             accuracies[agent_id] = acc
