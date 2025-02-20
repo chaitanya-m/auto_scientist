@@ -1,6 +1,5 @@
 # utils/environment.py
 import numpy as np
-import pandas as pd
 from graph.composer import GraphComposer, GraphTransformer
 from utils.nn import create_minimal_network
 
@@ -9,34 +8,6 @@ from utils.nn import create_minimal_network
 # Environment for multiple agents
 # -----------------------
 
-
-
-def step_operations_callback(step_idx, state, agents, env):
-    for agent_id, agent in agents.items():
-        # 1) Compute some new set of valid actions for this step
-        if step_idx == 0:
-            new_valid_actions = ["add_abstraction"]
-        else:
-            new_valid_actions = ["no_change", "some_other_action"]
-        
-        # 2) Update the agent’s valid actions
-        agent.update_valid_actions(new_valid_actions)
-
-        # 3) Optionally change policy mid-episode
-        if step_idx == 5:
-            def new_policy(state, step, valid_actions):
-                # Always pick 'some_other_action' if it exists
-                if "some_other_action" in valid_actions:
-                    return "some_other_action"
-                return np.random.choice(valid_actions)
-            agent.set_policy(new_policy)
-
-
-
-import numpy as np
-
-# Assume these functions/classes are defined elsewhere:
-# DataSchemaFactory, create_minimal_network
 
 class AgentState:
     def __init__(self, nodes, connections):
@@ -158,22 +129,6 @@ class RLEnvironment:
         for agent_id, acc in accuracies.items():
             avg_acc = self.agent_cum_acc[agent_id] / self.agent_steps[agent_id]
             rewards[agent_id] = avg_acc
-            # if acc > avg_acc:
-            #     rewards[agent_id] = 1
-            # elif np.isclose(acc, avg_acc):
-            #     rewards[agent_id] = 0
-            # else:
-            #     rewards[agent_id] = -1
-
-        # # If exactly 2 agents, use a difference-based bonus approach.
-        # if self.n_agents == 2:
-        #     agent_list = list(self.agents_networks.keys())
-        #     agent_a, agent_b = agent_list[0], agent_list[1]
-        #     diff = accuracies[agent_a] - accuracies[agent_b]
-        #     if diff >= 0:
-        #         rewards[agent_a] += diff * 10
-        #     elif diff < 0:
-        #         rewards[agent_b] += (-diff) * 10
 
         return rewards
 

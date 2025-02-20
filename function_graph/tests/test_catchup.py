@@ -67,8 +67,28 @@ class TestRLAgentCatchUp(unittest.TestCase):
             "Agent 0 failed to catch up to at least 90% of ideal performance."
         )
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
+
+# def step_operations_callback(step_idx, state, agents, env):
+#     for agent_id, agent in agents.items():
+#         # 1) Compute some new set of valid actions for this step
+#         if step_idx == 0:
+#             new_valid_actions = ["add_abstraction"]
+#         else:
+#             new_valid_actions = ["no_change", "some_other_action"]
+        
+#         # 2) Update the agent’s valid actions
+#         agent.update_valid_actions(new_valid_actions)
+
+#         # 3) Optionally change policy mid-episode
+#         if step_idx == 5:
+#             def new_policy(state, step, valid_actions):
+#                 # Always pick 'some_other_action' if it exists
+#                 if "some_other_action" in valid_actions:
+#                     return "some_other_action"
+#                 return np.random.choice(valid_actions)
+#             agent.set_policy(new_policy)
 
 
 
@@ -131,5 +151,3 @@ if __name__ == '__main__':
     #         "Agent 1 failed to catch up to at least 90% of agent 0's performance."
     #     )
 
-if __name__ == "__main__":
-    unittest.main()

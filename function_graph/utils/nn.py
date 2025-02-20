@@ -91,5 +91,4 @@ def train_learned_abstraction_model(df, epochs=1000, train_ratio=0.5):
 
     # Extract the hidden-layer submodel as a SubGraphNode
     abstraction_model = models.Model(new_input, hidden, name="learned_abstraction_model_extracted")
-    from graph.node import SubGraphNode
     return SubGraphNode(name="learned_abstraction", model=abstraction_model)

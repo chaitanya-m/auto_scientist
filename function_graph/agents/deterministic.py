@@ -21,7 +21,6 @@ class DeterministicAgent(AgentInterface):
         """
         A simple policy that chooses randomly among whatever valid_actions are provided.
         """
-        import numpy as np
         return np.random.choice(valid_actions) if valid_actions else None
 
     def set_policy(self, new_policy):
