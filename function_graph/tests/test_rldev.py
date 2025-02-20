@@ -17,7 +17,8 @@ tf.random.set_seed(SEED)
 import keras
 from keras import layers, initializers, utils
 from graph.node import SubGraphNode
-from utils.environment import RLEnvironment, run_episode, create_minimal_network, train_learned_abstraction_model
+from utils.environment import RLEnvironment, run_episode
+from utils.nn import create_minimal_network, train_learned_abstraction_model
 from utils.visualize import visualize_graph, print_graph_nodes
 from agents.deterministic import DeterministicAgent
 from graphviz import Digraph    
