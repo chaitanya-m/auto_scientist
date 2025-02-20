@@ -1,3 +1,5 @@
+# tests/test_rl_dev.py
+
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""         # Force CPU usage.
 os.environ["TF_DETERMINISTIC_OPS"] = "1"          # Request deterministic operations.
@@ -13,14 +15,10 @@ random.seed(SEED)
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
-import keras
-from keras import layers, initializers, utils
-from graph.node import SubGraphNode
-from envs.environment import RLEnvironment
+from envs.environment import RLEnvironment, State
 from utils.nn import create_minimal_graphmodel, train_learned_abstraction_model
-from utils.visualize import visualize_graph, print_graph_nodes
 from agents.deterministic import DeterministicAgent
-from graphviz import Digraph    
+   
 from data_gen.categorical_classification import DataSchemaFactory
 from utils.rl import run_episode
 
@@ -99,7 +97,7 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
             print(assertion)
         
         # Store the learned abstraction in the repository.
-        env.repository["learned_abstraction"] = learned_abstraction
+        State.repository["learned_abstraction"] = learned_abstraction
         
         # Assert final accuracy is above threshold.
         assertion = "Trained network accuracy should be above 0.9."
@@ -154,7 +152,7 @@ class TestReuseAdvantage(unittest.TestCase):
 
         # Train an abstraction on the dataset and store it in the environment's repository.
         learned_abstraction = train_learned_abstraction_model(dataset, epochs=1000)
-        env.repository["learned_abstraction"] = learned_abstraction
+        State.repository["learned_abstraction"] = learned_abstraction
 
         # Create DeterministicAgents.
         # Agent 0 uses a custom policy to choose "add_abstraction" on step 0.

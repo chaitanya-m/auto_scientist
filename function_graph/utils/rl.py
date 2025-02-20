@@ -43,7 +43,7 @@ def run_episode(env, agents, seed=0, steps=0, schema=None, step_callback=None):
             if action == "add_abstraction":
                 debug_counter[agent_id] += 1
                 print(f"DEBUG: {agent_id} adds abstraction {debug_counter[agent_id]} times")
-                learned_abstraction = env.repository["learned_abstraction"]
+                learned_abstraction = state.repository["learned_abstraction"]
                 # Get the agent's current graphmodel from the state.
                 composer, model = state.agents_states[agent_id].graphmodel
                 transformer = GraphTransformer(composer)

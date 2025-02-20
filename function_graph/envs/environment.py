@@ -42,7 +42,7 @@ class Environment(ABC):
         pass
 
 # -----------------------
-# Legacy Multi-Agent Environment (implements Environment)
+# State and AgentState data types
 # -----------------------
 
 class AgentState:
@@ -63,7 +63,11 @@ class AgentState:
         
 
 class State:
-    def __init__(self, dataset, agents_states):
+
+    # Shared repository for all State instances.
+    repository = {}
+
+    def __init__(self, dataset, agents_states, repository=None):
         """
         Represents the overall environment state.
 
@@ -79,6 +83,10 @@ class State:
         return f"State(dataset={self.dataset}, agents_states={self.agents_states})"
 
 
+
+# -----------------------
+# Legacy Environment
+# -----------------------
 
 class RLEnvironment(Environment):
     def __init__(self, num_instances_per_step=100, seed=0, n_agents=2, schema=None):
@@ -111,8 +119,6 @@ class RLEnvironment(Environment):
             self.agents_graphmodels[agent_id] = create_minimal_graphmodel(input_shape=(2,))
             self.agent_cum_acc[agent_id] = 0.0
             self.agent_steps[agent_id] = 0
-
-        self.repository = {}
 
     def reset(self, initial_state=None, seed: int = None, new_schema=None):
         """
