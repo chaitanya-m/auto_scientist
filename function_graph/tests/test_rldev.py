@@ -133,39 +133,55 @@ class TestReuseAdvantage(unittest.TestCase):
         while agent 1 always chooses "no_change". Print detailed step-by-step accuracies and rewards,
         and verify that agent 0's reward on the first step is higher than agent 1's.
         """
-
         num_steps = 5
-        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=100, seed=0)
+
+        # Create a schema externally and pass it to the environment.
+        from data_gen.categorical_classification import DataSchemaFactory
+        factory = DataSchemaFactory()
+        schema = factory.create_schema(
+            num_features=2,
+            num_categories=2,
+            num_classes=2,
+            random_seed=0
+        )
+
+        # Create the environment with the externally provided schema.
+        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=100, seed=0, schema=schema)
         
-        # Train an abstraction, store it in the environment's repository.
-        learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
+        # Reset environment and generate a dataset to train the abstraction.
+        env.reset(seed=0)
+        env.step()  # Generate the dataset.
+        dataset = env._get_state().dataset
+
+        # Train an abstraction on the dataset, then store it in the environment's repository.
+        learned_abstraction = train_learned_abstraction_model(dataset, epochs=1000)
         env.repository["learned_abstraction"] = learned_abstraction
 
-        # Create DeterministicAgents that follow those plans.
+        # Create DeterministicAgents.
+        # Agent 0 uses a custom policy to choose "add_abstraction" on step 0.
         agent0 = DeterministicAgent(policy=my_custom_policy)
         agent0.update_valid_actions(["add_abstraction", "no_change"])
 
+        # Agent 1 always chooses "no_change".
         agent1 = DeterministicAgent()
         agent1.update_valid_actions(["no_change"])
 
-        # run_episode now accepts a dictionary {agent_id: agent_instance}
+        # Prepare the dictionary of agents.
         agents_dict = {
             0: agent0,
             1: agent1
         }
 
-        # run_episode returns (actions_history, rewards_history, accuracies_history),
-        # each keyed by agent ID.
+        # Run the episode.
         actions, rewards, accuracies = run_episode(env, agents_dict, seed=0)
-        
+
         print("\nDetailed Step-by-Step Output:")
-        # Each step, we display the accuracy & reward for both agents.
         for step in range(num_steps):
             print(f"Step {step+1}:")
             print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
             print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
 
-        # Compute total reward for each agent across all steps.
+        # Compute total rewards.
         reward0 = sum(rewards[0])
         reward1 = sum(rewards[1])
  
