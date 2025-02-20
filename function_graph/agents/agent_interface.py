@@ -6,7 +6,7 @@ class AgentInterface(ABC):
     def __init__(self, training_params=None):
         self.actions_history = []
         self.valid_actions = []
-        self.training_params = training_params if training_params is not None else {"epochs": 300, "verbose": 0}
+        self.training_params = training_params
 
 
     @abstractmethod

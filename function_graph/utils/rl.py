@@ -2,7 +2,7 @@
 from graph.composer import GraphTransformer
 
 
-def run_episode(env, agents, seed=0, schema=None, step_callback=None):
+def run_episode(env, agents, seed=0, steps = 0, schema=None, step_callback=None):
     """
     Runs an episode of the environment for exactly env.total_steps steps,
     for one or more agents. Each agent can choose actions (including
@@ -54,9 +54,9 @@ def run_episode(env, agents, seed=0, schema=None, step_callback=None):
     debug_counter = {agent_id: 0 for agent_id in env.agents_networks}
     
     # 3. Main loop over total_steps.
-    for _ in range(env.total_steps):
+    for step_count in range(steps):
         # Generate new data and update the environment state.
-        state, done = env.step()
+        state = env.step()
 
         # Optional: give the test code a chance to modify agents, valid actions, etc.
         if step_callback is not None:
@@ -67,7 +67,7 @@ def run_episode(env, agents, seed=0, schema=None, step_callback=None):
         for agent_id in agents:
             # Use the AgentState from the new State object.
             agent_state = state.agents_states[agent_id]
-            action = agents[agent_id].choose_action(agent_state, env.current_step)
+            action = agents[agent_id].choose_action(agent_state, step_count)
             chosen_actions[agent_id] = action
             actions_history[agent_id].append(action)
 
@@ -101,9 +101,6 @@ def run_episode(env, agents, seed=0, schema=None, step_callback=None):
         rewards = env.compute_rewards(accuracies)
         for agent_id in agents:
             rewards_history[agent_id].append(rewards[agent_id])
-        
-        if done:
-            break
 
     return actions_history, rewards_history, accuracies_history
 

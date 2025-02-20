@@ -40,23 +40,20 @@ class State:
 
 
 class RLEnvironment:
-    def __init__(self, total_steps=100, num_instances_per_step=100, seed=0, n_agents=2, schema=None):
+    def __init__(self, num_instances_per_step=100, seed=0, n_agents=2, schema=None):
         """
         total_steps: Total steps (interactions) in the episode.
         num_instances_per_step: Number of data points provided at each step.
         seed: Seed for generating the fixed data distribution.
         n_agents: Number of agents in the environment (default 2).
         """
-        self.total_steps = total_steps
-        self.current_step = 0
+
         self.num_instances_per_step = num_instances_per_step
         self.seed = seed
         
         # Environment dataset
         self.schema = schema
         self.dataset = None
-        self.features = None
-        self.true_labels = None
 
         # Dynamically create networks for n_agents rather than hardcoding 0 and 1.
         self.n_agents = n_agents
@@ -78,7 +75,7 @@ class RLEnvironment:
         """
         if new_schema is None and seed is None:
             raise ValueError("Either a new_schema or a seed must be provided for reset()")
-        self.current_step = -1
+
         if new_schema is not None:
             self.schema = new_schema
         else:
@@ -97,6 +94,7 @@ class RLEnvironment:
                 connections=composer.connections
             )
             agents_states[agent_id] = agent_state
+
         return State(
             dataset=self.dataset,
             agents_states=agents_states
@@ -105,19 +103,12 @@ class RLEnvironment:
     def step(self):
         # Generate new data for this step.
         self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
-        # Optionally store features/labels for tests that need them.
-        self.features = self.dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
-        self.true_labels = self.dataset["label"].to_numpy(dtype=int)
-        
-        self.current_step += 1
         state = self._get_state()
-        done = self.current_step >= self.total_steps
-        return state, done
+        return state
 
     def compute_rewards(self, accuracies):
         """
         Update each agent's cumulative accuracy and assign base reward.
-        If exactly two agents are present, apply difference-based bonus/penalty.
         """
         # Update running average accuracy.
         for agent_id, acc in accuracies.items():
@@ -130,7 +121,3 @@ class RLEnvironment:
             rewards[agent_id] = avg_acc
 
         return rewards
-
-
-
-

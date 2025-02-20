@@ -1,19 +1,20 @@
 # agents/deterministic.py
 
 from agents.agent_interface import AgentInterface
+from utils.nn import train_and_evaluate
 import numpy as np
 
 # -----------------------
 # Deterministic Agent
 # -----------------------
 class DeterministicAgent(AgentInterface):
-    def __init__(self, policy=None):
+    def __init__(self, policy=None, training_params=None):
         """
         Initializes an agent with a predetermined sequence of actions.
         The action plan is a list of actions to be performed in sequence.
         If the action plan is exhausted, the agent selects actions randomly.
         """
-        super().__init__()
+        super().__init__(training_params=training_params)
         # Use the provided policy, or fall back to a default one that picks randomly.
         self.policy = policy if policy is not None else self.default_policy
 
@@ -42,7 +43,6 @@ class DeterministicAgent(AgentInterface):
         Uses a shared utility function to train and evaluate the model
         with a parameterized train/test split.
         """
-        from utils.nn import train_and_evaluate
         
         # Default ratio or retrieve from training_params if desired.
         ratio = self.training_params.get("train_ratio", 0.5)

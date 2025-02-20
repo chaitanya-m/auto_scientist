@@ -33,17 +33,17 @@ class TestRLAgentCatchUp(unittest.TestCase):
             num_classes=2,
             random_seed=0
         )
-        num_steps = 1
-        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=300, seed=0, n_agents=1, schema=schema)
+
+        env = RLEnvironment(num_instances_per_step=300, seed=0, n_agents=1, schema=schema)
    
-        agent0 = DeterministicAgent()
+        agent0 = DeterministicAgent(training_params = {"epochs": 300, "verbose": 0})
         agent0.update_valid_actions(["add_abstraction"])
 
         n_episodes = 10
         for ep in range(n_episodes):
             # Reset environment each episode for a fresh start.
             env.reset(seed=ep)
-            env.step()  # Generate dataset
+            env.step()  # Generate dataset, init state
             dataset = env._get_state().dataset
 
             # Train an abstraction on the new dataset, store it in the repository, replacing any existing model.
@@ -55,7 +55,7 @@ class TestRLAgentCatchUp(unittest.TestCase):
             
             agents_dict = {0: agent0}
 
-            actions_history, rewards, accuracies = run_episode(env, agents_dict, seed=ep)
+            actions_history, rewards, accuracies = run_episode(env, agents_dict, seed=ep, steps = 1, schema=schema, step_callback=None)
 
             # Print stepwise and episode-wise accuracies for the agent.
             for agent_id in sorted(accuracies.keys()):
