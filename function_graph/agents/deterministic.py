@@ -40,36 +40,22 @@ class DeterministicAgent(AgentInterface):
 
     def evaluate_accuracy(self, model, dataset):
         """
-        Performs a 50/50 train/test split on the dataset, trains the model on the training
-        split, and returns the test accuracy.
-
-        Args:
-            model: The Keras model to be evaluated.
-            dataset (DataFrame): The dataset containing features and labels.
-
-        Returns:
-            The accuracy computed on the test split.
+        Uses a shared utility function to train and evaluate the model
+        with a parameterized train/test split.
         """
-        split_idx = len(dataset) // 2
-        train_df = dataset.iloc[:split_idx]
-        test_df = dataset.iloc[split_idx:]
+        from utils.nn import train_and_evaluate
         
-        train_features = train_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
-        train_labels = train_df["label"].to_numpy(dtype=int)
-        
-        test_features = test_df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
-        test_labels = test_df["label"].to_numpy(dtype=int)
-        
-        model.fit(train_features, 
-                  train_labels, 
-                  epochs=self.training_params["epochs"], 
-                  verbose=self.training_params["verbose"]
-                  )
-        
-        predictions = model.predict(test_features, verbose=0)
-        preds = (predictions.flatten() > 0.5).astype(int)
-        accuracy = np.mean(preds == test_labels)
-        return accuracy
+        # Default ratio or retrieve from training_params if desired.
+        ratio = self.training_params.get("train_ratio", 0.5)
+
+        return train_and_evaluate(
+            model=model,
+            dataset=dataset,
+            train_ratio=ratio,
+            epochs=self.training_params["epochs"],
+            verbose=self.training_params["verbose"]
+        )
+
 
     def get_actions_history(self):
         """

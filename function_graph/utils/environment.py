@@ -4,6 +4,7 @@ import pandas as pd
 
 from graph.node import InputNode, SingleNeuron, SubGraphNode
 from graph.composer import GraphComposer, GraphTransformer
+from utils.nn import train_and_evaluate
 
 # -----------------------
 # Environment for multiple agents
@@ -27,39 +28,39 @@ def create_minimal_network(input_shape):
     return composer, model
 
 
-def train_learned_abstraction_model(df, epochs=1000):
+def train_learned_abstraction_model(df, epochs=1000, train_ratio=0.5):
     """
-    Helper function to build and train a learned abstraction model.
+    Builds and trains a learned abstraction model using a parameterized train/test split.
     This model consists of:
-      - an input layer (matching env.features, i.e. 2 features),
-      - a hidden dense layer with 3 neurons (ReLU activation),
-      - an output dense layer with 1 neuron and sigmoid activation.
-    It trains the full model on 500 instances generated from the environment's schema,
-    prints the full-model accuracy, then extracts the hidden layer model and wraps it in a SubGraphNode.
+      - An input layer (2 features),
+      - A hidden Dense layer with ReLU,
+      - An output Dense layer with sigmoid.
+
+    After training/evaluating, returns a SubGraphNode that outputs the hidden layer.
     """
     from keras import layers, initializers, models
     kernel_init = initializers.GlorotUniform(seed=42)
     input_shape = (2,)
+
     new_input = layers.Input(shape=input_shape, name="sub_input")
-    hidden = layers.Dense(3, activation='relu', name="hidden_layer", kernel_initializer=kernel_init)(new_input)
-    output = layers.Dense(1, activation='sigmoid', name="output_layer", kernel_initializer=kernel_init)(hidden)
+    hidden = layers.Dense(3, activation='relu', 
+                          name="hidden_layer", 
+                          kernel_initializer=kernel_init)(new_input)
+    output = layers.Dense(1, activation='sigmoid',
+                          name="output_layer",
+                          kernel_initializer=kernel_init)(hidden)
     full_model = models.Model(new_input, output, name="learned_abstraction_model_full")
     full_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-    
-    # Generate a new dataset of 500 examples from the fixed schema.
-    features = df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
-    true_labels = df["label"].to_numpy(dtype=int)
-    
-    full_model.fit(features, true_labels, epochs=epochs, verbose=0)
-    loss, acc = full_model.evaluate(features, true_labels, verbose=0)
-    print(f"Learned abstraction full model accuracy after {epochs} epochs on 500 instances: {acc:.3f}")
-    
-    # Create a model that outputs the hidden layer.
+
+    # Use the shared function with the given ratio/epochs
+    accuracy = train_and_evaluate(full_model, df, train_ratio=train_ratio, epochs=epochs, verbose=0)
+    print(f"Learned abstraction accuracy after {epochs} epochs "
+          f"with {train_ratio * 100:.0f}% training split: {accuracy:.3f}")
+
+    # Extract the hidden-layer submodel as a SubGraphNode
     abstraction_model = models.Model(new_input, hidden, name="learned_abstraction_model_extracted")
     from graph.node import SubGraphNode
-    subgraph_node = SubGraphNode(name="learned_abstraction", model=abstraction_model)
-    return subgraph_node
-
+    return SubGraphNode(name="learned_abstraction", model=abstraction_model)
 
 def step_operations_callback(step_idx, state, agents, env):
     for agent_id, agent in agents.items():
