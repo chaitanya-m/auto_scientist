@@ -35,43 +35,47 @@ class TestRLAgentCatchUp(unittest.TestCase):
         )
 
         env = RLEnvironment(num_instances_per_step=300, seed=0, n_agents=1, schema=schema)
-   
-        agent0 = DeterministicAgent(training_params = {"epochs": 300, "verbose": 0})
+        agent0 = DeterministicAgent(training_params={"epochs": 300, "verbose": 0})
         agent0.update_valid_actions(["add_abstraction"])
 
         n_episodes = 10
         for ep in range(n_episodes):
             # Reset environment each episode for a fresh start.
-            env.reset(seed=ep)
-            env.step()  # Generate dataset, init state
-            dataset = env._get_state().dataset
+            state = env.reset(seed=ep, new_schema=schema)
 
-            # Train an abstraction on the new dataset, store it in the repository, replacing any existing model.
+            dataset = state.dataset
+
+            # Train an abstraction on the new dataset, then store it in the repository.
             learned_abstraction = train_learned_abstraction_model(dataset, epochs=500)
             env.repository["learned_abstraction"] = learned_abstraction
 
-            # Reset the agent's network so that previous episodes do not interfere.
-            env.agents_graphmodels[0] = create_minimal_graphmodel(input_shape=(2,))
+            # Reset the agent's network by updating the graphmodel in the state.
+            new_graphmodel = create_minimal_graphmodel(input_shape=(2,))
+            state.agents_states[0].graphmodel = new_graphmodel
+            # Ensure the environment's internal store is also updated.
+            env.agents_graphmodels[0] = new_graphmodel
             
             agents_dict = {0: agent0}
 
-            actions_history, rewards, accuracies = run_episode(env, agents_dict, seed=ep, steps = 1, schema=schema, step_callback=None)
+            actions_history, rewards, accuracies = run_episode(
+                env, agents_dict, seed=ep, steps=1, schema=schema, step_callback=None
+            )
 
-            # Print stepwise and episode-wise accuracies for the agent.
+            # Print stepwise accuracies and actions for the agent.
             for agent_id in sorted(accuracies.keys()):
                 print(f"Agent {agent_id} stepwise accuracies: {accuracies[agent_id]}")
-                print(actions_history[agent_id])
-                #avg_acc = np.mean(accuracies[agent_id])
-                #print(f"Agent {agent_id} average accuracy for episode {ep}: {avg_acc:.4f}")
+                print(f"Actions history: {actions_history[agent_id]}")
 
         final_acc0 = np.mean(accuracies[0])  # average accuracy for agent0
         self.assertGreaterEqual(
-            final_acc0, 0.9, 
+            final_acc0, 0.9,
             "Agent 0 failed to catch up to at least 90% of ideal performance."
         )
 
+
 if __name__ == "__main__":
     unittest.main()
+
 
 # def step_operations_callback(step_idx, state, agents, env):
 #     for agent_id, agent in agents.items():
