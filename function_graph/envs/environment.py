@@ -75,15 +75,12 @@ class RLEnvironment(Environment):
         self.schema = schema
         self.dataset = None
 
-        # Create agent graphmodels and initialize reward trackers.
+        # Create agent graphmodels
         self.n_agents = n_agents
         self.agents_graphmodels = {}
-        self.agent_cum_acc = {}
-        self.agent_steps = {}
+
         for agent_id in range(self.n_agents):
             self.agents_graphmodels[agent_id] = create_minimal_graphmodel(input_shape=(2,))
-            self.agent_cum_acc[agent_id] = 0.0
-            self.agent_steps[agent_id] = 0
 
     def reset(self, initial_state=None, seed: int = None, new_schema=None):
         """
@@ -150,20 +147,11 @@ class RLEnvironment(Environment):
         """
         Default reward computation for the legacy environment.
         """
-        # Update running average accuracy.
-        dummy_accuracies = {}  # This function would normally use some computed accuracies.
-        for agent_id in range(self.n_agents):
-            # For simplicity, assume a dummy accuracy value (e.g., 1.0) for demonstration.
-            acc = 1.0
-            self.agent_steps[agent_id] += 1
-            self.agent_cum_acc[agent_id] += acc
-            dummy_accuracies[agent_id] = acc
-        
         rewards = {}
-        for agent_id, acc in dummy_accuracies.items():
-            avg_acc = self.agent_cum_acc[agent_id] / self.agent_steps[agent_id]
-            rewards[agent_id] = avg_acc
+        for agent_id in state.agents_states:
+            rewards[agent_id] = 1.0
         return rewards
+
 
     def compute_rewards(self, accuracies):
         """
