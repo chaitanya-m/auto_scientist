@@ -75,12 +75,14 @@ class RLEnvironment(Environment):
         self.schema = schema
         self.dataset = None
 
-        # Create agent graphmodels
-        self.n_agents = n_agents
-        self.agents_graphmodels = {}
-
-        for agent_id in range(self.n_agents):
-            self.agents_graphmodels[agent_id] = create_minimal_graphmodel(input_shape=(2,))
+    def _init_agents(self, n_agents):
+        """
+        Helper method to initialize agent graphmodels.
+        """
+        agents_graphmodels = {}
+        for agent_id in range(n_agents):
+            agents_graphmodels[agent_id] = create_minimal_graphmodel(input_shape=(2,))
+        return agents_graphmodels
 
     def reset(self, initial_state=None, seed: int = None, new_schema=None):
         """
@@ -93,12 +95,25 @@ class RLEnvironment(Environment):
             self.schema = new_schema
         else:
             self.schema.rng = np.random.default_rng(seed)
+
+        # Determine the number of agents from the initial state if provided, otherwise use self.n_agents or a default.
+        if initial_state is not None and hasattr(initial_state, "agents_states"):
+            n_agents = len(initial_state.agents_states)
+        else:
+            n_agents = 1
+        
+        # Reinitialize agent graphmodels using the helper method.
+        self.agents_graphmodels = self._init_agents(n_agents)
+        
         # Generate an initial dataset if none is provided.
         if initial_state is None:
             self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
             initial_state = self._get_state()
+        
         self.state = initial_state
         return self.state
+
+
 
     def _get_state(self):
         """
