@@ -1,4 +1,3 @@
-#test_rldev.py
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = ""         # Force CPU usage.
 os.environ["TF_DETERMINISTIC_OPS"] = "1"          # Request deterministic operations.
@@ -17,13 +16,14 @@ tf.random.set_seed(SEED)
 import keras
 from keras import layers, initializers, utils
 from graph.node import SubGraphNode
-from function_graph.envs.environment import RLEnvironment, run_episode
+from envs.environment import RLEnvironment
 from utils.nn import create_minimal_network, train_learned_abstraction_model
 from utils.visualize import visualize_graph, print_graph_nodes
 from agents.deterministic import DeterministicAgent
 from graphviz import Digraph    
 from data_gen.categorical_classification import DataSchemaFactory
 from utils.rl import run_episode
+
 
 class TestLearnedAbstractionTraining(unittest.TestCase):
     def test_learned_abstraction_training(self):
@@ -42,8 +42,6 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
           11. Asserts that the final accuracy is above a chosen threshold.
         """
 
-
-
         # Create the schema once with a fixed seed so distribution parameters are fixed.
         factory = DataSchemaFactory()
         schema = factory.create_schema(
@@ -54,11 +52,11 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         )
 
         # Create the environment with 500 examples per step.
-        env = RLEnvironment(total_steps=1, num_instances_per_step=500, seed=0, schema=schema)
+        env = RLEnvironment(num_instances_per_step=500, seed=0, n_agents=1, schema=schema)
         env.reset(seed=0)
-        env.step() # Generate the dataset now.
+        env.step()  # Generate dataset
 
-        features, true_labels = env.features, env.true_labels
+        # For this test, we directly extract the dataset.
         dataset = env._get_state().dataset
 
         # Build the minimal network.
@@ -81,11 +79,13 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         model = composer.build()
         model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
         
-        # Optionally visualize the graph here.
+        # Optionally visualize the graph.
         # print_graph_nodes(composer)
         # visualize_graph(composer=composer)
 
         # Fine-tune the composed model.
+        features = dataset[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
+        true_labels = dataset["label"].to_numpy(dtype=int)
         model.fit(features, true_labels, epochs=300, verbose=0)
 
         # Evaluate the fine-tuned model.
@@ -111,7 +111,8 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
 def my_custom_policy(state, step, valid_actions):
     """
     A custom policy that tries to pick 'add_abstraction' at step 0 if it's
-    in the valid_actions list, otherwise fallback to random selection.
+    in the valid_actions list, otherwise falls back to selecting 'no_change'
+    or a random valid action.
     """
     import numpy as np
     
@@ -120,7 +121,6 @@ def my_custom_policy(state, step, valid_actions):
     elif "no_change" in valid_actions:
         return "no_change"
     else:
-        # fallback: pick randomly among whatever is valid
         return np.random.choice(valid_actions) if valid_actions else None
 
 
@@ -131,14 +131,13 @@ class TestReuseAdvantage(unittest.TestCase):
         the agent that adds it will obtain higher accuracy and receive a reward advantage.
         
         Test: Pre-populate the repository with the learned abstraction.
-        Run an episode where agent 0 chooses "add_abstraction" on the first step,
+        Run a controlled number of steps where agent 0 chooses "add_abstraction" on the first step,
         while agent 1 always chooses "no_change". Print detailed step-by-step accuracies and rewards,
-        and verify that agent 0's reward on the first step is higher than agent 1's.
+        and verify that agent 0's cumulative reward exceeds that of agent 1.
         """
         num_steps = 5
 
         # Create a schema externally and pass it to the environment.
-        from data_gen.categorical_classification import DataSchemaFactory
         factory = DataSchemaFactory()
         schema = factory.create_schema(
             num_features=2,
@@ -148,24 +147,24 @@ class TestReuseAdvantage(unittest.TestCase):
         )
 
         # Create the environment with the externally provided schema.
-        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=100, seed=0, schema=schema)
+        env = RLEnvironment(num_instances_per_step=100, seed=0, n_agents=2, schema=schema)
         
         # Reset environment and generate a dataset to train the abstraction.
         env.reset(seed=0)
-        env.step()  # Generate the dataset.
+        env.step()  # Generate dataset
         dataset = env._get_state().dataset
 
-        # Train an abstraction on the dataset, then store it in the environment's repository.
+        # Train an abstraction on the dataset and store it in the environment's repository.
         learned_abstraction = train_learned_abstraction_model(dataset, epochs=1000)
         env.repository["learned_abstraction"] = learned_abstraction
 
         # Create DeterministicAgents.
         # Agent 0 uses a custom policy to choose "add_abstraction" on step 0.
-        agent0 = DeterministicAgent(policy=my_custom_policy)
+        agent0 = DeterministicAgent(policy=my_custom_policy, training_params={"epochs":300, "verbose":0})
         agent0.update_valid_actions(["add_abstraction", "no_change"])
 
         # Agent 1 always chooses "no_change".
-        agent1 = DeterministicAgent()
+        agent1 = DeterministicAgent(training_params={"epochs":300, "verbose":0})
         agent1.update_valid_actions(["no_change"])
 
         # Prepare the dictionary of agents.
@@ -174,8 +173,8 @@ class TestReuseAdvantage(unittest.TestCase):
             1: agent1
         }
 
-        # Run the episode.
-        actions, rewards, accuracies = run_episode(env, agents_dict, seed=0)
+        # Run the episode for the specified number of steps.
+        actions, rewards, accuracies = run_episode(env, agents_dict, seed=0, steps=num_steps, schema=schema, step_callback=None)
 
         print("\nDetailed Step-by-Step Output:")
         for step in range(num_steps):
@@ -183,7 +182,7 @@ class TestReuseAdvantage(unittest.TestCase):
             print(f"  Agent 0: Accuracy = {accuracies[0][step]:.3f}, Reward = {rewards[0][step]:.3f}")
             print(f"  Agent 1: Accuracy = {accuracies[1][step]:.3f}, Reward = {rewards[1][step]:.3f}")
 
-        # Compute total rewards.
+        # Compute cumulative rewards.
         reward0 = sum(rewards[0])
         reward1 = sum(rewards[1])
  
@@ -198,5 +197,5 @@ class TestReuseAdvantage(unittest.TestCase):
             "Agent 0 should receive a higher reward than Agent 1 when using the learned abstraction."
         )
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
