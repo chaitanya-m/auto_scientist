@@ -86,32 +86,42 @@ class RLEnvironment(Environment):
 
     def reset(self, initial_state=None, seed: int = None, new_schema=None):
         """
-        Resets the environment state. For legacy behavior, an initial dataset can be generated via schema.
-        Either supply a new_schema or a new seed.
+        Resets the environment state without generating a dataset.
+        
+        If an initial_state is provided, its agents_states are used to determine the number of agents.
+        Otherwise, the number of agents defaults to self.n_agents (if set) or a fallback value.
+        The dataset is not generated here; it will be generated during step().
         """
-        if new_schema is None and seed is None:
-            raise ValueError("Either a new_schema or a seed must be provided for reset()")
         if new_schema is not None:
             self.schema = new_schema
-        else:
+        elif seed is not None:
             self.schema.rng = np.random.default_rng(seed)
-
-        # Determine the number of agents from the initial state if provided, otherwise use self.n_agents or a default.
+        
+        # Determine the number of agents from the provided initial state if available.
         if initial_state is not None and hasattr(initial_state, "agents_states"):
             n_agents = len(initial_state.agents_states)
         else:
-            n_agents = 1
+            n_agents = getattr(self, "n_agents", 2)
         
         # Reinitialize agent graphmodels using the helper method.
         self.agents_graphmodels = self._init_agents(n_agents)
         
-        # Generate an initial dataset if none is provided.
-        if initial_state is None:
-            self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
-            initial_state = self._get_state()
+        # Create a new state with dataset set to None.
+        # Agents' states are built using the new agent graphmodels.
+        agents_states = {}
+        for agent_id, graphmodel in self.agents_graphmodels.items():
+            composer, _ = graphmodel
+            agent_state = AgentState(
+                nodes=list(composer.nodes.keys()),
+                connections=composer.connections,
+                graphmodel=graphmodel
+            )
+            agents_states[agent_id] = agent_state
         
+        initial_state = State(dataset=None, agents_states=agents_states)
         self.state = initial_state
         return self.state
+
 
 
 

@@ -53,7 +53,8 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
         env = RLEnvironment(num_instances_per_step=500, seed=0, n_agents=1, schema=schema)
         state = env.reset(seed=0)
 
-        # For this test, we directly extract the dataset.
+        # Call step() to generate a dataset and update the state.
+        state, _ = env.step()
         dataset = state.dataset
 
         # Build the minimal network.
@@ -145,9 +146,10 @@ class TestReuseAdvantage(unittest.TestCase):
 
         # Create the environment with the externally provided schema.
         env = RLEnvironment(num_instances_per_step=100, seed=0, n_agents=2, schema=schema)
-        
-        # Reset environment and generate a dataset to train the abstraction.
         state = env.reset(seed=0)
+
+        # Call step() to generate a dataset and update the state.
+        state, _ = env.step()
         dataset = state.dataset
 
         # Train an abstraction on the dataset and store it in the environment's repository.
