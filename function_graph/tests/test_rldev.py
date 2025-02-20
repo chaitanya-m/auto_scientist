@@ -53,11 +53,10 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
 
         # Create the environment with 500 examples per step.
         env = RLEnvironment(num_instances_per_step=500, seed=0, n_agents=1, schema=schema)
-        env.reset(seed=0)
-        env.step()  # Generate dataset
+        state = env.reset(seed=0)
 
         # For this test, we directly extract the dataset.
-        dataset = env._get_state().dataset
+        dataset = state.dataset
 
         # Build the minimal network.
         composer, model = create_minimal_graphmodel(input_shape=(2,))
@@ -150,9 +149,8 @@ class TestReuseAdvantage(unittest.TestCase):
         env = RLEnvironment(num_instances_per_step=100, seed=0, n_agents=2, schema=schema)
         
         # Reset environment and generate a dataset to train the abstraction.
-        env.reset(seed=0)
-        env.step()  # Generate dataset
-        dataset = env._get_state().dataset
+        state = env.reset(seed=0)
+        dataset = state.dataset
 
         # Train an abstraction on the dataset and store it in the environment's repository.
         learned_abstraction = train_learned_abstraction_model(dataset, epochs=1000)
