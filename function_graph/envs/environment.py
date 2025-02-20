@@ -46,33 +46,38 @@ class Environment(ABC):
 # -----------------------
 
 class AgentState:
-    def __init__(self, nodes, connections):
+    def __init__(self, nodes, connections, graphmodel):
         """
         Represents the state of an individual agent.
         
         :param nodes: List of node identifiers from the agent's composer.
         :param connections: The connection structure from the agent's composer.
+        :param graphmodel: The agent's current graphmodel (e.g., a tuple of (composer, model)).
         """
         self.nodes = nodes
         self.connections = connections
+        self.graphmodel = graphmodel
 
     def __repr__(self):
         return f"AgentState(nodes={self.nodes}, connections={self.connections})"
-
+        
 
 class State:
     def __init__(self, dataset, agents_states):
         """
         Represents the overall environment state.
-        
+
         :param dataset: The dataset generated at the current step.
         :param agents_states: A dictionary mapping agent IDs to their AgentState.
+                              Each AgentState contains details about the agent's nodes,
+                              connections, and current graphmodel.
         """
         self.dataset = dataset
         self.agents_states = agents_states
 
     def __repr__(self):
-        return f"State(agents_states={self.agents_states})"
+        return f"State(dataset={self.dataset}, agents_states={self.agents_states})"
+
 
 
 class RLEnvironment(Environment):
@@ -132,10 +137,13 @@ class RLEnvironment(Environment):
         Constructs and returns the current state as a State object.
         """
         agents_states = {}
-        for agent_id, (composer, _) in self.agents_graphmodels.items():
+        for agent_id, graphmodel in self.agents_graphmodels.items():
+            # Extract composer and connections from the graphmodel.
+            composer, _ = graphmodel
             agent_state = AgentState(
                 nodes=list(composer.nodes.keys()),
-                connections=composer.connections
+                connections=composer.connections,
+                graphmodel=graphmodel
             )
             agents_states[agent_id] = agent_state
 
