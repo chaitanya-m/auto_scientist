@@ -24,11 +24,13 @@ def run_episode(env, agents, seed=0, steps=0, schema=None, step_callback=None):
     # Main loop over steps.
     for step_count in range(steps):
         # Generate new data and update the environment state.
-        state = env.step()
-        
+        state, rewards = env.step()
+        for agent_id in agents:         # Add rewards to history.
+            rewards_history[agent_id].append(rewards[agent_id])
+
         # Optional: let the user update valid actions or policies.
         if step_callback is not None:
-            step_callback(env.current_step, state, agents, env)
+            step_callback(step_count, state, agents, env)
         
         # Each agent picks an action.
         chosen_actions = {}
@@ -66,10 +68,5 @@ def run_episode(env, agents, seed=0, steps=0, schema=None, step_callback=None):
             acc = agents[agent_id].evaluate_accuracy(model, env.dataset)
             accuracies_history[agent_id].append(acc)
             accuracies[agent_id] = acc
-        
-        # Compute rewards using the environment's logic.
-        rewards = env.compute_rewards(accuracies)
-        for agent_id in agents:
-            rewards_history[agent_id].append(rewards[agent_id])
     
     return actions_history, rewards_history, accuracies_history

@@ -1,7 +1,10 @@
 # envs/environment.py
+
+from typing import Tuple, Dict, Any
 import numpy as np
 from abc import ABC, abstractmethod
 from utils.nn import create_minimal_graphmodel
+from envs.data_types import State, AgentState
 
 # -----------------------
 # Environment Interface
@@ -32,55 +35,17 @@ class Environment(ABC):
         pass
 
     @abstractmethod
-    def step(self, actions):
+    def step(self, actions: Dict[Any, Any]) -> Tuple[Any, Dict[Any, float]]:
         """
         Applies the transition rule to update the state.
 
         :param actions: A dictionary mapping agent IDs to their actions.
-        :return: A tuple (next_state, reward, done).
+        :return: A tuple (next_state, reward), where:
+            next_state: the new state after the actions.
+            reward: a dictionary mapping each agent to its reward.
         """
         pass
 
-# -----------------------
-# State and AgentState data types
-# -----------------------
-
-class AgentState:
-    def __init__(self, nodes, connections, graphmodel):
-        """
-        Represents the state of an individual agent.
-        
-        :param nodes: List of node identifiers from the agent's composer.
-        :param connections: The connection structure from the agent's composer.
-        :param graphmodel: The agent's current graphmodel (e.g., a tuple of (composer, model)).
-        """
-        self.nodes = nodes
-        self.connections = connections
-        self.graphmodel = graphmodel
-
-    def __repr__(self):
-        return f"AgentState(nodes={self.nodes}, connections={self.connections})"
-        
-
-class State:
-
-    # Shared repository for all State instances.
-    repository = {}
-
-    def __init__(self, dataset, agents_states, repository=None):
-        """
-        Represents the overall environment state.
-
-        :param dataset: The dataset generated at the current step.
-        :param agents_states: A dictionary mapping agent IDs to their AgentState.
-                              Each AgentState contains details about the agent's nodes,
-                              connections, and current graphmodel.
-        """
-        self.dataset = dataset
-        self.agents_states = agents_states
-
-    def __repr__(self):
-        return f"State(dataset={self.dataset}, agents_states={self.agents_states})"
 
 
 
@@ -157,13 +122,29 @@ class RLEnvironment(Environment):
 
     def step(self, actions=None):
         """
-        Generates new data for this step and returns the updated state.
+        Generates new data for this step, updates the state, and returns the updated state along with computed rewards.
         Actions are ignored in the legacy environment's default transition.
+        
+        :param actions: (Ignored) Dictionary mapping agent IDs to their actions.
+        :return: A tuple (new_state, rewards), where rewards is a dict mapping agent IDs to their computed rewards.
         """
+        # Store the current state for reward computation.
+        previous_state = self.state
+
+        # Generate a new dataset.
         self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
-        state = self._get_state()
-        # For legacy behavior, 'actions' are not used to update the state.
-        return state
+        
+        # Obtain the new state.
+        new_state = self._get_state()
+        
+        # Compute rewards using the reward_rule provided
+        rewards = self.reward_rule(previous_state, actions, new_state)
+        
+        # Update the environment's state.
+        self.state = new_state
+        
+        return new_state, rewards
+
 
     def compute_rewards_default(self, state, actions, next_state):
         """
