@@ -9,9 +9,10 @@ import tensorflow as tf
 import unittest
 
 # Seed all relevant random generators.
-random.seed(1)
-np.random.seed(42)
-tf.random.set_seed(42)
+SEED = 0
+random.seed(SEED)
+np.random.seed(SEED)
+tf.random.set_seed(SEED)
 
 import keras
 from keras import layers, initializers, utils
@@ -20,7 +21,7 @@ from utils.environment import RLEnvironment, run_episode, create_minimal_network
 from utils.visualize import visualize_graph, print_graph_nodes
 from agents.deterministic import DeterministicAgent
 from graphviz import Digraph    
-
+from data_gen.categorical_classification import DataSchemaFactory
 
 class TestLearnedAbstractionTraining(unittest.TestCase):
     def test_learned_abstraction_training(self):
@@ -38,18 +39,31 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
           10. Stores the learned abstraction in the repository.
           11. Asserts that the final accuracy is above a chosen threshold.
         """
+
+
+
+        # Create the schema once with a fixed seed so distribution parameters are fixed.
+        factory = DataSchemaFactory()
+        schema = factory.create_schema(
+            num_features=2,
+            num_categories=2,
+            num_classes=2,
+            random_seed=SEED
+        )
+
         # Create the environment with 500 examples per step.
-        env = RLEnvironment(total_steps=1, num_instances_per_step=500, seed=0)
+        env = RLEnvironment(total_steps=1, num_instances_per_step=500, seed=0, schema=schema)
         env.reset(seed=0)
         env.step() # Generate the dataset now.
 
         features, true_labels = env.features, env.true_labels
+        dataset = env._get_state().dataset
 
         # Build the minimal network.
         composer, model = create_minimal_network(input_shape=(2,))
         
         # Train the learned abstraction on 500 examples.
-        learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
+        learned_abstraction = train_learned_abstraction_model(dataset, epochs=1000)
         
         # Freeze the learned abstraction so its weights remain unchanged.
         learned_abstraction.model.trainable = False
@@ -126,11 +140,6 @@ class TestReuseAdvantage(unittest.TestCase):
         # Train an abstraction, store it in the environment's repository.
         learned_abstraction = train_learned_abstraction_model(env, epochs=1000)
         env.repository["learned_abstraction"] = learned_abstraction
-
-        # Define policies: Agent 0 uses add_abstraction once, then no_change;
-        # Agent 1 always uses no_change.
-        action_plan0 = ["add_abstraction"] + ["no_change"] * (num_steps - 1)
-        action_plan1 = ["no_change"] * num_steps
 
         # Create DeterministicAgents that follow those plans.
         agent0 = DeterministicAgent(policy=my_custom_policy)

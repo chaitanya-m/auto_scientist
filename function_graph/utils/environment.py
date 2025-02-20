@@ -1,7 +1,7 @@
 # utils/environment.py
 import numpy as np
 import pandas as pd
-from data_gen.categorical_classification import DataSchemaFactory
+
 from graph.node import InputNode, SingleNeuron, SubGraphNode
 from graph.composer import GraphComposer, GraphTransformer
 
@@ -27,7 +27,7 @@ def create_minimal_network(input_shape):
     return composer, model
 
 
-def train_learned_abstraction_model(env, epochs=1000):
+def train_learned_abstraction_model(df, epochs=1000):
     """
     Helper function to build and train a learned abstraction model.
     This model consists of:
@@ -47,7 +47,6 @@ def train_learned_abstraction_model(env, epochs=1000):
     full_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
     
     # Generate a new dataset of 500 examples from the fixed schema.
-    df = env.schema.generate_dataset(num_instances=500)
     features = df[[f"feature_{i}" for i in range(2)]].to_numpy(dtype=float)
     true_labels = df["label"].to_numpy(dtype=int)
     
@@ -62,7 +61,7 @@ def train_learned_abstraction_model(env, epochs=1000):
     return subgraph_node
 
 
-def my_step_callback(step_idx, state, agents, env):
+def step_operations_callback(step_idx, state, agents, env):
     for agent_id, agent in agents.items():
         # 1) Compute some new set of valid actions for this step
         if step_idx == 0:
@@ -121,7 +120,7 @@ class State:
 
 
 class RLEnvironment:
-    def __init__(self, total_steps=100, num_instances_per_step=100, seed=0, n_agents=2):
+    def __init__(self, total_steps=100, num_instances_per_step=100, seed=0, n_agents=2, schema=None):
         """
         total_steps: Total steps (interactions) in the episode.
         num_instances_per_step: Number of data points provided at each step.
@@ -132,17 +131,9 @@ class RLEnvironment:
         self.current_step = 0
         self.num_instances_per_step = num_instances_per_step
         self.seed = seed
-
-        # Create the schema once with a fixed seed so distribution parameters are fixed.
-        self.factory = DataSchemaFactory()
-        self.schema = self.factory.create_schema(
-            num_features=2,
-            num_categories=2,
-            num_classes=2,
-            random_seed=self.seed
-        )
         
-        # Initialize environment data placeholders.
+        # Environment dataset
+        self.schema = schema
         self.dataset = None
         self.features = None
         self.true_labels = None
