@@ -17,12 +17,13 @@ tf.random.set_seed(SEED)
 import keras
 from keras import layers, initializers, utils
 from graph.node import SubGraphNode
-from utils.environment import RLEnvironment, run_episode
+from function_graph.envs.environment import RLEnvironment, run_episode
 from utils.nn import create_minimal_network, train_learned_abstraction_model
 from utils.visualize import visualize_graph, print_graph_nodes
 from agents.deterministic import DeterministicAgent
 from graphviz import Digraph    
 from data_gen.categorical_classification import DataSchemaFactory
+from utils.rl import run_episode
 
 class TestLearnedAbstractionTraining(unittest.TestCase):
     def test_learned_abstraction_training(self):

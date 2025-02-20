@@ -1,11 +1,14 @@
 import copy
 import unittest
 import numpy as np
-from utils.environment import RLEnvironment, run_episode
+from envs.environment import RLEnvironment
+from utils.rl import run_episode
 from utils.nn import create_minimal_network, train_learned_abstraction_model
 from agents.deterministic import DeterministicAgent
 from agents.qlearning import QLearningAgent
 from data_gen.categorical_classification import DataSchemaFactory
+from graph.composer import GraphComposer, GraphTransformer
+
 
 class TestRLAgentCatchUp(unittest.TestCase):
     def test_deterministic_reuse_catchup_to_baseline(self):
