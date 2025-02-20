@@ -1,11 +1,10 @@
-#tests/test_catchup.py
 import copy
 import unittest
 import numpy as np
-from utils.environment import RLEnvironment, run_episode, create_minimal_network
-from utils.environment import train_learned_abstraction_model
+from utils.environment import RLEnvironment, run_episode, create_minimal_network, train_learned_abstraction_model
 from agents.deterministic import DeterministicAgent
 from agents.qlearning import QLearningAgent
+from data_gen.categorical_classification import DataSchemaFactory
 
 class TestRLAgentCatchUp(unittest.TestCase):
     def test_deterministic_reuse_catchup_to_baseline(self):
@@ -22,9 +21,16 @@ class TestRLAgentCatchUp(unittest.TestCase):
         We want the number of learning epochs for reuse to be lower.
         """
 
-        # 1. Create environment
+        # 1. Create a schema externally and pass it to the environment.
+        factory = DataSchemaFactory()
+        schema = factory.create_schema(
+            num_features=2,
+            num_categories=2,
+            num_classes=2,
+            random_seed=0
+        )
         num_steps = 1
-        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=300, seed=0, n_agents=1)
+        env = RLEnvironment(total_steps=num_steps, num_instances_per_step=300, seed=0, n_agents=1, schema=schema)
    
         agent0 = DeterministicAgent()
         agent0.update_valid_actions(["add_abstraction"])
@@ -33,20 +39,21 @@ class TestRLAgentCatchUp(unittest.TestCase):
         for ep in range(n_episodes):
             # Reset environment each episode for a fresh start.
             env.reset(seed=ep)
+            env.step()  # Generate dataset
+            dataset = env._get_state().dataset
 
-            # Train an abstraction on new dataset, store it in the repository, replacing any existing model
-            learned_abstraction = train_learned_abstraction_model(env, epochs=500)
+            # Train an abstraction on the new dataset, store it in the repository, replacing any existing model.
+            learned_abstraction = train_learned_abstraction_model(dataset, epochs=500)
             env.repository["learned_abstraction"] = learned_abstraction
 
-            # Reset each agent's model so that previous episodes do not interfere.
-
+            # Reset the agent's network so that previous episodes do not interfere.
             env.agents_networks[0] = create_minimal_network(input_shape=(2,))
             
             agents_dict = {0: agent0}
 
             actions_history, rewards, accuracies = run_episode(env, agents_dict, seed=ep)
 
-            # Print stepwise and episode-wise accuracies for each agent.
+            # Print stepwise and episode-wise accuracies for the agent.
             for agent_id in sorted(accuracies.keys()):
                 print(f"Agent {agent_id} stepwise accuracies: {accuracies[agent_id]}")
                 print(actions_history[agent_id])
@@ -58,6 +65,9 @@ class TestRLAgentCatchUp(unittest.TestCase):
             final_acc0, 0.9, 
             "Agent 0 failed to catch up to at least 90% of ideal performance."
         )
+
+if __name__ == '__main__':
+    unittest.main()
 
 
 
