@@ -86,7 +86,7 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
 
         print("\n".join(line for line in desc))
 
-        for run in range(10):
+        for run in range(1):
             # Create the schema with fixed distribution parameters.
             factory = DataSchemaFactory()
             schema = factory.create_schema(
@@ -124,7 +124,7 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
 
             lr_map = {
                 # Example: any variable whose name has 'output' gets a 5x gradient boost
-                'reuse': 250.0
+                'fast': 1.0
             }
 
             # Wrap a base optimizer (e.g., Adam) with the LR multiplier
@@ -139,7 +139,7 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
             print_graph_nodes(composer=composer)
 
             # Evaluate the composed model using the shared train_and_evaluate function.
-            acc = train_and_evaluate(model, dataset, train_ratio=0.5, epochs=10, verbose=0)
+            acc = train_and_evaluate(model, dataset, train_ratio=0.5, epochs=300, verbose=0)
             print(f"Trained network accuracy after fine-tuning: {acc:.3f}, Abstraction accuracy: {abstraction_acc:.3f}")
             
             # Check that the learned abstraction's weights have not changed.

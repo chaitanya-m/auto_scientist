@@ -103,7 +103,7 @@ class SubGraphNode(GraphNode):
         expected_units = self.model.input.shape[1]     # Get expected feature dimension from the original model's Input layer.
         if input_tensor.shape[1] != expected_units:    # Check if shape adaptation is needed.
             # Generate a unique adapter layer name.
-            adapter_name = f"{self.name}_adapter_{uuid.uuid4()}"
+            adapter_name = f"fast_{self.name}_adapter_{uuid.uuid4()}"
             input_tensor = layers.Dense(expected_units,   # Adapt input using a linear Dense layer.
                                         activation="linear",
                                         name=adapter_name)(input_tensor)

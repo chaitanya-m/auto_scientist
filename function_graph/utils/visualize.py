@@ -76,7 +76,6 @@ def visualize_graph(composer, output_file_base="graph_view", image_dir="graph_im
     print("\nGraph DOT source:")
     print(dot.source)
 
-
 def print_graph_nodes(composer):
     """
     Prints a visual summary of the graph constructed by the composer.
@@ -85,7 +84,7 @@ def print_graph_nodes(composer):
       - For InputNodes: the input shape.
       - For SingleNeuron nodes: the activation function and the weights (if the model is built).
       - For SubGraphNodes: a summary of the contained Keras model and the weights of each layer.
-    Finally, it prints the connection list.
+    Finally, it prints the connection list and the final composed Keras model layers.
     """
     print("=== Graph Visualizer ===")
     print("Nodes:")
@@ -107,12 +106,23 @@ def print_graph_nodes(composer):
         # For SubGraphNode, print the internal Keras model summary and each layer's weights.
         if node.__class__.__name__ == "SubGraphNode":
             print("  Contains a Keras model:")
-            node.model.summary()
             for layer in node.model.layers:
                 print(f"    Layer {layer.name} weights: {layer.get_weights()}")
+            print("  Contains a bypass Keras model:")
+            for layer in node.bypass_model.layers:
+                print(f"    Layer {layer._name} weights: {layer.get_weights()}")
     print("\nConnections:")
     for target, connections in composer.connections.items():
         print(f"Node '{target}' has incoming connections:")
         for parent, merge_mode in connections:
             print(f"  From: '{parent}', merge mode: {merge_mode}")
-    print("=== End of Graph ===")
+    print("=== End of Graph Nodes ===")
+    
+    # Print the final composed Keras model layers.
+    print("\n=== Final Composed Keras Model Layers ===")
+    try:
+        for layer in composer.keras_model.layers:
+            print(f"Layer {layer.name} - Weights: {layer.get_weights()}")
+    except Exception as e:
+        print("Final model not built yet.")
+    print("=== End of Final Model Layers ===")

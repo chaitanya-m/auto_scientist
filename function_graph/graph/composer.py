@@ -1,7 +1,7 @@
 # graph/composer.py
 import keras
 from collections import deque
-from graph.node import SingleNeuron, InputNode  # Import blueprint node types
+from graph.node import SingleNeuron, InputNode, SubGraphNode  # Import blueprint node types
 import random
 import copy
 import uuid
@@ -108,9 +108,18 @@ class GraphComposer:
                 raise ValueError(f"Non-InputNode '{node_name}' has no parents.")
             parent_tensors = []
             merge_modes = []
+
             for parent_name, merge_mode in parent_infos:
-                parent_tensors.append(node_output_tensors[parent_name])
+                parent_tensor = node_output_tensors[parent_name]
+                # If the parent node is a SubGraphNode, insert an adapter layer.
+                if isinstance(self.nodes[parent_name], SubGraphNode):
+                    # Assume the output dimension remains the same.
+                    dim = int(parent_tensor.shape[-1])
+                    adapter_name = f"fast_adapter_{parent_name}_{uuid.uuid4().hex[:3]}"
+                    parent_tensor = keras.layers.Dense(dim, activation="linear", name=adapter_name)(parent_tensor)
+                parent_tensors.append(parent_tensor)
                 merge_modes.append(merge_mode)
+
             if len(parent_tensors) == 1:
                 combined = parent_tensors[0]
             else:
