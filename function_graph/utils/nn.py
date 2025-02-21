@@ -60,35 +60,3 @@ def create_minimal_graphmodel(input_shape):
     return composer, model
 
 
-def train_learned_abstraction_model(df, epochs=1000, train_ratio=0.5):
-    """
-    Builds and trains a learned abstraction model using a parameterized train/test split.
-    This model consists of:
-      - An input layer (2 features),
-      - A hidden Dense layer with ReLU,
-      - An output Dense layer with sigmoid.
-
-    After training/evaluating, returns a SubGraphNode that outputs the hidden layer.
-    """
-    from keras import layers, initializers, models
-    kernel_init = initializers.GlorotUniform(seed=42)
-    input_shape = (2,)
-
-    new_input = layers.Input(shape=input_shape, name="sub_input")
-    hidden = layers.Dense(3, activation='relu', 
-                          name="hidden_layer", 
-                          kernel_initializer=kernel_init)(new_input)
-    output = layers.Dense(1, activation='sigmoid',
-                          name="output_layer",
-                          kernel_initializer=kernel_init)(hidden)
-    full_model = models.Model(new_input, output, name="learned_abstraction_model_full")
-    full_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-
-    # Use the shared function with the given ratio/epochs
-    accuracy = train_and_evaluate(full_model, df, train_ratio=train_ratio, epochs=epochs, verbose=0)
-    print(f"Learned abstraction accuracy after {epochs} epochs "
-          f"with {train_ratio * 100:.0f}% training split: {accuracy:.3f}")
-
-    # Extract the hidden-layer submodel as a SubGraphNode
-    abstraction_model = models.Model(new_input, hidden, name="learned_abstraction_model_extracted")
-    return SubGraphNode(name="learned_abstraction", model=abstraction_model)

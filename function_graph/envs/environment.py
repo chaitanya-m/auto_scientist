@@ -25,8 +25,6 @@ class Environment(ABC):
         self.state = initial_state  # No initial state is generated automatically.
         self.initial_state = initial_state
 
-        return self.state
-
     @abstractmethod
     def reset(self, transition_rule=None, reward_rule=None, state=None):
         """
@@ -103,68 +101,3 @@ class RLEnvironment(Environment):
         return new_state, rewards
 
 
-
-    def _init_agents(self, n_agents):
-        """
-        Helper method to initialize agent graphmodels.
-        """
-        agents_graphmodels = {}
-        for agent_id in range(n_agents):
-            agents_graphmodels[agent_id] = create_minimal_graphmodel(input_shape=(2,))
-        return agents_graphmodels
-
-
-
-
-
-    def _get_state(self):
-        """
-        Constructs and returns the current state as a State object.
-        """
-        agents_states = {}
-        for agent_id, graphmodel in self.agents_graphmodels.items():
-            # Extract composer and connections from the graphmodel.
-            composer, _ = graphmodel
-            agent_state = AgentState(
-                nodes=list(composer.nodes.keys()),
-                connections=composer.connections,
-                graphmodel=graphmodel
-            )
-            agents_states[agent_id] = agent_state
-
-        return State(dataset=self.dataset, agents_states=agents_states)
-
-
-
-
-    def compute_rewards_default(self, state, actions, next_state):
-        """
-        Default reward computation for the legacy environment.
-        """
-        rewards = {}
-        for agent_id in state.agents_states:
-            rewards[agent_id] = 1.0
-        return rewards
-
-
-    def compute_rewards(self, accuracies):
-        """
-        Computes rewards based on provided accuracies.
-        """
-        for agent_id, acc in accuracies.items():
-            self.agent_steps[agent_id] += 1
-            self.agent_cum_acc[agent_id] += acc
-        rewards = {}
-        for agent_id, acc in accuracies.items():
-            avg_acc = self.agent_cum_acc[agent_id] / self.agent_steps[agent_id]
-            rewards[agent_id] = avg_acc
-        return rewards
-
-    def _default_transition(self, state, actions, schema):
-        """
-        Return the next state
-        """
-
-        dataset = schema.generate_dataset(num_instances=self.num_instances_per_step)
-
-        return State(dataset, )
