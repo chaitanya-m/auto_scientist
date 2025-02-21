@@ -1,6 +1,7 @@
 # utils/nn.py
 from graph.composer import GraphComposer, GraphTransformer
 from graph.node import InputNode, SingleNeuron, SubGraphNode
+import tensorflow as tf
 
 def train_and_evaluate(model, dataset, train_ratio=0.5, epochs=1, verbose=0):
     """
@@ -60,3 +61,29 @@ def create_minimal_graphmodel(input_shape):
     return composer, model
 
 
+import tensorflow as tf
+
+import tensorflow as tf
+
+class AdamWithLRMultiplier(tf.keras.optimizers.Adam):
+    def __init__(self, lr_map, *args, **kwargs):
+        """
+        lr_map: dict mapping substrings in variable names to a gradient multiplier.
+                e.g. {'output': 5.0} scales gradients for any variable whose name includes 'output'.
+        All other arguments are passed to the Adam initializer.
+        """
+        super().__init__(*args, **kwargs)
+        self.lr_map = lr_map
+
+    def apply_gradients(self, grads_and_vars, name=None, **kwargs):
+        new_grads_and_vars = []
+        for grad, var in grads_and_vars:
+            if grad is not None:
+                multiplier = 1.0
+                for key_substring, factor in self.lr_map.items():
+                    if key_substring in var.name:
+                        multiplier = factor
+                        break
+                grad = grad * multiplier
+            new_grads_and_vars.append((grad, var))
+        return super().apply_gradients(new_grads_and_vars, **kwargs)
