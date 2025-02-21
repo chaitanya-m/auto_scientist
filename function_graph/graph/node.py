@@ -83,8 +83,7 @@ class SubGraphNode(GraphNode):
         self.bypass_model = keras.models.Model(new_input, x, name=bypass_name) # Build the bypass model using the new input and its computed output
 
         for layer in self.bypass_model.layers:
-            layer._name = f"reuse_{layer.name}_{uuid.uuid4().hex[:3]}"
-
+            layer._name = f"{layer.name}_{uuid.uuid4().hex[:3]}"
 
     def apply(self, input_tensor):
         """
