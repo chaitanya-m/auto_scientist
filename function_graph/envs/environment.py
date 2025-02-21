@@ -11,7 +11,7 @@ from envs.data_types import State, AgentState
 # -----------------------
 
 class Environment(ABC):
-    def __init__(self, transition_rule, reward_rule):
+    def __init__(self, transition_rule, reward_rule, initial_state):
         """
         A minimal state transition environment interface.
 
@@ -22,17 +22,30 @@ class Environment(ABC):
         """
         self.transition_rule = transition_rule
         self.reward_rule = reward_rule
-        self.state = None  # No initial state is generated automatically.
+        self.state = initial_state  # No initial state is generated automatically.
+        self.initial_state = initial_state
+
+        return self.state
 
     @abstractmethod
-    def reset(self, initial_state):
+    def reset(self, transition_rule=None, reward_rule=None, state=None):
         """
-        Resets the environment to the given initial state.
+        Resets the environment by updating its rules and state only if new values are provided.
 
-        :param initial_state: The initial State object.
-        :return: The initial state.
+        :param transition_rule: (Optional) A new transition rule; if None, preserves the current rule.
+        :param reward_rule: (Optional) A new reward rule; if None, preserves the current rule.
+        :param state: (Optional) A new state object; if None, goes back to the original initial state.
+        :return: The state after reset.
         """
-        pass
+        if transition_rule is not None:
+            self.transition_rule = transition_rule
+        if reward_rule is not None:
+            self.reward_rule = reward_rule
+        
+        self.state = state if state is not None else self.initial_state
+
+        return self.state
+
 
     @abstractmethod
     def step(self, actions: Dict[Any, Any]) -> Tuple[Any, Dict[Any, float]]:
@@ -54,26 +67,42 @@ class Environment(ABC):
 # -----------------------
 
 class RLEnvironment(Environment):
-    def __init__(self, num_instances_per_step=100, seed=0, n_agents=2, schema=None):
+    def __init__(self, transition_rule, reward_rule, state):
         """
-        Legacy RLEnvironment that manages multi-agent setups, data generation, and reward computation.
+        RLEnvironment that manages multi-agent setups, data generation, and reward computation.
+        """
+        super().__init__(transition_rule=transition_rule, reward_rule=reward_rule, state=state)
 
-        :param num_instances_per_step: Number of data points provided at each step.
-        :param seed: Seed for generating the fixed data distribution.
-        :param n_agents: Number of agents in the environment.
-        :param schema: A data schema object used for generating datasets.
+    def reset(self, transition_rule=None, reward_rule=None, state=None):
         """
-        # For the legacy environment, we don't need transition_rule and reward_rule at initialization.
-        # We will provide default (dummy) callables.
-        super().__init__(transition_rule=lambda state, actions: self._default_transition(state, actions),
-                         reward_rule=lambda state, actions, next_state: self.compute_rewards_default(state, actions, next_state))
+        Resets the environment state
+        """
+        super.reset(transition_rule, reward_rule, state)
+
+
+    def step(self, actions: Dict[Any, Any]) -> Tuple[Any, Dict[Any, float]]:
+        """
+        Generates new data for this step, updates the state, and returns the updated state along with computed rewards.
+        Actions are ignored in the legacy environment's default transition.
         
-        self.num_instances_per_step = num_instances_per_step
-        self.seed = seed
+        :param actions: (Ignored) Dictionary mapping agent IDs to their actions.
+        :return: A tuple (new_state, rewards), where rewards is a dict mapping agent IDs to their computed rewards.
+        """
+        # Store the current state for reward computation.
+        previous_state = self.state
         
-        # Environment dataset
-        self.schema = schema
-        self.dataset = None
+        # Delegate dataset generation and state update to the transition rule.
+        new_state = self.transition_rule(previous_state, actions)
+
+        # Compute rewards using the reward_rule provided
+        rewards = self.reward_rule(previous_state, actions, new_state)
+        
+        # Update the environment's state.
+        self.state = new_state
+        
+        return new_state, rewards
+
+
 
     def _init_agents(self, n_agents):
         """
@@ -84,43 +113,6 @@ class RLEnvironment(Environment):
             agents_graphmodels[agent_id] = create_minimal_graphmodel(input_shape=(2,))
         return agents_graphmodels
 
-    def reset(self, initial_state=None, seed: int = None, new_schema=None):
-        """
-        Resets the environment state without generating a dataset.
-        
-        If an initial_state is provided, its agents_states are used to determine the number of agents.
-        Otherwise, the number of agents defaults to self.n_agents (if set) or a fallback value.
-        The dataset is not generated here; it will be generated during step().
-        """
-        if new_schema is not None:
-            self.schema = new_schema
-        elif seed is not None:
-            self.schema.rng = np.random.default_rng(seed)
-        
-        # Determine the number of agents from the provided initial state if available.
-        if initial_state is not None and hasattr(initial_state, "agents_states"):
-            n_agents = len(initial_state.agents_states)
-        else:
-            n_agents = getattr(self, "n_agents", 2)
-        
-        # Reinitialize agent graphmodels using the helper method.
-        self.agents_graphmodels = self._init_agents(n_agents)
-        
-        # Create a new state with dataset set to None.
-        # Agents' states are built using the new agent graphmodels.
-        agents_states = {}
-        for agent_id, graphmodel in self.agents_graphmodels.items():
-            composer, _ = graphmodel
-            agent_state = AgentState(
-                nodes=list(composer.nodes.keys()),
-                connections=composer.connections,
-                graphmodel=graphmodel
-            )
-            agents_states[agent_id] = agent_state
-        
-        initial_state = State(dataset=None, agents_states=agents_states)
-        self.state = initial_state
-        return self.state
 
 
 
@@ -142,30 +134,7 @@ class RLEnvironment(Environment):
 
         return State(dataset=self.dataset, agents_states=agents_states)
 
-    def step(self, actions=None):
-        """
-        Generates new data for this step, updates the state, and returns the updated state along with computed rewards.
-        Actions are ignored in the legacy environment's default transition.
-        
-        :param actions: (Ignored) Dictionary mapping agent IDs to their actions.
-        :return: A tuple (new_state, rewards), where rewards is a dict mapping agent IDs to their computed rewards.
-        """
-        # Store the current state for reward computation.
-        previous_state = self.state
 
-        # Generate a new dataset.
-        self.dataset = self.schema.generate_dataset(num_instances=self.num_instances_per_step)
-        
-        # Obtain the new state.
-        new_state = self._get_state()
-        
-        # Compute rewards using the reward_rule provided
-        rewards = self.reward_rule(previous_state, actions, new_state)
-        
-        # Update the environment's state.
-        self.state = new_state
-        
-        return new_state, rewards
 
 
     def compute_rewards_default(self, state, actions, next_state):
@@ -191,8 +160,11 @@ class RLEnvironment(Environment):
             rewards[agent_id] = avg_acc
         return rewards
 
-    def _default_transition(self, state, actions):
+    def _default_transition(self, state, actions, schema):
         """
-        A dummy transition rule that simply returns the current state.
+        Return the next state
         """
-        return state
+
+        dataset = schema.generate_dataset(num_instances=self.num_instances_per_step)
+
+        return State(dataset, )
