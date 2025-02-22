@@ -10,7 +10,19 @@ class DummyNode(GraphNode):
         return input_tensor
 
 class TestSingleNeuronBlueprint(unittest.TestCase):
+    """
+    Unit tests for the SingleNeuron blueprint.
+    """
+
     def test_single_neuron_blueprint(self):
+        """
+        This test case validates that a SingleNeuron instance configured with a ReLU
+        activation produces an output of the expected shape.
+
+        The test constructs a SingleNeuron and applies it to a global input tensor.
+        A temporary Keras model is built to ensure that the output tensor has the
+        expected shape, specifically (None, 1) as SingleNeuron outputs a single unit.
+        """
         # Create a SingleNeuron blueprint with a ReLU activation.
         neuron = SingleNeuron(name="test_neuron", activation="relu")
         # Create a global input tensor.
