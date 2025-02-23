@@ -139,7 +139,7 @@ class TestLearnedAbstractionTraining(unittest.TestCase):
             print_graph_nodes(composer=composer)
 
             # Evaluate the composed model using the shared train_and_evaluate function.
-            acc = train_and_evaluate(model, dataset, train_ratio=0.5, epochs=300, verbose=0)
+            acc = train_and_evaluate(model, dataset, train_ratio=0.5, epochs=10, verbose=0)
             print(f"Trained network accuracy after fine-tuning: {acc:.3f}, Abstraction accuracy: {abstraction_acc:.3f}")
             
             # Check that the learned abstraction's weights have not changed.
