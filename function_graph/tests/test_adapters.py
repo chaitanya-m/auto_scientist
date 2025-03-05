@@ -79,9 +79,7 @@ class TestSGDWithLRMultiplierTraining(unittest.TestCase):
     def test_sgd_lr_multiplier_applied_in_training(self):
         """
         Test that when using SGDWithLRMultiplier, the weight updates for layers with names 
-        containing 'fast' are scaled by the specified multiplier (e.g., 5x). This test builds 
-        two identical models (one using standard Adam and one using SGDWithLRMultiplier) and 
-        performs one training step on each with beta1=0 and beta2=0 for simplicity. The weight 
+        containing 'fast' are scaled by the specified multiplier (e.g., 5x). The weight 
         update for the 'fast_dense' layer in the custom model should be approximately 5 times that 
         of the standard model, confirming that our wrapper correctly scales the gradients during 
         training.
@@ -101,6 +99,7 @@ class TestSGDWithLRMultiplierTraining(unittest.TestCase):
             )(inp)
             # Build and return the Keras model.
             model = tf.keras.Model(inputs=inp, outputs=out)
+
 
                 # Debug: Print out all layer names.
             print("Keras model layers:")
