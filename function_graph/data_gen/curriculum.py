@@ -44,7 +44,10 @@ class Curriculum:
             centers=3,
             random_state=seed
         )
-        X = (X - X.mean(axis=0)) / X.std(axis=0)  # Standard scaling
+        # Min-max scaling to [0,1] range
+        X_min = X.min(axis=0)
+        X_range = X.max(axis=0) - X_min
+        X = (X - X_min) / (X_range + 1e-8)  # Add small epsilon to prevent division by zero
         
         # Add noise if specified
         if config['noise_level'] > 0:
