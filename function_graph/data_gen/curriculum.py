@@ -4,44 +4,71 @@ import tensorflow as tf
 from typing import Dict, List, Tuple
 
 class Curriculum:
-    def __init__(self, phases: List[Dict], seeds_per_phase: int = 10):
+    DEFAULT_PHASES = {
+        'basic': {
+            'input_dim': 3,
+            'encoder': [3, 4, 2],  # 2 latent neurons (1 cluster × 2)
+            'decoder': [2, 4, 3],
+            'noise_level': 0.1,
+            'clusters': 1,
+            'cluster_std': [0.3]
+        },
+        'intermediate': {
+            'input_dim': 3,
+            'encoder': [3, 6, 4],  # 4 latent neurons (2 clusters × 2)
+            'decoder': [4, 6, 3],
+            'noise_level': 0.2,
+            'clusters': 2,
+            'cluster_std': [0.3, 0.5]
+        }
+    }
+
+    def __init__(self, phase_type='basic', seeds_per_phase=10):
         """
-        Manages a curriculum of increasingly complex autoencoder tasks
+        Manages a curriculum of autoencoder tasks with validated architecture
         
         Args:
-            phases: List of phase configurations, each specifying:
-                - input_dim: Input dimension
-                - encoder: List of encoder layer sizes
-                - decoder: List of decoder layer sizes  
-                - noise_level: Gaussian noise stddev
-            seeds_per_phase: Number of random seeds per phase
+            phase_type: Which phase configuration to use (basic/intermediate)
+            seeds_per_phase: Number of random seeds for reproducibility
         """
-        self.phases = phases
+        self.phase_config = self.DEFAULT_PHASES[phase_type]
         self.seeds_per_phase = seeds_per_phase
-        self.reference_cache = {}  # Stores precomputed reference models
-        
-        # Precompute all reference autoencoders
+        self.reference_cache = {}
+        self._validate_architecture()
         self._precompute_references()
 
+    def _validate_architecture(self):
+        """Ensure latent dimension matches cluster requirements (2 per cluster)"""
+        latent_dim = self.phase_config['encoder'][-1]
+        required_dim = self.phase_config['clusters'] * 2
+        if latent_dim != required_dim:
+            raise ValueError(f"Latent dim {latent_dim} should be {required_dim} for {self.phase_config['clusters']} clusters")
+
     def _precompute_references(self):
-        """Precompute reference autoencoders for all phases and seeds"""
-        for phase_idx, phase_config in enumerate(self.phases):
-            for seed in range(self.seeds_per_phase):
-                key = (phase_idx, seed)
-                self.reference_cache[key] = self._train_reference_autoencoder(
-                    phase_config, 
-                    seed
-                )
+        """Precompute reference autoencoders for all seeds in current phase"""
+        for seed in range(self.seeds_per_phase):
+            key = (0, seed)  # Single phase index 0
+            self.reference_cache[key] = self._train_reference_autoencoder(
+                self.phase_config, 
+                seed
+            )
 
     def _train_reference_autoencoder(self, config: Dict, seed: int) -> Dict:
         """Train and store reference autoencoder"""
         tf.keras.utils.set_random_seed(seed)
         
-        # Generate and normalize synthetic data
+        # Generate synthetic data using Gaussian blobs (isotropic clusters)
+        # Creates 3 separable clusters of normally distributed points:
+        # - n_samples: 1000 total points (approx 333 per cluster)
+        # - n_features: Dimension matches phase configuration input size
+        # - centers: 3 cluster centers in feature space
+        # - cluster_std: 1.0 standard deviation for each cluster
+        # - random_state: Seed for reproducible data generation
         X, _ = make_blobs(
             n_samples=1000,
             n_features=config['input_dim'],
-            centers=3,
+            centers=config['clusters'],
+            cluster_std=config['cluster_std'],
             random_state=seed
         )
         # Min-max scaling to [0,1] range
