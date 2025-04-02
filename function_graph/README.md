@@ -1,4 +1,7 @@
 
+# An attempt at self-determined curriculum learning: getting an agent to learn a hard concept by requesting easier concepts to learn, and building a repository of motifs or patterns that can then be used to solve the harder problem, starting from basic functions. While Occam's Razor may be implicit in the feedback when a single agent is compared against a reference in terms of accuracy/complexity, allowing competing agents should make redundant the need to do so as agents will have to maintain their motif repositories at a finite, naturally bounded level in order to stay competitive.
+
+<!-- 
 
 ## Round:
 
@@ -334,7 +337,7 @@ The Agents compete to build a predictor graph that reaches the baseline performa
 - $subset(s, shape(c_j))$: Subset selection operation to match the input shape of $c_j$.
 - $replicate(c_j, shape(s))$: Replication operation to handle all outputs of $s$.
 
-
+ -->
 
 
 
