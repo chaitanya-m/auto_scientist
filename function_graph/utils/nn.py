@@ -42,23 +42,40 @@ def train_and_evaluate(model, dataset, train_ratio=0.5, epochs=1, verbose=0):
     accuracy = (preds == test_labels).mean()
     return accuracy
 
+# utils/nn.py
+from graph.composer import GraphComposer
+from graph.node import InputNode, SingleNeuron, DenseNode  # Ensure DenseNode is imported
 
-def create_minimal_graphmodel(input_shape):
+def create_minimal_graphmodel(input_shape, output_units=1, activation='sigmoid'):
     """
     Builds a minimal valid network using our node and composer framework.
-    The network has an InputNode (with the given input_shape) and a SingleNeuron output node with sigmoid activation.
+    If output_units > 1, a DenseNode is used to create an output node with the specified number of units.
+    Otherwise, a SingleNeuron node is used.
     """
     composer = GraphComposer()
+    
+    # Create input node.
     input_node = InputNode(name="input", input_shape=input_shape)
-    # For binary classification, we use a sigmoid on the output.
-    output_node = SingleNeuron(name="output", activation="sigmoid")
     composer.add_node(input_node)
+    
+    # Decide which output node to use based on output_units.
+    if output_units == 1:
+        output_node = SingleNeuron(name="output", activation=activation)
+    else:
+        output_node = DenseNode(name="output", units=output_units, activation=activation)
+    
     composer.add_node(output_node)
+    
+    # Set input and output nodes and connect them.
     composer.set_input_node("input")
     composer.set_output_node("output")
     composer.connect("input", "output")
+    
+    # Build the final model.
     model = composer.build()
     return composer, model
+
+
 
 class AdamWithLRMultiplier(tf.keras.optimizers.Adam):
     def __init__(self, lr_map, *args, **kwargs):

@@ -130,3 +130,17 @@ class SubGraphNode(GraphNode):
         if compile_model:
             loaded_model.compile(optimizer=optimizer, loss=loss)
         return cls(name, loaded_model)
+
+
+class DenseNode(GraphNode):
+    """
+    Blueprint for a Dense layer with a configurable number of units.
+    Useful for building minimal graphs, such as encoder/decoder input/output only networks to be filled in.
+    """
+    def __init__(self, name: str, units: int, activation=None):
+        super().__init__(name)
+        self.units = units
+        self.activation = activation
+
+    def apply(self, input_tensor):
+        return layers.Dense(self.units, activation=self.activation, name=self.name)(input_tensor)

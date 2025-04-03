@@ -1,3 +1,4 @@
+# agents/mcts.py
 from agents.mcts_agent_interface import MCTSAgentInterface
 from data_gen.curriculum import Curriculum
 from utils.nn import create_minimal_graphmodel
@@ -10,16 +11,16 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         self.curriculum = Curriculum(phase_type='basic')
         self.reference = self.curriculum.get_reference(0, seed=0)
         self.target_mse = self.reference['mse']
-        self.encoder_config = self.reference['config']['encoder']
         self.input_dim = self.reference['config']['input_dim']
-        self.output_dim = self.reference['config']['output_dim']
+        self.latent_dim = self.reference['config']['encoder'][-1]  # Get the encoder's latent dimension
 
     def get_initial_state(self):
-        composer, _ = create_minimal_graphmodel((self.input_dim,))
+        # Use latent_dim as output_units, and choose an appropriate activation function (e.g., 'relu').
+        composer, _ = create_minimal_graphmodel((self.input_dim,), output_units=self.latent_dim, activation="relu")
         return {
             "composer": composer,
             "graph_actions": [],
-            "performance": 1.0,  # dummy until we hook up evaluation
+            "performance": 1.0,  # dummy value until evaluation is hooked up
             "target_mse": self.target_mse,
         }
 
