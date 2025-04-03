@@ -55,7 +55,7 @@ class TestSimpleMCTSAgent(unittest.TestCase):
         self.assertIn("performance", state)
         self.assertIn("target_mse", state)
         self.assertIsInstance(state["composer"], GraphComposer)
-        # Check that the model built has an output dimension equal to latent_dim.
+        # Ensure the built model has an output dimension equal to the latent_dim.
         state["composer"].build()
         output_dim = state["composer"].keras_model.output.shape[-1]
         self.assertEqual(output_dim, self.agent.latent_dim)
@@ -72,18 +72,42 @@ class TestSimpleMCTSAgent(unittest.TestCase):
         initial_actions_length = len(state["graph_actions"])
         new_state = self.agent.apply_action(state, "add_neuron")
         self.assertEqual(len(new_state["graph_actions"]), initial_actions_length + 1)
-        # Check that the new graph can build a valid model.
         new_state["composer"].build()
         self.assertIsNotNone(new_state["composer"].keras_model)
     
-    def test_apply_delete_repository_action(self):
-        # For delete_repository_entry to work, add something to repository first.
-        self.agent.repository.append("dummy_entry")
+    def test_update_repository(self):
+        # Test that update_repository adds a state if performance improves.
         state = self.agent.get_initial_state()
-        initial_repo_length = len(self.agent.repository)
+        state["performance"] = 0.5  # Simulate an improved performance.
+        initial_repo_len = len(self.agent.repository)
+        self.agent.update_repository(state)
+        self.assertEqual(len(self.agent.repository), initial_repo_len + 1)
+        self.assertAlmostEqual(self.agent.best_mse, 0.5)
+    
+    def test_apply_add_from_repository_action(self):
+        # Ensure that when there is a repository entry, the add_from_repository action works.
+        state = self.agent.get_initial_state()
+        # First, update repository with an improved state.
+        state["performance"] = 0.4
+        self.agent.update_repository(state)
+        actions_before = state["graph_actions"].copy()
+        available_actions = self.agent.get_available_actions(state)
+        self.assertIn("add_from_repository", available_actions)
+        
+        new_state = self.agent.apply_action(state, "add_from_repository")
+        # Verify that the action history includes the "add_from_repository" action.
+        self.assertIn("add_from_repository", new_state["graph_actions"])
+        # Build the updated graph to ensure the model can be rebuilt.
+        new_state["composer"].build()
+        self.assertIsNotNone(new_state["composer"].keras_model)
+    
+    def test_apply_delete_repository_entry_action(self):
+        # Add a dummy repository entry to enable deletion.
+        self.agent.repository.append({"dummy": True})
+        state = self.agent.get_initial_state()
+        initial_repo_len = len(self.agent.repository)
         new_state = self.agent.apply_action(state, "delete_repository_entry")
-        self.assertEqual(len(self.agent.repository), initial_repo_length - 1)
-
+        self.assertEqual(len(self.agent.repository), initial_repo_len - 1)
 
 if __name__ == '__main__':
     unittest.main()

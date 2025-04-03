@@ -2,9 +2,10 @@
 from agents.mcts_agent_interface import MCTSAgentInterface
 from data_gen.curriculum import Curriculum
 from utils.nn import create_minimal_graphmodel
-from graph.composer import GraphComposer
-from graph.node import SingleNeuron
+from graph.composer import GraphComposer, GraphTransformer
+from graph.node import SingleNeuron, SubGraphNode
 import uuid
+import os
 
 class SimpleMCTSAgent(MCTSAgentInterface):
     def __init__(self):
@@ -17,6 +18,7 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         
         # Repository to store successful architectures (starting empty).
         self.repository = []
+        self.best_mse = float('inf')
 
     def get_initial_state(self):
         # Build a minimal graph with an input shape matching the reference
@@ -34,9 +36,8 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         }
     
     def get_available_actions(self, state):
-        # For now, we have two actions: add a neuron or delete a repository entry.
+        # For now, we have three actions: add a neuron, add from repository, or delete a repository entry.
         actions = ["add_neuron", "delete_repository_entry"]
-        # Optionally, we can also include actions to add a subgraph from the repository
         if self.repository:
             actions.append("add_from_repository")
         return actions
@@ -48,57 +49,103 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         
         if action == "add_neuron":
             # Add a new neuron (using SingleNeuron for now) to the graph.
-            # Here we choose a random identifier for the new node.
             new_node = SingleNeuron(name=str(uuid.uuid4()), activation="relu")
-            
-            # For simplicity, assume we are adding the neuron between the input and output.
-            # First, disconnect the current connection.
+            # For simplicity, assume we add the neuron between input and output.
             try:
                 composer.disconnect("input", "output")
             except Exception:
-                # If no connection exists, skip disconnection.
-                pass
-                
-            # Add the new neuron node.
+                pass  # If the connection doesn't exist, skip
             composer.add_node(new_node)
-            # Connect: input -> new neuron -> output.
             composer.connect("input", new_node.name)
             composer.connect(new_node.name, "output")
         
         elif action == "delete_repository_entry":
-            # For now, we simply remove the last entry in the repository.
+            # Remove the last entry from the repository.
             if self.repository:
                 self.repository.pop()
                 
         elif action == "add_from_repository":
-            # Dummy action: if repository is not empty, add its first element to the graph.
-            # In a more advanced version, you'd merge the repository's subgraph intelligently.
-            repo_entry = self.repository[0]
-            # Assume repo_entry contains a composer or subgraph that can be merged.
-            # For now, we just simulate this by adding a neuron with a different activation.
-            new_node = SingleNeuron(name=str(uuid.uuid4()), activation="tanh")
-            try:
-                composer.disconnect("input", "output")
-            except Exception:
-                pass
-            composer.add_node(new_node)
-            composer.connect("input", new_node.name)
-            composer.connect(new_node.name, "output")
+            if self.repository:
+                # Retrieve the first repository entry.
+                repo_entry = self.repository[0]
+                # Use GraphTransformer to add the repository subgraph into the current graph.
+                transformer = GraphTransformer(composer)
+                # For simplicity, we choose "input" as the chosen subset and "output" as the output.
+                transformer.add_abstraction_node(
+                    repo_entry["subgraph_node"],
+                    chosen_subset=["input"],
+                    outputs=["output"]
+                )
         
-        # Clear any built model so that a new one is constructed on the next evaluation.
+        # Clear any built model so that a new one is constructed on next evaluation.
         composer.keras_model = None
         # Rebuild the model.
         composer.build()
         
-        # Dummy update: for now, performance remains unchanged.
+        # Dummy update: performance remains unchanged until evaluate_state is called.
         new_state["performance"] = state["performance"]
         return new_state
 
     def evaluate_state(self, state):
-        # Dummy evaluation: for now, we simply return a dummy performance value.
-        # In a real scenario, you'd train the model briefly and compute its MSE.
-        return state["performance"]
+        """
+        Evaluate the state's performance by training the model briefly and computing MSE.
+        """
+        X, y = self.get_training_data()
+        model = state["composer"].build()
+        model.compile(optimizer="adam", loss="mse")
+        
+        # Train briefly for fast evaluation.
+        history = model.fit(X, y, epochs=5, verbose=0)
+        mse = history.history['loss'][-1]
+        state["performance"] = mse
+        
+        # Update repository if this state is better than the current best.
+        self.update_repository(state)
+        return mse
+
+    def update_repository(self, state):
+        """
+        Add state to the repository if its performance improves on the current best.
+        Uses save_subgraph and add_abstraction_node to store the subgraph.
+        """
+        if state["performance"] < self.best_mse:
+            self.best_mse = state["performance"]
+            # Save the current subgraph to a temporary file.
+            tmp_filepath = f"temp_subgraph_{uuid.uuid4().hex[:4]}.keras"
+            state["composer"].save_subgraph(tmp_filepath)
+            # Load the saved subgraph as a SubGraphNode.
+            new_subgraph_node = SubGraphNode.load(tmp_filepath, name=f"subgraph_{uuid.uuid4().hex[:4]}")
+            # Optionally, remove the temporary file.
+            if os.path.exists(tmp_filepath):
+                os.remove(tmp_filepath)
+            
+            # Use GraphTransformer to add an abstraction node from the repository.
+            transformer = GraphTransformer(state["composer"])
+            transformer.add_abstraction_node(
+                new_subgraph_node,
+                chosen_subset=["input"],
+                outputs=["output"]
+            )
+            # Store in the repository.
+            repo_entry = {
+                "subgraph_node": new_subgraph_node,
+                "performance": state["performance"],
+                "graph_actions": state["graph_actions"].copy()
+            }
+            self.repository.append(repo_entry)
+            print(f"Repository updated: New best performance {self.best_mse}")
+
+    def get_training_data(self):
+        """
+        Dummy function to generate training data.
+        Replace with actual data from your curriculum.
+        """
+        import numpy as np
+        X = np.random.rand(100, self.input_dim)
+        # For an autoencoder, target is the input itself, or you could transform it using the reference encoder.
+        y = X.copy()
+        return X, y
 
     def is_terminal(self, state):
-        # Dummy terminal check: we'll always return False until we add proper criteria.
+        # Define termination criteria (e.g., performance threshold or search budget).
         return False
