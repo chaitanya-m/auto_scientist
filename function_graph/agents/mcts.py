@@ -8,50 +8,97 @@ import uuid
 
 class SimpleMCTSAgent(MCTSAgentInterface):
     def __init__(self):
+        # Initialize the curriculum and get reference autoencoder parameters.
         self.curriculum = Curriculum(phase_type='basic')
         self.reference = self.curriculum.get_reference(0, seed=0)
         self.target_mse = self.reference['mse']
         self.input_dim = self.reference['config']['input_dim']
-        self.latent_dim = self.reference['config']['encoder'][-1]  # Get the encoder's latent dimension
+        self.latent_dim = self.reference['config']['encoder'][-1]
+        
+        # Repository to store successful architectures (starting empty).
+        self.repository = []
 
     def get_initial_state(self):
-        # Use latent_dim as output_units, and choose an appropriate activation function (e.g., 'relu').
-        composer, _ = create_minimal_graphmodel((self.input_dim,), output_units=self.latent_dim, activation="relu")
+        # Build a minimal graph with an input shape matching the reference
+        # and an output corresponding to the encoder's latent space.
+        composer, _ = create_minimal_graphmodel(
+            (self.input_dim,),
+            output_units=self.latent_dim,
+            activation="relu"
+        )
         return {
             "composer": composer,
             "graph_actions": [],
-            "performance": 1.0,  # dummy value until evaluation is hooked up
+            "performance": 1.0,  # Dummy performance for now
             "target_mse": self.target_mse,
         }
-
+    
     def get_available_actions(self, state):
-        return ["add_neuron"]  # We'll start with just this one action
-
+        # For now, we have two actions: add a neuron or delete a repository entry.
+        actions = ["add_neuron", "delete_repository_entry"]
+        # Optionally, we can also include actions to add a subgraph from the repository
+        if self.repository:
+            actions.append("add_from_repository")
+        return actions
+    
     def apply_action(self, state, action):
         composer = state["composer"]
-        new_node = SingleNeuron(name=str(uuid.uuid4()), activation="relu")
-
-        # Connect new neuron between input and output (for now)
-        input_node = composer.input_node
-        output_node = composer.output_node
-
-        # Disconnect input → output
-        composer.disconnect(input_node, output_node)
-
-        # Add new node and wire it: input → new → output
-        composer.add_node(new_node)
-        composer.connect(input_node, new_node)
-        composer.connect(new_node, output_node)
-
-        return {
-            "composer": composer,
-            "graph_actions": state["graph_actions"] + [action],
-            "performance": 1.0,  # still dummy
-            "target_mse": state["target_mse"]
-        }
+        new_state = state.copy()
+        new_state["graph_actions"] = state["graph_actions"] + [action]
+        
+        if action == "add_neuron":
+            # Add a new neuron (using SingleNeuron for now) to the graph.
+            # Here we choose a random identifier for the new node.
+            new_node = SingleNeuron(name=str(uuid.uuid4()), activation="relu")
+            
+            # For simplicity, assume we are adding the neuron between the input and output.
+            # First, disconnect the current connection.
+            try:
+                composer.disconnect("input", "output")
+            except Exception:
+                # If no connection exists, skip disconnection.
+                pass
+                
+            # Add the new neuron node.
+            composer.add_node(new_node)
+            # Connect: input -> new neuron -> output.
+            composer.connect("input", new_node.name)
+            composer.connect(new_node.name, "output")
+        
+        elif action == "delete_repository_entry":
+            # For now, we simply remove the last entry in the repository.
+            if self.repository:
+                self.repository.pop()
+                
+        elif action == "add_from_repository":
+            # Dummy action: if repository is not empty, add its first element to the graph.
+            # In a more advanced version, you'd merge the repository's subgraph intelligently.
+            repo_entry = self.repository[0]
+            # Assume repo_entry contains a composer or subgraph that can be merged.
+            # For now, we just simulate this by adding a neuron with a different activation.
+            new_node = SingleNeuron(name=str(uuid.uuid4()), activation="tanh")
+            try:
+                composer.disconnect("input", "output")
+            except Exception:
+                pass
+            composer.add_node(new_node)
+            composer.connect("input", new_node.name)
+            composer.connect(new_node.name, "output")
+        
+        # Clear any built model so that a new one is constructed on the next evaluation.
+        composer.keras_model = None
+        # Rebuild the model.
+        composer.build()
+        
+        # Dummy update: for now, performance remains unchanged.
+        new_state["performance"] = state["performance"]
+        return new_state
 
     def evaluate_state(self, state):
-        return 0.0  # We'll update this in Stage 2
+        # Dummy evaluation: for now, we simply return a dummy performance value.
+        # In a real scenario, you'd train the model briefly and compute its MSE.
+        return state["performance"]
 
     def is_terminal(self, state):
-        return False  # Also to be updated later
+        # Dummy terminal check: we'll always return False until we add proper criteria.
+        return False
