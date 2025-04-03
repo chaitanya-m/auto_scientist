@@ -88,9 +88,7 @@ class AdamWithLRMultiplier(tf.keras.optimizers.Adam):
                         if key_substring in var.name:
                             multiplier = factor
                             break
-                print(f"Variable: {var.name}, Layer: {getattr(var, '_layer_name', 'N/A')}, Original grad: {grad.numpy()}, Multiplier: {multiplier}")
                 grad = grad * multiplier
-                print(f"Variable: {var.name}, Layer: {getattr(var, '_layer_name', 'N/A')}, New grad: {grad.numpy()}, Multiplier: {multiplier}")
             new_grads_and_vars.append((grad, var))
         return super().apply_gradients(new_grads_and_vars, **kwargs)
 
