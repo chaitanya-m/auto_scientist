@@ -1,3 +1,4 @@
+#tests/test_curriculum.py
 import unittest
 import numpy as np
 from function_graph.data_gen.curriculum import Curriculum
