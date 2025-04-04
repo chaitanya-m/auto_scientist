@@ -1,3 +1,4 @@
+#data_gen/curriculum.py
 import numpy as np
 from sklearn.datasets import make_blobs
 import tensorflow as tf
@@ -53,17 +54,19 @@ class Curriculum:
                 seed
             )
 
+
     def _train_reference_autoencoder(self, config: Dict, seed: int) -> Dict:
-        """Train and store reference autoencoder"""
+        """Train and store reference autoencoder and its components"""
         tf.keras.utils.set_random_seed(seed)
         
-        # Generate synthetic data using Gaussian blobs (isotropic clusters)
-        # Creates 3 separable clusters of normally distributed points:
-        # - n_samples: 1000 total points (approx 333 per cluster)
-        # - n_features: Dimension matches phase configuration input size
-        # - centers: 3 cluster centers in feature space
-        # - cluster_std: 1.0 standard deviation for each cluster
-        # - random_state: Seed for reproducible data generation
+
+            # Generate synthetic data using Gaussian blobs (isotropic clusters)
+            # Creates 3 separable clusters of normally distributed points:
+            # - n_samples: 1000 total points (approx 333 per cluster)
+            # - n_features: Dimension matches phase configuration input size
+            # - centers: 3 cluster centers in feature space
+            # - cluster_std: 1.0 standard deviation for each cluster
+            # - random_state: Seed for reproducible data generation
         X, _ = make_blobs(
             n_samples=1000,
             n_features=config['input_dim'],
@@ -71,28 +74,25 @@ class Curriculum:
             cluster_std=config['cluster_std'],
             random_state=seed
         )
-        # Min-max scaling to [0,1] range
         X_min = X.min(axis=0)
         X_range = X.max(axis=0) - X_min
-        X = (X - X_min) / (X_range + 1e-8)  # Add small epsilon to prevent division by zero
+        X = (X - X_min) / (X_range + 1e-8)
         
-        # Add noise if specified
         if config['noise_level'] > 0:
             X += np.random.normal(scale=config['noise_level'], size=X.shape)
         
-        # Build autoencoder with bottleneck and final linear activation
+        # Build autoencoder model.
         autoencoder = tf.keras.Sequential()
         
-        # Encoder
+        # Encoder layers.
         for size in config['encoder']:
             autoencoder.add(tf.keras.layers.Dense(size, activation='relu'))
-            
-        # Decoder with linear output for normalized data
+        
+        # Decoder layers.
         for size in config['decoder'][:-1]:
             autoencoder.add(tf.keras.layers.Dense(size, activation='relu'))
         autoencoder.add(tf.keras.layers.Dense(config['decoder'][-1], activation='linear'))
         
-        # Train with better optimization
         autoencoder.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')
         history = autoencoder.fit(
             X, X,
@@ -107,10 +107,30 @@ class Curriculum:
             ]
         )
         
+        val_mse = min(history.history['val_loss'])
+        
+        # Extract encoder and decoder from the autoencoder.
+        # Assuming a Sequential model, the encoder is the first len(config['encoder']) layers.
+        encoder = tf.keras.Sequential()
+        encoder.add(tf.keras.layers.InputLayer(input_shape=(config['input_dim'],)))
+        for i in range(len(config['encoder'])):
+            encoder.add(autoencoder.layers[i])
+        
+        # The decoder is the remainder of the model.
+        decoder = tf.keras.Sequential()
+        # For the decoder, we need to infer the shape of the latent space from the encoder's output.
+        latent_dim = config['encoder'][-1]
+        decoder.add(tf.keras.layers.InputLayer(input_shape=(latent_dim,)))
+        for i in range(len(config['encoder']), len(autoencoder.layers)):
+            decoder.add(autoencoder.layers[i])
+        
         return {
-            'mse': min(history.history['val_loss']),
-            'weights': autoencoder.get_weights(),
-            'config': config.copy()
+            'mse': val_mse,
+            'autoencoder': autoencoder,
+            'encoder': encoder,
+            'decoder': decoder,
+            'config': config.copy(),
+            'seed': seed
         }
 
     def get_reference(self, phase: int, seed: int) -> Dict:
