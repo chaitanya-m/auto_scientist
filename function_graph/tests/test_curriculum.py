@@ -1,4 +1,3 @@
-#tests/test_curriculum.py
 import unittest
 import numpy as np
 import tensorflow as tf
@@ -51,6 +50,19 @@ class TestCurriculum(unittest.TestCase):
         
         # Check that the seed matches.
         self.assertEqual(ref['seed'], 0, "Returned seed does not match expected value.")
-        
+
+    def test_data_generator_output(self):
+        """Verify that the data generator returns data of expected shape and variability."""
+        curriculum = Curriculum(seeds_per_phase=3)
+        # Request 50 samples.
+        X1 = curriculum.data_generator(50)
+        self.assertEqual(X1.shape, (50, curriculum.phase_config['input_dim']),
+                         "Data generator did not return expected shape.")
+        # Request another 50 samples without a fixed seed; ensure the output is different.
+        X2 = curriculum.data_generator(50)
+        # It's possible (though unlikely) that the outputs are identical; we'll check that they are not almost equal.
+        self.assertFalse(np.allclose(X1, X2),
+                         "Data generator should produce variable outputs when no seed is provided.")
+
 if __name__ == '__main__':
     unittest.main()
