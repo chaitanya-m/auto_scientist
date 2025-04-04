@@ -1,9 +1,40 @@
 import unittest
+import tensorflow as tf
+import numpy as np
+from utils.nn import create_minimal_graphmodel
 from agents.mcts import SimpleMCTSAgent
+from graph.composer import GraphComposer
 
-class TestMCTSSearch(unittest.TestCase):
+class TestSimpleMCTSAgent(unittest.TestCase):
     def setUp(self):
         self.agent = SimpleMCTSAgent()
+    
+    def test_initial_state(self):
+        state = self.agent.get_initial_state()
+        self.assertIn("composer", state)
+        self.assertIn("graph_actions", state)
+        self.assertIn("performance", state)
+        self.assertIn("target_mse", state)
+        self.assertIsInstance(state["composer"], GraphComposer)
+        # Build the model and check that its output dimension equals latent_dim.
+        state["composer"].build()
+        output_dim = state["composer"].keras_model.output.shape[-1]
+        self.assertEqual(output_dim, self.agent.latent_dim)
+    
+    def test_evaluate_state_output_shape(self):
+        """
+        Test that after evaluation, the candidate encoder produces outputs with shape
+        [batch_size, latent_dim].
+        """
+        state = self.agent.get_initial_state()
+        mse = self.agent.evaluate_state(state)
+        model = state["composer"].build()
+        X, _ = self.agent.get_training_data()
+        output = model.predict(X)
+        self.assertEqual(output.shape[-1], self.agent.latent_dim,
+                         "Candidate encoder output dimension should equal latent_dim.")
+        # Also check that the MSE is a non-negative number.
+        self.assertGreaterEqual(mse, 0.0, "MSE should be non-negative.")
     
     def test_search_loop_returns_best_state(self):
         # Run the search with a small search budget.
