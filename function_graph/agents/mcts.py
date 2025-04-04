@@ -8,6 +8,9 @@ import uuid
 import os
 import math
 import random
+import tensorflow as tf
+from keras import models
+from keras import layers
 
 class SimpleMCTSAgent(MCTSAgentInterface):
     class TreeNode:
@@ -23,12 +26,15 @@ class SimpleMCTSAgent(MCTSAgentInterface):
             return self.total_value / self.visits if self.visits > 0 else 0.0
 
     def __init__(self):
-        # Initialize the curriculum and reference autoencoder parameters.
+        # Initialize the curriculum and retrieve the precomputed reference autoencoder.
         self.curriculum = Curriculum(phase_type='basic')
         self.reference = self.curriculum.get_reference(0, seed=0)
         self.target_mse = self.reference['mse']
         self.input_dim = self.reference['config']['input_dim']
         self.latent_dim = self.reference['config']['encoder'][-1]
+        
+        # Extract the reference encoder from the full, trained reference autoencoder.
+        self.reference_encoder = self.get_reference_encoder()
         
         # Repository to store successful architectures.
         self.repository = []
@@ -36,6 +42,20 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         
         # Root of the search tree.
         self.root = None
+
+    def get_reference_encoder(self):
+        """
+        Extracts the encoder component from the full reference autoencoder.
+        Assumes the reference autoencoder is a Sequential model and the encoder
+        corresponds to the first len(config["encoder"]) layers.
+        """
+        config = self.reference["config"]
+        ref_model = self.reference["autoencoder"]  # The full, trained autoencoder.
+        encoder = models.Sequential()
+        encoder.add(layers.InputLayer(input_shape=(config["input_dim"],)))
+        for i in range(len(config["encoder"])):
+            encoder.add(ref_model.layers[i])
+        return encoder
 
     def get_initial_state(self):
         composer, _ = create_minimal_graphmodel(
@@ -92,15 +112,10 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         new_state["performance"] = state["performance"]
         return new_state
 
-    def evaluate_state(self, state):
-        X, y = self.get_training_data()
-        model = state["composer"].build()
-        model.compile(optimizer="adam", loss="mse")
-        history = model.fit(X, y, epochs=5, verbose=0)
-        mse = history.history['loss'][-1]
-        state["performance"] = mse
-        self.update_repository(state)
-        return mse
+    def get_training_data(self):
+        import numpy as np
+        X = np.random.rand(100, self.input_dim)
+        return X, None
 
     def update_repository(self, state):
         if state["performance"] < self.best_mse:
@@ -124,28 +139,42 @@ class SimpleMCTSAgent(MCTSAgentInterface):
             self.repository.append(repo_entry)
             print(f"Repository updated: New best performance {self.best_mse}")
 
-    def get_training_data(self):
-        import numpy as np
-        X = np.random.rand(100, self.input_dim)
-        # For encoder evaluation, use the first latent_dim columns of X as target.
-        y = X[:, :self.latent_dim]
-        return X, y
+    def evaluate_state(self, state):
+        # Obtain a batch of training data.
+        X, _ = self.get_training_data()
+        split_idx = int(0.8 * len(X))
+        X_train, X_test = X[:split_idx], X[split_idx:]
+        
+        # Use the reference encoder to generate target latent representations.
+        y_train = self.reference_encoder.predict(X_train)
+        y_test = self.reference_encoder.predict(X_test)
+        
+        # Build and compile the candidate encoder from the current state.
+        model = state["composer"].build()
+        model.compile(optimizer="adam", loss="mse")
+        
+        # Train the candidate encoder briefly.
+        history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=5, verbose=0)
+        mse = history.history["val_loss"][-1]
+        state["performance"] = mse
+        
+        # Update repository if performance improved.
+        self.update_repository(state)
+        
+        return mse
 
     def policy_network(self, state, actions):
-        # Stub: return uniform probabilities over available actions.
         n = len(actions)
-        return [1.0 / n for _ in actions]
+        return [1.0 / n for _ in range(n)]
 
     def is_terminal(self, state):
         return False
 
     def mcts_search(self, search_budget=20, exploration_constant=1.41):
-        # Initialize the tree with the root node.
         root_state = self.get_initial_state()
         self.root = self.TreeNode(root_state)
         
         for iteration in range(search_budget):
-            # Selection: start from root and traverse until a leaf is reached.
             node = self.root
             while node.children:
                 actions = self.get_available_actions(node.state)
@@ -179,16 +208,13 @@ class SimpleMCTSAgent(MCTSAgentInterface):
                 else:
                     node = best_child
             
-            # Simulation: evaluate the selected node.
-            reward = -self.evaluate_state(node.state)  # Reward is negative MSE.
-            # Backpropagation: update nodes along the path.
+            reward = -self.evaluate_state(node.state)
             temp = node
             while temp is not None:
                 temp.visits += 1
                 temp.total_value += reward
                 temp = temp.parent
         
-        # After search, select the best node based on average value.
         best_node = self.root
         best_avg = best_node.average_value()
         nodes_to_check = [self.root]
