@@ -1,3 +1,4 @@
+#tests/test_curriculum.py
 import unittest
 import numpy as np
 import tensorflow as tf

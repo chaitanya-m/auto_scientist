@@ -21,4 +21,3 @@ class MCTSAgentInterface(ABC):
 
     @abstractmethod
     def is_terminal(self, state): pass
-

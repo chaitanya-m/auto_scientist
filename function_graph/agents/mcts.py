@@ -9,8 +9,42 @@ import os
 import math
 import random
 import tensorflow as tf
-from keras import models
-from keras import layers
+from keras import models, layers
+import numpy as np
+
+class PolicyNetwork:
+    """
+    A simple MLP policy network which maps state feature vectors to probability distributions over actions.
+    For this example, we define a fixed input dimension (3 features) and fixed output dimension (3 actions).
+    """
+    def __init__(self, input_dim=3, num_actions=3, hidden_units=16, learning_rate=0.001):
+        self.model = models.Sequential([
+            layers.Input(shape=(input_dim,)),
+            layers.Dense(hidden_units, activation='relu'),
+            layers.Dense(num_actions, activation='softmax')
+        ])
+        self.model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+                           loss='sparse_categorical_crossentropy')
+    
+    def predict(self, features):
+        """
+        features: a numpy array of shape (input_dim, ) or (batch, input_dim)
+        returns: a numpy array of probabilities (if batch, then shape (batch, num_actions)).
+        """
+        # Ensure batch dimension.
+        features = np.atleast_2d(features)
+        return self.model.predict(features, verbose=0)[0]
+
+    def train(self, features, actions, rewards, epochs=5, batch_size=32):
+        """
+        Train the policy network on a batch of experiences.
+        features: numpy array of shape (batch, input_dim)
+        actions: numpy array of shape (batch,) as integer indices (0,1,2)
+        rewards: numpy array of shape (batch,) used as sample weights.
+        """
+        # Train using sample weights to weight the loss by observed reward.
+        self.model.fit(features, actions, sample_weight=rewards, 
+                       epochs=epochs, batch_size=batch_size, verbose=0)
 
 class SimpleMCTSAgent(MCTSAgentInterface):
     class TreeNode:
@@ -37,11 +71,17 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         self.reference_encoder = self.get_reference_encoder()
         
         # Repository to store successful architectures.
-        self.repository = []
+        self.repository = []  # Each entry will have an associated 'utility' computed as -performance.
         self.best_mse = float('inf')
         
         # Root of the search tree.
         self.root = None
+
+        # Initialize the policy network and experience buffer.
+        # In this example we use a fixed feature vector of size 3 and 3 output actions.
+        self.policy_net = PolicyNetwork(input_dim=3, num_actions=3)
+        self.experience = []  # Each experience is a tuple (features, action_index, reward)
+        self.experience_threshold = 20  # Train when at least this many samples are collected
 
     def get_reference_encoder(self):
         """
@@ -99,10 +139,11 @@ class SimpleMCTSAgent(MCTSAgentInterface):
                 
         elif action == "add_from_repository":
             if self.repository:
-                repo_entry = self.repository[0]  # For now, simply use the first entry.
+                # Select the repository entry with the highest utility.
+                best_entry = max(self.repository, key=lambda entry: entry["utility"])
                 transformer = GraphTransformer(composer)
                 transformer.add_abstraction_node(
-                    repo_entry["subgraph_node"],
+                    best_entry["subgraph_node"],
                     chosen_subset=["input"],
                     outputs=["output"]
                 )
@@ -131,10 +172,12 @@ class SimpleMCTSAgent(MCTSAgentInterface):
                 chosen_subset=["input"],
                 outputs=["output"]
             )
+            # Compute utility as -performance (lower performance/MSE implies higher utility).
             repo_entry = {
                 "subgraph_node": new_subgraph_node,
                 "performance": state["performance"],
-                "graph_actions": state["graph_actions"].copy()
+                "graph_actions": state["graph_actions"].copy(),
+                "utility": -state["performance"]
             }
             self.repository.append(repo_entry)
             print(f"Repository updated: New best performance {self.best_mse}")
@@ -163,9 +206,72 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         
         return mse
 
+    def extract_features(self, state):
+        """
+        Constructs a feature vector from the current state.
+        Here we use:
+          - performance: current candidate MSE (lower is better)
+          - number of actions taken
+          - size of the repository
+        """
+        perf = state.get("performance", 1.0)
+        num_actions = len(state.get("graph_actions", []))
+        repo_size = len(self.repository)
+        # You may choose to scale or transform these features.
+        return np.array([perf, num_actions, repo_size], dtype=float)
+
     def policy_network(self, state, actions):
-        n = len(actions)
-        return [1.0 / n for _ in range(n)]
+        """
+        Uses the learned policy network to predict probabilities over available actions.
+        The full network always outputs 3 probabilities corresponding to:
+          [ "add_neuron", "delete_repository_entry", "add_from_repository" ].
+        This method filters the full output to return a probability for each available action.
+        """
+        # Full action set for reference.
+        full_actions = ["add_neuron", "delete_repository_entry", "add_from_repository"]
+        # Extract state features.
+        features = self.extract_features(state)
+        probs_full = self.policy_net.predict(features)  # shape (3,)
+        
+        # Filter probabilities to only those for available actions.
+        available_probs = []
+        for action in actions:
+            idx = full_actions.index(action)
+            available_probs.append(probs_full[idx])
+        # Renormalize the available probabilities.
+        available_probs = np.array(available_probs)
+        if available_probs.sum() == 0:
+            available_probs = np.ones(len(actions))
+        available_probs = available_probs / available_probs.sum()
+        return available_probs.tolist()
+
+    def record_experience(self, state, action, reward):
+        """
+        Records an experience tuple and triggers training if enough data has been collected.
+        'action' is expected to be one of the strings in the full action space.
+        """
+        features = self.extract_features(state)
+        full_actions = ["add_neuron", "delete_repository_entry", "add_from_repository"]
+        try:
+            action_idx = full_actions.index(action)
+        except ValueError:
+            return  # Unrecognized action.
+        self.experience.append((features, action_idx, reward))
+        # If we have enough experience, train the policy network.
+        if len(self.experience) >= self.experience_threshold:
+            self.train_policy_network()
+            self.experience = []  # Clear after training.
+
+    def train_policy_network(self):
+        """
+        Trains the policy network on all recorded experiences.
+        We use the observed reward as a weight for each sample.
+        """
+        features = np.array([exp[0] for exp in self.experience])
+        actions = np.array([exp[1] for exp in self.experience])
+        rewards = np.array([exp[2] for exp in self.experience])
+        self.policy_net.train(features, actions, rewards)
+        print("Policy network trained on experience.")
 
     def is_terminal(self, state):
         return False
@@ -176,25 +282,29 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         
         for iteration in range(search_budget):
             node = self.root
+            # Select phase.
             while node.children:
-                actions = self.get_available_actions(node.state)
-                probs = self.policy_network(node.state, actions)
+                available_actions = self.get_available_actions(node.state)
+                probs = self.policy_network(node.state, available_actions)
                 best_ucb = -float('inf')
                 best_action = None
                 best_child = None
-                for i, action in enumerate(actions):
+                full_actions = ["add_neuron", "delete_repository_entry", "add_from_repository"]
+                for i, action in enumerate(full_actions):
+                    if action not in available_actions:
+                        continue  # Skip actions not allowed in current state.
                     if action in node.children:
                         child = node.children[action]
                         avg_reward = child.average_value()
                         ucb = avg_reward + exploration_constant * math.sqrt(math.log(node.visits + 1) / (child.visits + 1))
-                        ucb *= probs[i]
+                        ucb *= probs[available_actions.index(action)]
                         if ucb > best_ucb:
                             best_ucb = ucb
                             best_action = action
                             best_child = child
                     else:
                         ucb = exploration_constant * math.sqrt(math.log(node.visits + 1))
-                        ucb *= probs[i]
+                        ucb *= probs[available_actions.index(action)]
                         if ucb > best_ucb:
                             best_ucb = ucb
                             best_action = action
@@ -203,12 +313,19 @@ class SimpleMCTSAgent(MCTSAgentInterface):
                     new_state = self.apply_action(node.state, best_action)
                     new_node = self.TreeNode(new_state, parent=node, action=best_action)
                     node.children[best_action] = new_node
+                    # Record the experience immediately after node expansion.
+                    # We use a negative reward (since performance is MSE, lower is better).
+                    self.record_experience(node.state, best_action, 0)
                     node = new_node
                     break
                 else:
                     node = best_child
             
+            # Expand/evaluate leaf.
             reward = -self.evaluate_state(node.state)
+            # Record the final experience from this simulation.
+            if node.parent is not None and node.action is not None:
+                self.record_experience(node.parent.state, node.action, reward)
             temp = node
             while temp is not None:
                 temp.visits += 1
