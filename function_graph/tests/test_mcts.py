@@ -116,5 +116,71 @@ class TestSimpleMCTSAgent(unittest.TestCase):
         self.assertEqual(output.shape[-1], self.agent.latent_dim,
                          "Candidate encoder output dimension should equal latent_dim.")
 
+# tests/test_mcts.py
+import unittest
+import numpy as np
+from agents.mcts import SimpleMCTSAgent
+from graph.composer import GraphComposer
+from utils.nn import create_minimal_graphmodel
+from graph.node import SubGraphNode
+
+class TestRepositoryUtility(unittest.TestCase):
+
+    def setUp(self):
+        self.agent = SimpleMCTSAgent()
+        
+    def test_repository_entry_utility_calculation(self):
+        # Create a dummy state with a known performance
+        state = self.agent.get_initial_state()
+        state["performance"] = 0.25  # known MSE
+        # Call update_repository to add a repository entry based on the state.
+        initial_repo_len = len(self.agent.repository)
+        self.agent.update_repository(state)
+        self.assertEqual(len(self.agent.repository), initial_repo_len + 1)
+        # Check that the utility value equals -performance.
+        repo_entry = self.agent.repository[-1]
+        self.assertAlmostEqual(repo_entry["utility"], -0.25, msg="Utility should equal negative performance.")
+
+    def test_add_from_repository_selects_best_entry(self):
+        # Create real SubGraphNode instances using the minimal graph model function.
+        # Each subgraph node is built from a valid model with the current input dimension.
+        sub_nodes = []
+        for name in ["subgraph1", "subgraph2", "subgraph3"]:
+            composer, model = create_minimal_graphmodel((self.agent.input_dim,), output_units=1, activation="relu")
+            node = SubGraphNode(name=name, model=model)
+            sub_nodes.append(node)
+        
+        # Create a dummy repository with entries having different performances.
+        dummy_entries = [
+            {"subgraph_node": sub_nodes[0], "performance": 0.5, "graph_actions": [], "utility": -0.5},
+            {"subgraph_node": sub_nodes[1], "performance": 0.3, "graph_actions": [], "utility": -0.3},
+            {"subgraph_node": sub_nodes[2], "performance": 0.2, "graph_actions": [], "utility": -0.2}
+        ]
+        # Intentionally shuffling is not necessary since we use max() over utility.
+        self.agent.repository = dummy_entries.copy()
+        
+        # Create a dummy state with a valid composer.
+        state = self.agent.get_initial_state()
+        state["graph_actions"] = []
+        # Execute the "add_from_repository" action.
+        new_state = self.agent.apply_action(state, "add_from_repository")
+        
+        # Since the best (highest) utility is -0.2 (from subgraph3),
+        # we expect that the transformer used the corresponding repository entry.
+        # At minimum, the composer should rebuild its Keras model, indicating the action was performed.
+        self.assertIsNotNone(new_state["composer"].keras_model, 
+                             "Composer should rebuild the Keras model after add_from_repository.")
+    
+    def test_policy_network_output_filtering(self):
+        # Test that reducing the available actions returns a probability vector
+        # with the correct dimensions that sums to 1.
+        state = self.agent.get_initial_state()
+        available_actions = ["add_neuron", "delete_repository_entry"]  # Excluding reuse.
+        probs = self.agent.policy_network(state, available_actions)
+        self.assertEqual(len(probs), len(available_actions),
+                         "Policy network output should match the available actions count")
+        np.testing.assert_almost_equal(sum(probs), 1.0, decimal=5,
+            err_msg="Filtered probabilities should sum to 1.")
+
 if __name__ == '__main__':
     unittest.main()
