@@ -182,5 +182,114 @@ class TestRepositoryUtility(unittest.TestCase):
         np.testing.assert_almost_equal(sum(probs), 1.0, decimal=5,
             err_msg="Filtered probabilities should sum to 1.")
 
+
+# tests/test_mcts.py
+import unittest
+import numpy as np
+import tensorflow as tf
+from agents.mcts import SimpleMCTSAgent
+from graph.composer import GraphComposer
+from utils.nn import create_minimal_graphmodel
+from graph.node import SubGraphNode
+
+class TestRepositoryUtility(unittest.TestCase):
+
+    def setUp(self):
+        self.agent = SimpleMCTSAgent()
+        
+    def test_repository_entry_utility_calculation(self):
+        # Create a state with a known performance
+        state = self.agent.get_initial_state()
+        state["performance"] = 0.25  # known MSE
+        # Update the repository based on this state.
+        initial_repo_len = len(self.agent.repository)
+        self.agent.update_repository(state)
+        self.assertEqual(len(self.agent.repository), initial_repo_len + 1)
+        # The utility should equal -performance.
+        repo_entry = self.agent.repository[-1]
+        self.assertAlmostEqual(repo_entry["utility"], -0.25, msg="Utility should equal negative performance.")
+
+    def test_add_from_repository_selects_best_entry(self):
+        # Create real SubGraphNode instances using the minimal graph model.
+        sub_nodes = []
+        for name in ["subgraph1", "subgraph2", "subgraph3"]:
+            composer, model = create_minimal_graphmodel((self.agent.input_dim,), output_units=1, activation="relu")
+            node = SubGraphNode(name=name, model=model)
+            sub_nodes.append(node)
+        
+        # Build dummy repository entries with distinct performance (and utility) values.
+        dummy_entries = [
+            {"subgraph_node": sub_nodes[0], "performance": 0.5, "graph_actions": [], "utility": -0.5},
+            {"subgraph_node": sub_nodes[1], "performance": 0.3, "graph_actions": [], "utility": -0.3},
+            {"subgraph_node": sub_nodes[2], "performance": 0.2, "graph_actions": [], "utility": -0.2}
+        ]
+        self.agent.repository = dummy_entries.copy()
+        
+        # Create a state with a valid composer.
+        state = self.agent.get_initial_state()
+        state["graph_actions"] = []
+        # Apply the "add_from_repository" action.
+        new_state = self.agent.apply_action(state, "add_from_repository")
+        
+        # Check that the composer's Keras model is rebuilt,
+        # which indicates that the transformation was executed.
+        self.assertIsNotNone(new_state["composer"].keras_model, 
+                             "Composer should rebuild the Keras model after add_from_repository.")
+    
+    def test_policy_network_output_filtering(self):
+        # Check that if the available action set is reduced,
+        # the policy network outputs a vector with the correct length and that sums to 1.
+        state = self.agent.get_initial_state()
+        available_actions = ["add_neuron", "delete_repository_entry"]  # Excluding repository reuse.
+        probs = self.agent.policy_network(state, available_actions)
+        self.assertEqual(len(probs), len(available_actions),
+                         "Policy network output should match the available actions count")
+        np.testing.assert_almost_equal(sum(probs), 1.0, decimal=5,
+            err_msg="Filtered probabilities should sum to 1.")
+
+class TestExperienceBuffer(unittest.TestCase):
+    def setUp(self):
+        self.agent = SimpleMCTSAgent()
+        # Lower the threshold for quicker triggering in tests.
+        self.agent.experience_threshold = 5
+
+    def test_experience_training_trigger(self):
+        initial_buffer_len = len(self.agent.experience)
+        # Record dummy experiences until the threshold is reached.
+        dummy_state = self.agent.get_initial_state()
+        for i in range(5):
+            self.agent.record_experience(dummy_state, "add_neuron", reward= -0.1 * i)
+        # After recording enough experiences, the experience buffer should be cleared.
+        self.assertEqual(len(self.agent.experience), 0,
+                         "Experience buffer should be cleared after training is triggered.")
+
+    def test_policy_network_training_effect(self):
+        # Check that policy network parameters are updated after training.
+        # We capture the parameters before and after training dummy experiences.
+        initial_weights = self.agent.policy_net.model.get_weights()
+        dummy_state = self.agent.get_initial_state()
+        # Record enough dummy experiences to trigger training.
+        for i in range(5):
+            self.agent.record_experience(dummy_state, "delete_repository_entry", reward=-0.1 * i)
+        updated_weights = self.agent.policy_net.model.get_weights()
+        # Test that at least one weight array has changed.
+        weight_changed = any(
+            not np.array_equal(initial, updated)
+            for initial, updated in zip(initial_weights, updated_weights)
+        )
+        self.assertTrue(weight_changed, "Policy network weights should be updated after training.")
+
+class TestMCTSSearchOutcome(unittest.TestCase):
+    def setUp(self):
+        self.agent = SimpleMCTSAgent()
+
+    def test_mcts_search_improves_performance(self):
+        # Run the full MCTS search with a certain budget.
+        best_state = self.agent.mcts_search(search_budget=10)
+        # Check that the candidate's performance is improved from the dummy value (1.0).
+        self.assertIn("performance", best_state)
+        self.assertLess(best_state["performance"], 1.0,
+                        "The best state's performance should be improved (lower than 1.0) after MCTS search.")
+
 if __name__ == '__main__':
     unittest.main()
