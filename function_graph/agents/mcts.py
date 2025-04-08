@@ -223,9 +223,24 @@ class SimpleMCTSAgent(MCTSAgentInterface):
     def policy_network(self, state, actions):
         """
         Uses the learned policy network to predict probabilities over available actions.
-        The full network always outputs 3 probabilities corresponding to:
-          [ "add_neuron", "delete_repository_entry", "add_from_repository" ].
-        This method filters the full output to return a probability for each available action.
+        
+        The policy network always outputs a fixed-length probability vector corresponding
+        to all possible actions in the full action set:
+            [ "add_neuron", "delete_repository_entry", "add_from_repository" ]
+        
+        Since not all these actions may be available in a given state (for instance, if the
+        repository is empty "add_from_repository" might be invalid), we perform the following steps:
+        
+        1. Full Probability Vector: The network outputs a vector, e.g., [p1, p2, p3].
+        2. Action Masking: Create a mask indicating available actions (1 for allowed, 0 for disallowed).
+           For example, if available actions are ["add_neuron", "delete_repository_entry"], the mask is [1, 1, 0].
+        3. Filtering: Multiply the full probability vector element-wise by the mask. This sets the
+           probabilities of unavailable actions to zero.
+        4. Renormalization: Divide each element of the filtered vector by the total sum of the vector,
+           ensuring that the probabilities for the available actions sum to 1.
+        
+        Returns:
+            A list of probabilities corresponding only to the available actions.
         """
         # Full action set for reference.
         full_actions = ["add_neuron", "delete_repository_entry", "add_from_repository"]
@@ -233,7 +248,8 @@ class SimpleMCTSAgent(MCTSAgentInterface):
         features = self.extract_features(state)
         probs_full = self.policy_net.predict(features)  # shape (3,)
         
-        # Filter probabilities to only those for available actions.
+        # --- Action Masking and Filtering ---
+        # Filter probabilities to only those corresponding to available actions.
         available_probs = []
         for action in actions:
             idx = full_actions.index(action)
@@ -244,6 +260,7 @@ class SimpleMCTSAgent(MCTSAgentInterface):
             available_probs = np.ones(len(actions))
         available_probs = available_probs / available_probs.sum()
         return available_probs.tolist()
+
 
     def record_experience(self, state, action, reward):
         """
@@ -342,3 +359,5 @@ class SimpleMCTSAgent(MCTSAgentInterface):
                 best_node = current
             nodes_to_check.extend(list(current.children.values()))
         return best_node.state
+
+
