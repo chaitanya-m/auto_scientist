@@ -17,7 +17,7 @@ import unittest
 import numpy as np
 import keras
 from keras import layers
-from graph.composer import GraphComposer
+from graph.composer import GraphComposer, GraphHasher
 from graph.node import InputNode, SingleNeuron, SubGraphNode, GraphNode
 
 
@@ -413,11 +413,6 @@ class TestSubGraph(unittest.TestCase):
         self.assertEqual(preds.shape, (50, 1))  # Verify prediction shape.
 
 
-import unittest
-from graph.composer import GraphComposer
-from graph.node import InputNode, SingleNeuron
-from graph.composer  import canonical_graph_representation, hash_graph
-
 class TestGraphHash(unittest.TestCase):
     def setUp(self):
         # Create an instance of GraphComposer and build a simple graph.
@@ -433,29 +428,29 @@ class TestGraphHash(unittest.TestCase):
 
     def test_hash_stability(self):
         # Ensure that the same hash is produced for an unchanged graph.
-        hash1 = hash_graph(self.composer)
-        hash2 = hash_graph(self.composer)
+        hash1 = GraphHasher.hash(self.composer)
+        hash2 = GraphHasher.hash(self.composer)
         self.assertEqual(hash1, hash2, "Hash should be stable for unchanged graphs.")
 
     def test_hash_change_with_node_addition(self):
         # Save the original hash.
-        original_hash = hash_graph(self.composer)
+        original_hash = GraphHasher.hash(self.composer)
         # Add a new node and connect it.
         new_node_name = "neuron2"
         self.composer.add_node(SingleNeuron(name=new_node_name, activation="sigmoid"))
         self.composer.connect("input", new_node_name, merge_mode="concat")
         # Get the new hash.
-        new_hash = hash_graph(self.composer)
+        new_hash = GraphHasher.hash(self.composer)
         self.assertNotEqual(original_hash, new_hash, "Hash should change when a new node is added.")
 
     def test_hash_change_with_connection_modification(self):
         # Save the original hash.
-        original_hash = hash_graph(self.composer)
+        original_hash = GraphHasher.hash(self.composer)
         # Modify the connection: remove the existing connection and add a new one with a different merge_mode.
         self.composer.remove_connection("input", "neuron1", merge_mode="concat")
         self.composer.connect("input", "neuron1", merge_mode="add")
         # Get the new hash.
-        new_hash = hash_graph(self.composer)
+        new_hash = GraphHasher.hash(self.composer)
         self.assertNotEqual(original_hash, new_hash, "Hash should change when connection merge mode is modified.")
 
 

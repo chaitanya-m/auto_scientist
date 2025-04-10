@@ -5,6 +5,7 @@ from graph.node import SingleNeuron, InputNode, SubGraphNode  # Import blueprint
 import random
 import copy
 import uuid
+import hashlib  # Ensure hashlib is imported
 
 class GraphComposer:
     """
@@ -79,7 +80,6 @@ class GraphComposer:
         if len(self.connections[to_node]) == original_length:
             raise ValueError(f"No connection found from '{from_node}' to '{to_node}' with merge mode '{merge_mode}'")
 
-
     def build(self):
         """
         Assembles and returns the final Keras model.
@@ -144,7 +144,6 @@ class GraphComposer:
             name=unique_model_name
         )
 
-
         return self.keras_model
 
     def _topological_sort(self):
@@ -195,7 +194,6 @@ class GraphComposer:
         new_model.save(filepath.replace(".h5", ".keras"))
 
 
-
 class GraphTransformer:
     """
     Provides high-level transformations on a GraphComposer,
@@ -238,8 +236,6 @@ class GraphTransformer:
             - 0.0 => keep all direct connections
             - 0.5 => remove about half on average
         """
-
-
         composer = self.composer
 
         # Always deep-copy the abstraction node to ensure a fresh instance.
@@ -249,9 +245,7 @@ class GraphTransformer:
         unique_suffix = str(uuid.uuid4().hex[:4])
 
         # Rename the top-level node
-
         new_abstraction.name = f"{abstraction_node.name}_{unique_suffix}"
-
 
         # Rebuild the bypass model from scratch so that all internal layer names are freshly generated.
         new_input = keras.layers.Input(
@@ -262,7 +256,6 @@ class GraphTransformer:
         x = abstraction_node.model(new_input)
         new_bypass_model_name = f"{new_abstraction.name}_bypass_model"
         new_abstraction.bypass_model = keras.models.Model(new_input, x, name=new_bypass_model_name)
-
 
         # Rename all keras layers in the bypass model
         for layer in new_abstraction.bypass_model.layers:
@@ -300,78 +293,91 @@ class GraphTransformer:
         return new_model
 
 
-import hashlib
+# ---------------------------------------------------------------------------
+# Hashing functionality refactored into a dedicated class
+# ---------------------------------------------------------------------------
 
-def canonical_graph_representation(composer):
+class GraphHasher:
     """
-    Generates a canonical string representation of a GraphComposer's structure.
+    Provides methods to generate a canonical string representation and a hash for a GraphComposer's structure.
     
-    This function:
-      1. Iterates over the composer’s nodes (a dictionary mapping node names to node objects),
-         sorting them by node name.
-      2. For each node, it extracts the node type (using __class__.__name__) and key parameters
-         that describe the node's behavior (for example, input_shape for an InputNode, activation
-         (and optionally units) for a SingleNeuron or DenseNode). This information is concatenated
-         into a string for each node.
-      3. Iterates over the composer’s connections (a dictionary mapping a target node name to a list
-         of (parent_node, merge_mode) tuples), sorts them by target node name and then by the parent's
-         name and merge_mode, and serializes them into a string.
-      4. Concatenates the node and connection strings (with delimiters) to produce a complete,
-         canonical representation of the graph structure.
-    
-    Args:
-        composer (GraphComposer): The graph composer whose structure is to be hashed.
-    
-    Returns:
-        str: A canonical string representation of the graph.
+    This functionality:
+      1. Serializes graph nodes by sorting them, extracting their key parameters as defined below.
+      2. Serializes graph connections by sorting and formatting them.
+      3. Combines both serialized representations into a canonical form and computes an MD5 hash.
     """
-    # Serialize nodes: sort by node name to ensure consistent ordering.
-    node_strs = []
-    for node_name in sorted(composer.nodes.keys()):
-        node = composer.nodes[node_name]
-        # Determine key parameters based on node type.
-        if hasattr(node, 'input_shape'):
-            params = f"input_shape={node.input_shape}"
-        elif hasattr(node, 'activation') and hasattr(node, 'units'):
-            # For nodes like DenseNode that specify units and activation.
-            params = f"units={node.units},activation={node.activation}"
-        elif hasattr(node, 'activation'):
-            # For nodes like SingleNeuron.
-            params = f"activation={node.activation}"
-        else:
-            # Fallback if no key parameters are defined.
-            params = "N/A"
-        node_str = f"{node_name}:{node.__class__.__name__}({params})"
-        node_strs.append(node_str)
-    nodes_part = ";".join(node_strs)
+    @staticmethod
+    def canonical_representation(composer):
+        """
+        Generates a canonical string representation of a GraphComposer's structure.
     
-    # Serialize connections: sort keys and each parent's entry for consistency.
-    connection_strs = []
-    for child_name in sorted(composer.connections.keys()):
-        parent_list = composer.connections[child_name]
-        # Sort parent's by name and merge_mode.
-        sorted_parents = sorted(parent_list, key=lambda x: (x[0], x[1]))
-        for parent, merge_mode in sorted_parents:
-            connection_strs.append(f"{parent}->{child_name}[merge={merge_mode}]")
-    # Sort the connection strings themselves.
-    connections_part = ";".join(sorted(connection_strs))
+        This function:
+          1. Iterates over the composer’s nodes (a dictionary mapping node names to node objects),
+             sorting them by node name.
+          2. For each node, it extracts the node type (using __class__.__name__) and key parameters
+             that describe the node's behavior (for example, input_shape for an InputNode, activation
+             (and optionally units) for a SingleNeuron or DenseNode). This information is concatenated
+             into a string for each node.
+          3. Iterates over the composer’s connections (a dictionary mapping a target node name to a list
+             of (parent_node, merge_mode) tuples), sorts them by target node name and then by the parent's
+             name and merge_mode, and serializes them into a string.
+          4. Concatenates the node and connection strings (with delimiters) to produce a complete,
+             canonical representation of the graph structure.
     
-    # Combine the nodes and connections into one canonical string.
-    full_repr = f"Nodes:{nodes_part}|Connections:{connections_part}"
-    return full_repr
+        Args:
+            composer (GraphComposer): The graph composer whose structure is to be hashed.
+    
+        Returns:
+            str: A canonical string representation of the graph.
+        """
+        # Serialize nodes: sort by node name to ensure consistent ordering.
+        node_strs = []
+        for node_name in sorted(composer.nodes.keys()):
+            node = composer.nodes[node_name]
+            # Determine key parameters based on node type.
+            if hasattr(node, 'input_shape'):
+                params = f"input_shape={node.input_shape}"
+            elif hasattr(node, 'activation') and hasattr(node, 'units'):
+                # For nodes like DenseNode that specify units and activation.
+                params = f"units={node.units},activation={node.activation}"
+            elif hasattr(node, 'activation'):
+                # For nodes like SingleNeuron.
+                params = f"activation={node.activation}"
+            else:
+                # Fallback if no key parameters are defined.
+                params = "N/A"
+            node_str = f"{node_name}:{node.__class__.__name__}({params})"
+            node_strs.append(node_str)
+        nodes_part = ";".join(node_strs)
+    
+        # Serialize connections: sort keys and each parent's entry for consistency.
+        connection_strs = []
+        for child_name in sorted(composer.connections.keys()):
+            parent_list = composer.connections[child_name]
+            # Sort parent's by name and merge_mode.
+            sorted_parents = sorted(parent_list, key=lambda x: (x[0], x[1]))
+            for parent, merge_mode in sorted_parents:
+                connection_strs.append(f"{parent}->{child_name}[merge={merge_mode}]")
+        # Sort the connection strings themselves.
+        connections_part = ";".join(sorted(connection_strs))
+    
+        # Combine the nodes and connections into one canonical string.
+        full_repr = f"Nodes:{nodes_part}|Connections:{connections_part}"
+        return full_repr
 
-def hash_graph(composer):
-    """
-    Returns a hash for the given graph.
+    @staticmethod
+    def hash(composer):
+        """
+        Returns a hash for the given graph.
     
-    The graph is first serialized into a canonical string (via canonical_graph_representation)
-    capturing its node types, key parameters, and connections, and then hashed using MD5.
+        The graph is first serialized into a canonical string (via canonical_representation)
+        capturing its node types, key parameters, and connections, and then hashed using MD5.
     
-    Args:
-        composer (GraphComposer): The graph composer to hash.
+        Args:
+            composer (GraphComposer): The graph composer to hash.
     
-    Returns:
-        str: A fixed-length MD5 hash of the graph's canonical representation.
-    """
-    canonical_str = canonical_graph_representation(composer)
-    return hashlib.md5(canonical_str.encode('utf-8')).hexdigest()
+        Returns:
+            str: A fixed-length MD5 hash of the graph's canonical representation.
+        """
+        canonical_str = GraphHasher.canonical_representation(composer)
+        return hashlib.md5(canonical_str.encode('utf-8')).hexdigest()
