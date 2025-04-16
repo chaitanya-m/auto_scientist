@@ -3,7 +3,7 @@ import unittest
 import tensorflow as tf
 import numpy as np
 from utils.nn import create_minimal_graphmodel
-from agents.mcts import SimpleMCTSAgent
+from agents.mcts import SimpleMCTSAgent, compute_complexity
 from graph.composer import GraphComposer
 
 class TestMinimalGraphModel(unittest.TestCase):
@@ -291,5 +291,68 @@ class TestMCTSSearchOutcome(unittest.TestCase):
         self.assertLess(best_state["performance"], 1.0,
                         "The best state's performance should be improved (lower than 1.0) after MCTS search.")
 
+class TestMCTSExtras(unittest.TestCase):
+
+    def setUp(self):
+        # Create an agent instance for tests.
+        self.agent = SimpleMCTSAgent()
+
+    def test_compute_complexity(self):
+        """
+        Test that compute_complexity returns the correct number of nodes in a GraphComposer.
+        """
+        composer, model = create_minimal_graphmodel((self.agent.input_dim,), output_units=1, activation="relu")
+        # By default, create_minimal_graphmodel adds an input node and an output node.
+        expected_nodes = 2  # "input" and "output"
+        complexity = compute_complexity(composer)
+        self.assertEqual(complexity, expected_nodes, f"Expected complexity {expected_nodes}, got {complexity}")
+
+    def test_update_repository(self):
+        """
+        Test that update_repository correctly updates the repository when an improved candidate is found.
+        Also verifies that the utility is stored as negative performance.
+        """
+        state = self.agent.get_initial_state()
+        # Manually set a performance better than the dummy initial (1.0).
+        state["performance"] = 0.5
+        initial_repo_len = len(self.agent.repository)
+        self.agent.update_repository(state)
+        self.assertEqual(len(self.agent.repository), initial_repo_len + 1, "Repository should have 1 new entry.")
+        # Check that the repository entry's utility equals -performance.
+        latest_entry = self.agent.repository[-1]
+        self.assertAlmostEqual(latest_entry["utility"], -state["performance"],
+                               msg="Utility should be negative of the performance.")
+
+    def test_deletion_counter(self):
+        """
+        Test that invoking 'delete_repository_entry' increments the deletion counter.
+        """
+        # Populate repository with dummy entries.
+        self.agent.repository = [{"subgraph_node": None, "performance": 0.6, "graph_actions": [], "utility": -0.6},
+                                 {"subgraph_node": None, "performance": 0.7, "graph_actions": [], "utility": -0.7}]
+        initial_deletions = self.agent.deletion_count
+        state = self.agent.get_initial_state()
+        # Force a delete action.
+        new_state = self.agent.apply_action(state, "delete_repository_entry")
+        self.assertGreater(self.agent.deletion_count, initial_deletions,
+                           "Deletion counter should increment after delete_repository_entry action.")
+
+    def test_experience_buffer_clearing(self):
+        """
+        Test that recording enough dummy experiences triggers training and clears the experience buffer.
+        """
+        # Set a small threshold to trigger training quickly.
+        self.agent.experience_threshold = 3
+        initial_buffer_len = len(self.agent.experience)
+        state = self.agent.get_initial_state()
+        # Record three dummy experiences.
+        self.agent.record_experience(state, "add_neuron", reward=0.1)
+        self.agent.record_experience(state, "add_neuron", reward=0.2)
+        self.agent.record_experience(state, "add_neuron", reward=0.3)
+        # After the threshold is reached, the buffer should be cleared.
+        self.assertEqual(len(self.agent.experience), 0, "Experience buffer should be empty after training is triggered.")
+
 if __name__ == '__main__':
     unittest.main()
+
+
