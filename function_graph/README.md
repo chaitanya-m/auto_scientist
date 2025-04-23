@@ -1,81 +1,116 @@
+# An Attempt at Self-Determined Curriculum Learning
 
-# An attempt at self-determined curriculum learning: getting an agent to learn a hard concept by requesting easier concepts to learn, and building a repository of motifs or patterns that can then be used to solve the harder problem, starting from basic functions. While Occam's Razor may be implicit in the feedback when a single agent is compared against a reference in terms of accuracy/complexity, allowing competing agents should make redundant the need to do so as agents will have to maintain their motif repositories at a finite, naturally bounded level in order to stay competitive.
+Getting an agent to learn a hard concept by requesting easier concepts to learn, and building a repository of motifs or patterns that can then be used to solve the harder problem, starting from basic functions. While Occam’s Razor may be implicit in the feedback when a single agent is compared against a reference in terms of accuracy/complexity, allowing competing agents should make redundant the need to do so as agents will have to maintain their motif repositories at a finite, naturally bounded level in order to stay competitive.
 
+# README
 
-<!--
-README
-
-Overview
+## Overview
 
 The main goal is to demonstrate that complex problems can be solved by an agent that progressively handles simpler subtasks, efficiently reusing learned functions (motifs) and pruning its function repository over time.
 
-Current Implementation
+## Current Implementation
 
-Main Components
-Curriculum and Data Generation
-A Curriculum class generates synthetic datasets and trains a reference autoencoder.
-The autoencoder’s encoder serves as a performance reference for candidate architectures.
-Graph Composition Framework
-A set of modular components (e.g., InputNode, SingleNeuron, DenseNode, and SubGraphNode) is used to construct candidate encoders.
-A GraphComposer assembles these nodes using the Keras Functional API.
-A GraphTransformer supports inserting and reusing learned subgraphs as abstraction nodes.
-MCTS Agent (SimpleMCTSAgent)
+### Main Components
+
+#### Curriculum and Data Generation
+
+- A `Curriculum` class generates synthetic datasets and trains a reference autoencoder.
+- The autoencoder’s encoder serves as a performance reference for candidate architectures.
+
+#### Graph Composition Framework
+
+- A set of modular components (e.g., `InputNode`, `SingleNeuron`, `DenseNode`, and `SubGraphNode`) is used to construct candidate encoders.
+- A `GraphComposer` assembles these nodes using the Keras Functional API.
+- A `GraphTransformer` supports inserting and reusing learned subgraphs as abstraction nodes.
+
+### MCTS Agent (SimpleMCTSAgent)
+
 The agent employs Monte Carlo Tree Search to explore the space of candidate architectures.
-Key Elements of the MCTS Agent:
-Policy Network Integration:
-A simple MLP-based policy network evaluates the current state (via a 3-element feature vector comprising candidate performance (MSE), number of actions taken, and current repository size) and outputs a fixed probability distribution over three actions:
-add_neuron – adds a neuron node with random inputs/outputs.
-delete_repository_entry – randomly deletes a repository element.
-add_from_repository – reuses a fragment from the repository.
-Policy Network Filtering:
-The agent always receives a full probability vector corresponding to all three actions from the network. When not all actions are available (e.g., if the repository is empty), we apply an action mask and renormalize the vector so that the available actions receive the proper probability mass.
-For example: If the full output is [0.3, 0.4, 0.3] but only "add_neuron" and "delete_repository_entry" are allowed, we set the probability for "add_from_repository" to zero, resulting in [0.3, 0.4, 0.0], and then renormalize to obtain approximately [0.4286, 0.5714].
-Experience Logging and Training:
-The agent records experience tuples (features, action index, reward) from its MCTS iterations. Once the experience buffer reaches a predefined threshold, the policy network is trained on these experiences, and the buffer is cleared. This mechanism is in place to gradually inform the agent’s action selection over time.
-Repository Utility Management:
-Each repository entry is now stored along with a utility metric computed as the negative of its performance (MSE). With this utility, a simple stopgap mechanism chooses the repository entry with the highest utility (i.e., the one that has historically yielded the best performance improvements) when the "add_from_repository" action is invoked.
-Testing and Validation
+
+#### Key Elements of the MCTS Agent
+
+##### Policy Network Integration
+
+- A simple MLP-based policy network evaluates the current state (via a 3-element feature vector comprising candidate performance (MSE), number of actions taken, and current repository size) and outputs a fixed probability distribution over three actions:
+  - `add_neuron` – adds a neuron node with random inputs/outputs.
+  - `delete_repository_entry` – randomly deletes a repository element.
+  - `add_from_repository` – reuses a fragment from the repository.
+
+##### Policy Network Filtering
+
+- The agent always receives a full probability vector corresponding to all three actions from the network. When not all actions are available (e.g., if the repository is empty), an action mask is applied and the vector is renormalized so that the available actions receive the proper probability mass.
+- **Example:** If the full output is `[0.3, 0.4, 0.3]` but only `add_neuron` and `delete_repository_entry` are allowed, we set the probability for `add_from_repository` to zero, resulting in `[0.3, 0.4, 0.0]`, then renormalize to approximately `[0.4286, 0.5714]`.
+
+##### Experience Logging and Training
+
+- The agent records experience tuples `(features, action index, reward)` from its MCTS iterations.
+- Once the experience buffer reaches a predefined threshold, the policy network is trained on these experiences, and the buffer is cleared.
+
+##### Repository Utility Management
+
+- Each repository entry is stored along with a utility metric computed as the negative of its performance (MSE).
+- When invoking `add_from_repository`, the entry with the highest utility (i.e., lowest MSE) is selected.
+
+## Testing and Validation
+
 The project includes comprehensive tests covering:
-Repository Utility Calculation: Ensuring that repository entries store a utility equal to the negative MSE.
-Policy Network Filtering: Verifying that the filtered probability vector matches the available action set (both in length and normalized sum).
-Experience Buffer and Training: Checking that recording enough experiences triggers the policy network training and clears the buffer.
-MCTS Search Outcome: Validating that the overall MCTS search loop returns a candidate state with improved performance relative to the dummy initial value.
-What Is Fixed for Simplicity (and Future Tuning)
 
-Currently, the implementation uses fixed components in key areas to simplify the architecture:
+- **Repository Utility Calculation:** Ensuring that repository entries store a utility equal to the negative MSE.
+- **Policy Network Filtering:** Verifying that the filtered probability vector matches the available action set (both in length and normalized sum).
+- **Experience Buffer and Training:** Checking that recording enough experiences triggers the policy network training and clears the buffer.
+- **MCTS Search Outcome:** Validating that the overall MCTS search loop returns a candidate state with improved performance relative to the dummy initial value.
 
-Training Regimes:
-The training parameters for candidate encoder evaluation (e.g., number of epochs, learning rate) are set to constant values. Ideally, the agent would choose or adapt these dynamically based on ongoing performance.
-UCB Exploration Constant:
-The exploration constant used in the UCB (Upper Confidence Bound) calculation during the search is fixed. In future iterations, we envision the agent adapting this parameter as part of its learning process.
-Policy Network Architecture:
-The current policy network is a fixed simple MLP with a static architecture. In future work, we aim to develop a two-stage policy system:
-The first stage selects among the three high-level actions.
-The second stage, dedicated to repository selection, could evaluate and choose among different repository fragments based on richer candidate-specific features.
-What We Are Doing Now
+## What Is Fixed for Simplicity (and Future Tuning)
 
-At this stage, the MCTS loop runs with:
+### Training Regimes
 
-A fixed training regime, UCB exploration constant, and policy network.
-Repository management that leverages a utility metric ensures that only the best-performing learned fragments are reused.
-Regular experience logging and periodic policy network training to refine the overall decision-making process within the agent.
-This implementation serves as a robust starting point to automatically learn functions in a complex, modularized search space. It provides strong baseline behavior and valuable metrics (such as repository growth and candidate performance improvements) that can inform future tuning.
+- Training parameters for candidate encoder evaluation (e.g., number of epochs, learning rate) are set to constant values.  
+- Future work: Allow dynamic adjustment based on ongoing performance.
 
-Future Roadmap
+### UCB Exploration Constant
 
-Advanced Repository Selection:
-Develop a dedicated (possibly two-stage) policy network for repository selection that learns to evaluate and choose the best repository fragment based on historical performance and structural features.
-Adaptive Training Regimes:
-Experiment with dynamic adjustment of training regimes for candidate evaluation. Allow the agent to fine-tune parameters like learning rates, epoch counts, and other optimizer settings based on real-time feedback.
-Adaptive UCB Exploration:
-Allow the agent to adjust the UCB exploration constant over time, balancing exploration and exploitation more effectively.
-Extended Experimentation and Logging:
-Perform long-run simulations to study repository size control and overall performance improvements, refining the policies and tuning hyperparameters based on empirical observations.
-Refactoring and Documentation:
-Continue improving modularity and documentation, ensuring that all components (data generation, graph composition, policy network training, etc.) are clearly documented for ease of future modifications.
-This README provides a comprehensive snapshot of where the project is today, what remains for future tuning, and our immediate approach for automatically learning functions using MCTS. Feel free to expand or modify this document as the project evolves.
+- The exploration constant in UCB (Upper Confidence Bound) calculation is fixed.  
+- Future work: Let the agent adapt this constant over time.
 
--->
+### Policy Network Architecture
+
+- The current policy network is a fixed simple MLP.  
+- Future plan: Develop a two-stage policy:
+  1. Select among the three high-level actions.
+  2. Evaluate and choose among repository fragments based on richer features.
+
+## What We Are Doing Now
+
+- The MCTS loop runs with a fixed training regime, UCB exploration constant, and policy network.
+- Repository management leverages a utility metric to reuse only the best-performing fragments.
+- Regular experience logging and periodic policy network training refine decision-making.
+
+## Future Roadmap
+
+### Advanced Repository Selection
+
+- Develop a dedicated (possibly two-stage) policy network for repository fragment selection, based on historical performance and structural features.
+
+### Adaptive Training Regimes
+
+- Experiment with dynamic adjustment of training regimes (learning rates, epoch counts, optimizer settings) based on real-time feedback.
+
+### Adaptive UCB Exploration
+
+- Enable the agent to adjust the UCB exploration constant over time to better balance exploration and exploitation.
+
+### Extended Experimentation and Logging
+
+- Conduct long-run simulations to study repository size control and performance improvements.  
+- Refine policies and tune hyperparameters based on empirical observations.
+
+### Refactoring and Documentation
+
+- Improve modularity and documentation for all components (data generation, graph composition, policy network training, etc.).
+
+## Note on Repository Utility
+
+Each repository entry carries a “utility” score reflecting its effectiveness for the specific learning problem in which it was discovered (computed as `–MSE`). As the agent moves through related problems—varying random seeds and incrementally increasing complexity—these utility values remain meaningful, allowing transfer of high-utility motifs to similar tasks.
 
 
 
