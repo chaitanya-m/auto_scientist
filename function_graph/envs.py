@@ -9,10 +9,9 @@ import random
 
 from data_gen.curriculum import Curriculum
 from utils.nn import create_minimal_graphmodel
-from graph.composer import GraphTransformer
+from graph.composer import GraphComposer
 from graph.node import SingleNeuron, SubGraphNode
 from utils.graph_utils import compute_complexity
-
 
 class FunctionGraphEnv(gym.Env):
     """
@@ -110,17 +109,11 @@ class FunctionGraphEnv(gym.Env):
                 self.deletion_count += 1
 
         else:  # add_from_repository
-            # Retrieve and integrate the best stored subgraph directly (no deep copy)
+            # Safely integrate the best stored subgraph without creating cycles.
             best = max(self.repository, key=lambda e: e["utility"])
             sub = best["subgraph_node"]
-            # Add the subgraph node as-is and wire input->sub->output
-            try:
-                self.composer.add_node(sub)
-                self.composer.disconnect("input", "output")
-            except Exception:
-                pass
-            self.composer.connect("input", sub.name)
-            self.composer.connect(sub.name, "output")
+            # Attempt safe insert via composer
+            _ = self.composer.safe_insert_subgraph(sub)
 
         # Evaluate the updated graph
         X = np.random.rand(100, self.input_dim)
@@ -141,15 +134,9 @@ class FunctionGraphEnv(gym.Env):
             self.improvement_count += 1
             # Create SubGraphNode directly from current model
             sub = SubGraphNode(name=f"sub_{uuid.uuid4().hex}", model=self.composer.build())
-            # Integrate this subgraph just like reuse: add node and wire input->sub->output
-            try:
-                self.composer.add_node(sub)
-                self.composer.disconnect("input", "output")
-            except Exception:
-                pass
-            self.composer.connect("input", sub.name)
-            self.composer.connect(sub.name, "output")
-            self.repository.append({"subgraph_node": sub, "utility": -mse})
+            # Safely integrate it
+            if self.composer.safe_insert_subgraph(sub):
+                self.repository.append({"subgraph_node": sub, "utility": -mse})
 
         # Compute reward
         cand_complexity = compute_complexity(self.composer)

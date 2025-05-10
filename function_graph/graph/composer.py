@@ -194,6 +194,41 @@ class GraphComposer:
         new_model.save(filepath.replace(".h5", ".keras"))
 
 
+    def safe_insert_subgraph(self, sub_node, input_name="input", output_name="output"):
+        """
+        Attempt to insert `sub_node` into this composer without creating cycles.
+        Returns True and mutates self if successful, False otherwise.
+        """
+        import copy
+        trial = copy.deepcopy(self)
+
+        # Add the subgraph node
+        try:
+            trial.add_node(sub_node)
+        except ValueError:
+            return False
+
+        # Rewire input→sub→output
+        try:
+            trial.disconnect(input_name, output_name)
+        except Exception:
+            pass
+        trial.connect(input_name, sub_node.name)
+        trial.connect(sub_node.name, output_name)
+
+        # Test for cycles or disconnects
+        try:
+            trial.build()
+        except ValueError:
+            return False
+
+        # Commit: copy trial’s nodes and connections back into self
+        self.nodes = trial.nodes
+        self.connections = trial.connections
+        return True
+
+
+
 class GraphTransformer:
     """
     Provides high-level transformations on a GraphComposer,
