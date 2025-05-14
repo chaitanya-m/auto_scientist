@@ -3,9 +3,10 @@ import keras
 from collections import deque
 from graph.node import SingleNeuron, InputNode, SubGraphNode  # Import blueprint node types
 import random
-import copy
 import uuid
 import hashlib  # Ensure hashlib is imported
+import copy
+from keras import models
 
 class GraphComposer:
     """
@@ -194,41 +195,6 @@ class GraphComposer:
         new_model.save(filepath.replace(".h5", ".keras"))
 
 
-    def safe_insert_subgraph(self, sub_node, input_name="input", output_name="output"):
-        """
-        Attempt to insert `sub_node` into this composer without creating cycles.
-        Returns True and mutates self if successful, False otherwise.
-        """
-        import copy
-        trial = copy.deepcopy(self)
-
-        # Add the subgraph node
-        try:
-            trial.add_node(sub_node)
-        except ValueError:
-            return False
-
-        # Rewire input→sub→output
-        try:
-            trial.disconnect(input_name, output_name)
-        except Exception:
-            pass
-        trial.connect(input_name, sub_node.name)
-        trial.connect(sub_node.name, output_name)
-
-        # Test for cycles or disconnects
-        try:
-            trial.build()
-        except ValueError:
-            return False
-
-        # Commit: copy trial’s nodes and connections back into self
-        self.nodes = trial.nodes
-        self.connections = trial.connections
-        return True
-
-
-
 class GraphTransformer:
     """
     Provides high-level transformations on a GraphComposer,
@@ -273,44 +239,30 @@ class GraphTransformer:
         """
         composer = self.composer
 
-        # Always deep-copy the abstraction node to ensure a fresh instance.
-        new_abstraction = copy.deepcopy(abstraction_node)
+        # 1) Clone the bypass model so we never invoke Keras unpickling:
+        unique_suffix = uuid.uuid4().hex[:4]
+        # clone the previously built bypass_model
+        cloned_bypass = models.clone_model(abstraction_node.bypass_model)
+        cloned_bypass.set_weights(abstraction_node.bypass_model.get_weights())
 
-        # Generate a short random suffix (e.g. 4 hex characters).
-        unique_suffix = str(uuid.uuid4().hex[:4])
+        # 2) Build our new SubGraphNode around the clone:
+        new_name = f"{abstraction_node.name}_{unique_suffix}"
+        new_abstraction = SubGraphNode(name=new_name, model=cloned_bypass)
 
-        # Rename the top-level node
-        new_abstraction.name = f"{abstraction_node.name}_{unique_suffix}"
-
-        # Rebuild the bypass model from scratch so that all internal layer names are freshly generated.
-        new_input = keras.layers.Input(
-            shape=abstraction_node.model.input.shape[1:], 
-            name=f"{new_abstraction.name}_bypass_input"
-        )
-        # Pass the new input through the original model to get the output.
-        x = abstraction_node.model(new_input)
-        new_bypass_model_name = f"{new_abstraction.name}_bypass_model"
-        new_abstraction.bypass_model = keras.models.Model(new_input, x, name=new_bypass_model_name)
-
-        # Rename all keras layers in the bypass model
+        # 3) Rename internal layers in the cloned bypass to avoid name collisions
         for layer in new_abstraction.bypass_model.layers:
             if isinstance(layer, keras.layers.InputLayer):
                 continue
-            unique_layer_name = f"{layer.name}_{unique_suffix}"
-            try:
-                layer._name = unique_layer_name
-            except Exception as e:
-                print(f"DEBUG: Could not update layer name for {layer.name} due to {e}")
+            layer._name = f"{layer.name}_{unique_suffix}"
 
-        # Add the new, uniquely-named abstraction node.
+        # 4) Insert the new node into the graph
         composer.add_node(new_abstraction)
-        # Connect each node in the chosen subset to the new abstraction node.
         for node_name in chosen_subset:
             composer.connect(node_name, new_abstraction.name, merge_mode='concat')
-        # Connect the new abstraction node to each output.
         for out_name in outputs:
             composer.connect(new_abstraction.name, out_name, merge_mode='concat')
-        # Remove direct connections from chosen_subset to outputs with probability remove_prob.
+
+        # 5) Optionally remove the old direct wires
         for node_name in chosen_subset:
             for out_name in outputs:
                 if random.random() < remove_prob:
@@ -319,14 +271,11 @@ class GraphTransformer:
                     except ValueError:
                         pass
 
-        # Clear any previously built model to start fresh.
+        # 6) Clear any previously built model and rebuild
         composer.keras_model = None
-
         new_model = composer.build()
-
         new_model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
         return new_model
-
 
 # ---------------------------------------------------------------------------
 # Hashing functionality refactored into a dedicated class

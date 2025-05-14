@@ -9,7 +9,7 @@ import random
 
 from data_gen.curriculum import Curriculum
 from utils.nn import create_minimal_graphmodel
-from graph.composer import GraphComposer
+from graph.composer import GraphTransformer
 from graph.node import SingleNeuron, SubGraphNode
 from utils.graph_utils import compute_complexity
 
@@ -26,7 +26,7 @@ class FunctionGraphEnv(gym.Env):
       2 = add_from_repository
 
     valid_actions():
-      returns subset of {0,1,2}—2 only if repository non-empty.
+      returns subset of {0,1,2} — 2 only if repository non-empty.
 
     Reward:
       (reference_mse / reference_complexity) - (candidate_mse / candidate_complexity)
@@ -36,14 +36,15 @@ class FunctionGraphEnv(gym.Env):
     def __init__(self, phase="basic", seed=0):
         super().__init__()
         self.curriculum = Curriculum(phase_type=phase)
-        self.reference = self.curriculum.get_reference(0, seed)
+        # wrap seed to avoid KeyError
+        wrapped = seed % self.curriculum.seeds_per_phase
+        self.reference = self.curriculum.get_reference(0, wrapped)
         self.reference_mse = self.reference["mse"]
         self.reference_complexity = len(self.reference["config"]["encoder"])
 
         self.input_dim = self.reference["config"]["input_dim"]
         self.latent_dim = self.reference["config"]["encoder"][-1]
 
-        # Discrete action space
         self.action_space = spaces.Discrete(3)
         low = np.array([0.0, 1.0, 0.0], dtype=float)
         high = np.array([np.inf, np.inf, np.inf], dtype=float)
@@ -63,18 +64,18 @@ class FunctionGraphEnv(gym.Env):
             activation="relu"
         )
         self.composer = composer
-        self.repository = []            # stored subgraph entries
-        self.best_mse = float('inf')    # track best candidate performance
+        self.repository = []
+        self.best_mse = float('inf')
         self.graph_actions = []
         self.deletion_count = 0
         self.improvement_count = 0
-        self.current_mse = 1.0          # dummy start
+        self.current_mse = 1.0
 
         return self._get_obs(), {}
 
     def valid_actions(self):
         """
-        Returns valid action indices. Reuse (2) only if repository non-empty.
+        Returns valid action indices. 2 only if repository non-empty.
         """
         valids = [0, 1]
         if self.repository:
@@ -102,20 +103,23 @@ class FunctionGraphEnv(gym.Env):
             self.composer.connect(node.name, "output")
 
         elif act == "delete_repository_entry":
-            # No-op if repository is empty
             if self.repository:
                 idx = random.randrange(len(self.repository))
                 del self.repository[idx]
                 self.deletion_count += 1
 
         else:  # add_from_repository
-            # Safely integrate the best stored subgraph without creating cycles.
-            best = max(self.repository, key=lambda e: e["utility"])
-            sub = best["subgraph_node"]
-            # Attempt safe insert via composer
-            _ = self.composer.safe_insert_subgraph(sub)
+            # ALWAYS inject a fresh clone (GraphTransformer now uses clone_model internally)
+            best_entry = max(self.repository, key=lambda e: e["utility"])
+            transformer = GraphTransformer(self.composer)
+            transformer.add_abstraction_node(
+                abstraction_node=best_entry["subgraph_node"],
+                chosen_subset=["input"],
+                outputs=["output"],
+                remove_prob=1.0
+            )
 
-        # Evaluate the updated graph
+        # ... rest of step() unchanged: evaluate MSE, update repository, compute reward, return obs, reward, etc.
         X = np.random.rand(100, self.input_dim)
         split = int(0.8 * len(X))
         Xtr, Xte = X[:split], X[split:]
@@ -128,17 +132,19 @@ class FunctionGraphEnv(gym.Env):
         mse = history.history["val_loss"][-1]
         self.current_mse = mse
 
-        # Auto-update repository if performance improved
         if mse < self.best_mse:
             self.best_mse = mse
             self.improvement_count += 1
-            # Create SubGraphNode directly from current model
             sub = SubGraphNode(name=f"sub_{uuid.uuid4().hex}", model=self.composer.build())
-            # Safely integrate it
-            if self.composer.safe_insert_subgraph(sub):
-                self.repository.append({"subgraph_node": sub, "utility": -mse})
+            transformer = GraphTransformer(self.composer)
+            transformer.add_abstraction_node(
+                abstraction_node=sub,
+                chosen_subset=["input"],
+                outputs=["output"],
+                remove_prob=1.0
+            )
+            self.repository.append({"subgraph_node": sub, "utility": -mse})
 
-        # Compute reward
         cand_complexity = compute_complexity(self.composer)
         reward = (self.reference_mse / self.reference_complexity) - (mse / cand_complexity)
 
