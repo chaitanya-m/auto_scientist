@@ -4,7 +4,7 @@ from typing import Tuple, Dict, Any
 import numpy as np
 from abc import ABC, abstractmethod
 from utils.nn import create_minimal_graphmodel
-from envs.data_types import State, AgentState
+from data_types import State, AgentState
 
 # -----------------------
 # Environment Interface

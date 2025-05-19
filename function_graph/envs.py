@@ -1,13 +1,10 @@
-# function_graph/envs.py
-
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import uuid
-import os
 import random
 
-from data_gen.curriculum import Curriculum
+from data_gen.problems import Problem
 from utils.nn import create_minimal_graphmodel
 from graph.composer import GraphTransformer
 from graph.node import SingleNeuron, SubGraphNode
@@ -15,7 +12,7 @@ from utils.graph_utils import compute_complexity
 
 class FunctionGraphEnv(gym.Env):
     """
-    A Gymnasium environment for neural-architecture search via MCTS or other agents.
+    A Gymnasium environment for neural‐architecture search on any Problem.
 
     Observation:
       3D float vector: [current_mse, num_nodes, num_actions]
@@ -33,17 +30,24 @@ class FunctionGraphEnv(gym.Env):
     """
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, phase="basic", seed=0):
+    def __init__(self,
+                 problem: Problem,
+                 train_epochs: int = 5,
+                 batch_size: int = 100,
+                 seed: int = 0):
         super().__init__()
-        self.curriculum = Curriculum(phase_type=phase)
-        # wrap seed to avoid KeyError
-        wrapped = seed % self.curriculum.seeds_per_phase
-        self.reference = self.curriculum.get_reference(0, wrapped)
-        self.reference_mse = self.reference["mse"]
-        self.reference_complexity = len(self.reference["config"]["encoder"])
+        assert isinstance(problem, Problem), "problem must implement the Problem interface"
+        self.problem = problem
+        self.train_epochs = train_epochs
+        self.batch_size = batch_size
 
-        self.input_dim = self.reference["config"]["input_dim"]
-        self.latent_dim = self.reference["config"]["encoder"][-1]
+        # ground‐truth scalars
+        self.reference_mse = problem.reference_mse
+        self.reference_complexity = problem.reference_complexity()
+
+        # build minimal graph using declared dims
+        self.input_dim = problem.input_dim
+        self.latent_dim = problem.output_dim
 
         self.action_space = spaces.Discrete(3)
         low = np.array([0.0, 1.0, 0.0], dtype=float)
@@ -109,7 +113,6 @@ class FunctionGraphEnv(gym.Env):
                 self.deletion_count += 1
 
         else:  # add_from_repository
-            # ALWAYS inject a fresh clone (GraphTransformer now uses clone_model internally)
             best_entry = max(self.repository, key=lambda e: e["utility"])
             transformer = GraphTransformer(self.composer)
             transformer.add_abstraction_node(
@@ -119,16 +122,17 @@ class FunctionGraphEnv(gym.Env):
                 remove_prob=1.0
             )
 
-        # ... rest of step() unchanged: evaluate MSE, update repository, compute reward, return obs, reward, etc.
-        X = np.random.rand(100, self.input_dim)
-        split = int(0.8 * len(X))
-        Xtr, Xte = X[:split], X[split:]
-        ytr = self.reference["encoder"].predict(Xtr)
-        yte = self.reference["encoder"].predict(Xte)
+        # draw data from the problem
+        (Xtr, Ytr), (Xte, Yte) = self.problem.sample_batch(self.batch_size)
+        # ground truth outputs
+        ytr = self.problem.reference_output(Xtr)
+        yte = self.problem.reference_output(Xte)
 
+        # train candidate to match reference
         model = self.composer.build()
         model.compile(optimizer="adam", loss="mse")
-        history = model.fit(Xtr, ytr, validation_data=(Xte, yte), epochs=5, verbose=0)
+        history = model.fit(Xtr, ytr, validation_data=(Xte, yte),
+                            epochs=self.train_epochs, verbose=0)
         mse = history.history["val_loss"][-1]
         self.current_mse = mse
 
