@@ -93,7 +93,8 @@ class AutoencoderProblem(Problem):
         # Create Curriculum instance using config from DEFAULT_PHASES
         config = DEFAULT_PHASES[phase]
         self.curriculum = Curriculum(config)
-        wrapped = seed % self.curriculum.seeds_per_phase
+        self.seeds_per_phase = 1
+        wrapped = seed % self.seeds_per_phase
         self._base_seed = wrapped
         self._batch_counter = 0
 

@@ -4,7 +4,7 @@ import tensorflow as tf
 from typing import Dict, Callable
 
 class Curriculum:
-    def __init__(self, config: dict, seeds_per_phase=1):
+    def __init__(self, config: dict):
         """
         Manages a curriculum of autoencoder tasks with validated architecture.
         Args:
@@ -12,7 +12,6 @@ class Curriculum:
             seeds_per_phase: Number of random seeds for reproducibility.
         """
         self.config = config
-        self.seeds_per_phase = seeds_per_phase
         self.reference_cache = {}
         self._validate_architecture()
 
