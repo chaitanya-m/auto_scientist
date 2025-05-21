@@ -24,7 +24,7 @@ class Curriculum:
         }
     }
 
-    def __init__(self, phase_type='basic', seeds_per_phase=10):
+    def __init__(self, phase_type='basic', seeds_per_phase=1):
         """
         Manages a curriculum of autoencoder tasks with validated architecture.
         Args:
@@ -35,10 +35,10 @@ class Curriculum:
         self.seeds_per_phase = seeds_per_phase
         self.reference_cache = {}
         self._validate_architecture()
-        # Initialize the data generator before precomputing references.
+        # Initialize the data generator.
         self.data_generator = self._create_data_generator()
-        self._precompute_references()
-
+        # Removed precomputation:
+        # self._precompute_references()
 
     def _validate_architecture(self):
         """Ensure latent dimension matches cluster requirements (2 per cluster)"""
@@ -76,12 +76,6 @@ class Curriculum:
         def generator(n: int, seed=None) -> np.ndarray:
             return self._generate_data(n, seed)
         return generator
-
-    def _precompute_references(self):
-        """Precompute reference autoencoders for all seeds in current phase"""
-        for seed in range(self.seeds_per_phase):
-            key = (0, seed)  # Single phase index 0
-            self.reference_cache[key] = self._train_reference_autoencoder(self.phase_config, seed)
 
     def _train_reference_autoencoder(self, config: Dict, seed: int) -> Dict:
         """Train and store reference autoencoder and its components"""
@@ -132,8 +126,39 @@ class Curriculum:
 
     def get_reference(self, phase: int, seed: int) -> Dict:
         """Get precomputed reference for a phase/seed combination."""
-        return self.reference_cache[(phase, seed)]
+        key = (phase, seed)
+        if key not in self.reference_cache:
+            self.reference_cache[key] = self._train_reference_autoencoder(self.phase_config, seed)
+        return self.reference_cache[key]
 
     @property
     def num_phases(self) -> int:
         return len(self.DEFAULT_PHASES)
+
+def get_phase_config(phase: str) -> dict:
+    """
+    Returns the configuration dictionary for the given phase.
+    """
+    return Curriculum.DEFAULT_PHASES[phase]
+
+def create_data_generator(config: dict) -> Callable[[int, int], np.ndarray]:
+    """
+    Returns a data generator function that draws samples based on the provided config.
+    """
+    from sklearn.datasets import make_blobs
+    import numpy as np
+    def generator(n: int, seed=None) -> np.ndarray:
+        X, _ = make_blobs(
+            n_samples=n,
+            n_features=config['input_dim'],
+            centers=config['clusters'],
+            cluster_std=config['cluster_std'],
+            random_state=seed
+        )
+        X_min = X.min(axis=0)
+        X_range = X.max(axis=0) - X_min
+        X = (X - X_min) / (X_range + 1e-8)
+        if config['noise_level'] > 0:
+            X += np.random.normal(scale=config['noise_level'], size=X.shape)
+        return X
+    return generator
