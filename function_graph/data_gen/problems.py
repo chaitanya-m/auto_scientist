@@ -97,7 +97,6 @@ class AutoencoderProblem(Problem):
         self._validate_architecture(config)
         self.config = config
         
-
         self.problem_seed = problem_seed
         self._batch_counter = 0
 
@@ -112,7 +111,6 @@ class AutoencoderProblem(Problem):
         ref_cfg = ref["config"]
         self._input_dim = ref_cfg["input_dim"]
         self._output_dim = ref_cfg["encoder"][-1]  # latent dimension
-
 
     def _train_reference_autoencoder(self, config: Dict, seed: int, data_generator: Callable[[int, int], np.ndarray]) -> Dict:
         """Train and store reference autoencoder and its components using provided data."""
@@ -160,7 +158,6 @@ class AutoencoderProblem(Problem):
             'config': config.copy(),
             'seed': seed
         }
-
 
     def _get_reference(self, phase: int, seed: int, data_generator) -> dict:
         """
@@ -237,6 +234,13 @@ class AutoencoderProblem(Problem):
     def output_dim(self) -> int:
         return self._output_dim
 
+    @classmethod
+    def problem_generator(cls, phase: str, num: int, batch_size: int = 100):
+        """
+        Yields a sequence of problem instances for the given phase.
+        """
+        for problem_seed in range(num):
+            yield cls(phase=phase, problem_seed=problem_seed, batch_size=batch_size)
 
 
 class RegressionProblem(Problem):

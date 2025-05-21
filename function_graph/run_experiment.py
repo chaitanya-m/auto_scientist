@@ -113,14 +113,11 @@ def main(
 
     num_problems = 2
 
-    def problem_generator(phase: str, num: int):
-        for problem_seed in range(num):
-            yield AutoencoderProblem(phase=phase, problem_seed=problem_seed)
-
+    # Use the class-provided problem generator.
     all_dfs = []
     summaries = []
 
-    for problem in problem_generator(phase, num_problems):
+    for problem in AutoencoderProblem.problem_generator(phase, num_problems):
         # extract the problem seed from the problem instance if needed
         df, summary = run_simple_experiment(
             problem=problem,
