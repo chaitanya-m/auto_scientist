@@ -11,7 +11,6 @@ class Curriculum:
             config: Configuration dictionary.
         """
         self.config = config
-        self.reference_cache = {}
 
     def _train_reference_autoencoder(self, config: Dict, seed: int, data_generator: Callable[[int, int], np.ndarray]) -> Dict:
         """Train and store reference autoencoder and its components using provided data."""
@@ -59,13 +58,6 @@ class Curriculum:
             'config': config.copy(),
             'seed': seed
         }
-
-    def get_reference(self, phase: int, seed: int, data_generator: Callable[[int, int], np.ndarray]) -> Dict:
-        """Get precomputed reference for a phase/seed combination using the given data generator."""
-        key = (phase, seed)
-        if key not in self.reference_cache:
-            self.reference_cache[key] = self._train_reference_autoencoder(self.config, seed, data_generator)
-        return self.reference_cache[key]
 
     @property
     def num_phases(self) -> int:

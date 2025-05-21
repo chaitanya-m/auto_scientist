@@ -95,16 +95,15 @@ class AutoencoderProblem(Problem):
         self._validate_architecture(config)
         self.config = config
         
-        # Still create a Curriculum instance for any remaining functionality,
-        # but its internal validation is now offloaded.
+        # Still create a Curriculum instance for any remaining functionality.
         self.curriculum = Curriculum(config)
         self.seeds_per_phase = 1
         wrapped = seed % self.seeds_per_phase
         self._base_seed = wrapped
         self._batch_counter = 0
 
-        # Train reference autoencoder using the internal _generate_data method.
-        ref = self.curriculum.get_reference(0, wrapped, self._generate_data)
+        # Use the moved get_reference functionality (now in _get_reference)
+        ref = self._get_reference(0, wrapped, self._generate_data)
         self._encoder = ref["encoder"]
         self._mse = ref["mse"]
         self._complexity = len(ref["config"]["encoder"])
@@ -114,6 +113,19 @@ class AutoencoderProblem(Problem):
         ref_cfg = ref["config"]
         self._input_dim = ref_cfg["input_dim"]
         self._output_dim = ref_cfg["encoder"][-1]  # latent dimension
+
+    def _get_reference(self, phase: int, seed: int, data_generator) -> dict:
+        """
+        Retrieves the precomputed reference autoencoder configuration.
+        Implements caching behavior previously provided by Curriculum.get_reference.
+        """
+        # Initialize the cache once.
+        if not hasattr(self, '_reference_cache'):
+            self._reference_cache = {}
+        key = (phase, seed)
+        if key not in self._reference_cache:
+            self._reference_cache[key] = self.curriculum._train_reference_autoencoder(self.config, seed, data_generator)
+        return self._reference_cache[key]
 
     def _validate_architecture(self, config: dict):
         """
