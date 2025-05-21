@@ -3,7 +3,9 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from sklearn.datasets import make_blobs
-from data_gen.curriculum import Curriculum
+
+import tensorflow as tf
+from typing import Dict, Callable
 
 # DEFAULT_PHASES now lives in problems.py
 DEFAULT_PHASES = {
@@ -95,8 +97,7 @@ class AutoencoderProblem(Problem):
         self._validate_architecture(config)
         self.config = config
         
-        # Still create a Curriculum instance for any remaining functionality.
-        self.curriculum = Curriculum(config)
+
         self.seeds_per_phase = 1
         wrapped = seed % self.seeds_per_phase
         self._base_seed = wrapped
@@ -114,6 +115,55 @@ class AutoencoderProblem(Problem):
         self._input_dim = ref_cfg["input_dim"]
         self._output_dim = ref_cfg["encoder"][-1]  # latent dimension
 
+
+    def _train_reference_autoencoder(self, config: Dict, seed: int, data_generator: Callable[[int, int], np.ndarray]) -> Dict:
+        """Train and store reference autoencoder and its components using provided data."""
+        tf.keras.utils.set_random_seed(seed)
+        
+        # Generate training data via the provided generator.
+        X = data_generator(1000, seed=seed)
+        
+        # Build autoencoder.
+        autoencoder = tf.keras.Sequential()
+        for size in config['encoder']:
+            autoencoder.add(tf.keras.layers.Dense(size, activation='relu'))
+        for size in config['decoder'][:-1]:
+            autoencoder.add(tf.keras.layers.Dense(size, activation='relu'))
+        autoencoder.add(tf.keras.layers.Dense(config['decoder'][-1], activation='linear'))
+        
+        autoencoder.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')
+        history = autoencoder.fit(
+            X, X,
+            epochs=10000,
+            validation_split=0.2,
+            verbose=0,
+            callbacks=[tf.keras.callbacks.EarlyStopping(patience=20, restore_best_weights=True)]
+        )
+        val_mse = min(history.history['val_loss'])
+        
+        # Extract encoder.
+        encoder = tf.keras.Sequential()
+        encoder.add(tf.keras.layers.InputLayer(input_shape=(config['input_dim'],)))
+        for i in range(len(config['encoder'])):
+            encoder.add(autoencoder.layers[i])
+        
+        # Extract decoder.
+        decoder = tf.keras.Sequential()
+        latent_dim = config['encoder'][-1]
+        decoder.add(tf.keras.layers.InputLayer(input_shape=(latent_dim,)))
+        for i in range(len(config['encoder']), len(autoencoder.layers)):
+            decoder.add(autoencoder.layers[i])
+        
+        return {
+            'mse': val_mse,
+            'autoencoder': autoencoder,
+            'encoder': encoder,
+            'decoder': decoder,
+            'config': config.copy(),
+            'seed': seed
+        }
+
+
     def _get_reference(self, phase: int, seed: int, data_generator) -> dict:
         """
         Retrieves the precomputed reference autoencoder configuration.
@@ -124,7 +174,7 @@ class AutoencoderProblem(Problem):
             self._reference_cache = {}
         key = (phase, seed)
         if key not in self._reference_cache:
-            self._reference_cache[key] = self.curriculum._train_reference_autoencoder(self.config, seed, data_generator)
+            self._reference_cache[key] = self._train_reference_autoencoder(self.config, seed, data_generator)
         return self._reference_cache[key]
 
     def _validate_architecture(self, config: dict):
@@ -140,7 +190,7 @@ class AutoencoderProblem(Problem):
         """
         Generates synthetic data for the autoencoder problem.
         """
-        config = self.curriculum.config
+        config = self.config
         X, _ = make_blobs(
             n_samples=n_samples,
             n_features=config['input_dim'],
@@ -188,6 +238,16 @@ class AutoencoderProblem(Problem):
     @property
     def output_dim(self) -> int:
         return self._output_dim
+
+
+
+
+
+
+
+
+
+
 
 
 class RegressionProblem(Problem):
