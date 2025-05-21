@@ -7,7 +7,7 @@ from sklearn.datasets import make_blobs
 import tensorflow as tf
 from typing import Dict, Callable
 
-# DEFAULT_PHASES now lives in problems.py
+
 DEFAULT_PHASES = {
     'basic': {
         'input_dim': 3,
@@ -236,15 +236,6 @@ class AutoencoderProblem(Problem):
     @property
     def output_dim(self) -> int:
         return self._output_dim
-
-
-
-
-
-
-
-
-
 
 
 

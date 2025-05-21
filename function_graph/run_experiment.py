@@ -111,19 +111,20 @@ def main(
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Create a prototype autoencoder to determine how many seeds exist.
-    base_autoencoder = AutoencoderProblem(phase=phase, problem_seed=0)
     num_problems = 2
+
+    def problem_generator(phase: str, num: int):
+        for problem_seed in range(num):
+            yield AutoencoderProblem(phase=phase, problem_seed=problem_seed)
 
     all_dfs = []
     summaries = []
 
-    for problem_seed in range(num_problems):
-        # instantiate a fresh problem for each seed
-        problem = AutoencoderProblem(phase=phase, problem_seed=problem_seed)
+    for problem in problem_generator(phase, num_problems):
+        # extract the problem seed from the problem instance if needed
         df, summary = run_simple_experiment(
             problem=problem,
-            problem_seed=problem_seed,
+            problem_seed=problem.problem_seed,
             mcts_budget=mcts_budget,
             steps=steps
         )
