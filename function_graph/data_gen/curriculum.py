@@ -6,21 +6,12 @@ from typing import Dict, Callable
 class Curriculum:
     def __init__(self, config: dict):
         """
-        Manages a curriculum of autoencoder tasks with validated architecture.
+        Manages a curriculum of autoencoder tasks.
         Args:
             config: Configuration dictionary.
-            seeds_per_phase: Number of random seeds for reproducibility.
         """
         self.config = config
         self.reference_cache = {}
-        self._validate_architecture()
-
-    def _validate_architecture(self):
-        """Ensure latent dimension matches cluster requirements (2 per cluster)"""
-        latent_dim = self.config['encoder'][-1]
-        required_dim = self.config['clusters'] * 2
-        if latent_dim != required_dim:
-            raise ValueError(f"Latent dim {latent_dim} should be {required_dim} for {self.config['clusters']} clusters")
 
     def _train_reference_autoencoder(self, config: Dict, seed: int, data_generator: Callable[[int, int], np.ndarray]) -> Dict:
         """Train and store reference autoencoder and its components using provided data."""

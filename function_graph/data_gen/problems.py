@@ -90,8 +90,13 @@ class AutoencoderProblem(Problem):
     This class now defines its own data generator.
     """
     def __init__(self, phase: str = "basic", seed: int = 0, batch_size: int = 100):
-        # Create Curriculum instance using config from DEFAULT_PHASES
         config = DEFAULT_PHASES[phase]
+        # Validate architecture directly.
+        self._validate_architecture(config)
+        self.config = config
+        
+        # Still create a Curriculum instance for any remaining functionality,
+        # but its internal validation is now offloaded.
         self.curriculum = Curriculum(config)
         self.seeds_per_phase = 1
         wrapped = seed % self.seeds_per_phase
@@ -105,10 +110,19 @@ class AutoencoderProblem(Problem):
         self._complexity = len(ref["config"]["encoder"])
         self.batch_size = batch_size
 
-        # Record dimensions from the reference config.
+        # Record dimensions.
         ref_cfg = ref["config"]
         self._input_dim = ref_cfg["input_dim"]
         self._output_dim = ref_cfg["encoder"][-1]  # latent dimension
+
+    def _validate_architecture(self, config: dict):
+        """
+        Ensure latent dimension matches cluster requirements (2 per cluster)
+        """
+        latent_dim = config['encoder'][-1]
+        required_dim = config['clusters'] * 2
+        if latent_dim != required_dim:
+            raise ValueError(f"Latent dim {latent_dim} should be {required_dim} for {config['clusters']} clusters")
 
     def _generate_data(self, n_samples: int, seed: int = None) -> np.ndarray:
         """

@@ -113,7 +113,7 @@ def main(
 
     # Create a prototype autoencoder to determine how many seeds exist.
     base_autoencoder = AutoencoderProblem(phase=phase, seed=0)
-    num_seeds = base_autoencoder.curriculum.seeds_per_phase
+    num_seeds = base_autoencoder.seeds_per_phase
 
     all_dfs = []
     summaries = []
