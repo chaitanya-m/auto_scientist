@@ -1,12 +1,11 @@
 # data_gen/problems.py
 
-from abc import ABC, abstractmethod
-import numpy as np
 from sklearn.datasets import make_blobs
-
+import numpy as np
 import tensorflow as tf
 from typing import Dict, Callable
 
+from data_gen.problem_interface import Problem
 
 DEFAULT_PHASES = {
     'basic': {
@@ -26,64 +25,6 @@ DEFAULT_PHASES = {
         'cluster_std': [0.3, 0.5]
     }
 }
-
-
-class Problem(ABC):
-    """
-    Abstract interface for a ground‐truth task.
-
-    Implementations must provide:
-      - sample_batch(): draw a batch of data (train & val)
-      - reference_output(): return the true outputs for a batch
-      - reference_mse: the “target” error scale (for normalization)
-      - reference_complexity(): a scalar measuring ground‐truth complexity
-      - input_dim / output_dim: dimensionalities of X and Y
-    """
-    @abstractmethod
-    def sample_batch(self, batch_size: int):
-        """
-        Return ((X_train, Y_train), (X_val, Y_val)), where
-        X are inputs and Y are targets drawn from the distribution.
-        """
-        pass
-
-    @abstractmethod
-    def reference_output(self, X_val):
-        """
-        Given validation inputs X_val, return the corresponding Y_val.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def reference_mse(self) -> float:
-        """
-        A scalar error (e.g. pretrained model MSE) for normalizing rewards.
-        """
-        pass
-
-    @abstractmethod
-    def reference_complexity(self) -> float:
-        """
-        A scalar measuring the complexity of the ground‐truth mapping.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def input_dim(self) -> int:
-        """
-        Dimensionality of the input X.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def output_dim(self) -> int:
-        """
-        Dimensionality of the prediction Y.
-        """
-        pass
 
 
 class AutoencoderProblem(Problem):
