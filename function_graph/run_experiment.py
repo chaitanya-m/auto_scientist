@@ -111,7 +111,7 @@ def main(
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Create a prototype autoencoder to discover how many seeds exist
+    # Create a prototype autoencoder to determine how many seeds exist.
     base_autoencoder = AutoencoderProblem(phase=phase, seed=0)
     num_seeds = base_autoencoder.curriculum.seeds_per_phase
 
@@ -130,13 +130,13 @@ def main(
         all_dfs.append(df)
         summaries.append(summary)
 
-    # concatenate all runs into one CSV
+    # Concatenate all runs into one CSV.
     master_df = pd.concat(all_dfs, ignore_index=True)
     csv_path = os.path.join(output_dir, f"results_{phase}.csv")
     master_df.to_csv(csv_path, index=False)
     print(f"Saved detailed metrics to {csv_path}")
 
-    # print terminal summary
+    # Print terminal summary
     sum_df = pd.DataFrame(summaries)
     print("\n=== Experiment Summary ===")
     print(f"Phase: {phase}")

@@ -1,88 +1,34 @@
 # data_gen/curriculum.py
 import numpy as np
-from sklearn.datasets import make_blobs
 import tensorflow as tf
 from typing import Dict, Callable
 
 class Curriculum:
-    DEFAULT_PHASES = {
-        'basic': {
-            'input_dim': 3,
-            'encoder': [3, 4, 2],  # 2 latent neurons (1 cluster × 2)
-            'decoder': [2, 4, 3],
-            'noise_level': 0.1,
-            'clusters': 1,
-            'cluster_std': [0.3]
-        },
-        'intermediate': {
-            'input_dim': 3,
-            'encoder': [3, 6, 4],  # 4 latent neurons (2 clusters × 2)
-            'decoder': [4, 6, 3],
-            'noise_level': 0.2,
-            'clusters': 2,
-            'cluster_std': [0.3, 0.5]
-        }
-    }
-
-    def __init__(self, phase_type='basic', seeds_per_phase=1):
+    def __init__(self, config: dict, seeds_per_phase=1):
         """
         Manages a curriculum of autoencoder tasks with validated architecture.
         Args:
-            phase_type: Which phase configuration to use (basic/intermediate)
-            seeds_per_phase: Number of random seeds for reproducibility
+            config: Configuration dictionary.
+            seeds_per_phase: Number of random seeds for reproducibility.
         """
-        self.phase_config = self.DEFAULT_PHASES[phase_type]
+        self.config = config
         self.seeds_per_phase = seeds_per_phase
         self.reference_cache = {}
         self._validate_architecture()
-        # Initialize the data generator.
-        self.data_generator = self._create_data_generator()
-        # Removed precomputation:
-        # self._precompute_references()
 
     def _validate_architecture(self):
         """Ensure latent dimension matches cluster requirements (2 per cluster)"""
-        latent_dim = self.phase_config['encoder'][-1]
-        required_dim = self.phase_config['clusters'] * 2
+        latent_dim = self.config['encoder'][-1]
+        required_dim = self.config['clusters'] * 2
         if latent_dim != required_dim:
-            raise ValueError(f"Latent dim {latent_dim} should be {required_dim} for {self.phase_config['clusters']} clusters")
+            raise ValueError(f"Latent dim {latent_dim} should be {required_dim} for {self.config['clusters']} clusters")
 
-    def _generate_data(self, n_samples: int, seed=None) -> np.ndarray:
-        """
-        Generates synthetic data using the same procedure as in training.
-        If a seed is provided, it is used for reproducibility.
-        """
-        X, _ = make_blobs(
-            n_samples=n_samples,
-            n_features=self.phase_config['input_dim'],
-            centers=self.phase_config['clusters'],
-            cluster_std=self.phase_config['cluster_std'],
-            random_state=seed
-        )
-        X_min = X.min(axis=0)
-        X_range = X.max(axis=0) - X_min
-        X = (X - X_min) / (X_range + 1e-8)
-        if self.phase_config['noise_level'] > 0:
-            X += np.random.normal(scale=self.phase_config['noise_level'], size=X.shape)
-        return X
-
-    def _create_data_generator(self) -> Callable[[int, int], np.ndarray]:
-        """
-        Creates and returns a data generator function.
-        The returned function accepts parameters 'n' (number of samples)
-        and an optional 'seed' to generate n samples.
-        This generator continuously yields data from the specified distribution.
-        """
-        def generator(n: int, seed=None) -> np.ndarray:
-            return self._generate_data(n, seed)
-        return generator
-
-    def _train_reference_autoencoder(self, config: Dict, seed: int) -> Dict:
-        """Train and store reference autoencoder and its components"""
+    def _train_reference_autoencoder(self, config: Dict, seed: int, data_generator: Callable[[int, int], np.ndarray]) -> Dict:
+        """Train and store reference autoencoder and its components using provided data."""
         tf.keras.utils.set_random_seed(seed)
         
-        # Generate data using the unified generator with a fixed seed.
-        X = self.data_generator(1000, seed=seed)
+        # Generate training data via the provided generator.
+        X = data_generator(1000, seed=seed)
         
         # Build autoencoder.
         autoencoder = tf.keras.Sequential()
@@ -124,41 +70,14 @@ class Curriculum:
             'seed': seed
         }
 
-    def get_reference(self, phase: int, seed: int) -> Dict:
-        """Get precomputed reference for a phase/seed combination."""
+    def get_reference(self, phase: int, seed: int, data_generator: Callable[[int, int], np.ndarray]) -> Dict:
+        """Get precomputed reference for a phase/seed combination using the given data generator."""
         key = (phase, seed)
         if key not in self.reference_cache:
-            self.reference_cache[key] = self._train_reference_autoencoder(self.phase_config, seed)
+            self.reference_cache[key] = self._train_reference_autoencoder(self.config, seed, data_generator)
         return self.reference_cache[key]
 
     @property
     def num_phases(self) -> int:
-        return len(self.DEFAULT_PHASES)
-
-def get_phase_config(phase: str) -> dict:
-    """
-    Returns the configuration dictionary for the given phase.
-    """
-    return Curriculum.DEFAULT_PHASES[phase]
-
-def create_data_generator(config: dict) -> Callable[[int, int], np.ndarray]:
-    """
-    Returns a data generator function that draws samples based on the provided config.
-    """
-    from sklearn.datasets import make_blobs
-    import numpy as np
-    def generator(n: int, seed=None) -> np.ndarray:
-        X, _ = make_blobs(
-            n_samples=n,
-            n_features=config['input_dim'],
-            centers=config['clusters'],
-            cluster_std=config['cluster_std'],
-            random_state=seed
-        )
-        X_min = X.min(axis=0)
-        X_range = X.max(axis=0) - X_min
-        X = (X - X_min) / (X_range + 1e-8)
-        if config['noise_level'] > 0:
-            X += np.random.normal(scale=config['noise_level'], size=X.shape)
-        return X
-    return generator
+        # With an externally provided config, there is a single phase.
+        return 1

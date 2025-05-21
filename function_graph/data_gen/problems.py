@@ -2,7 +2,29 @@
 
 from abc import ABC, abstractmethod
 import numpy as np
+from sklearn.datasets import make_blobs
 from data_gen.curriculum import Curriculum
+
+# DEFAULT_PHASES now lives in problems.py
+DEFAULT_PHASES = {
+    'basic': {
+        'input_dim': 3,
+        'encoder': [3, 4, 2],  # 2 latent neurons (1 cluster × 2)
+        'decoder': [2, 4, 3],
+        'noise_level': 0.1,
+        'clusters': 1,
+        'cluster_std': 0.3  # single value is acceptable for one cluster
+    },
+    'intermediate': {
+        'input_dim': 3,
+        'encoder': [3, 6, 4],  # 4 latent neurons (2 clusters × 2)
+        'decoder': [4, 6, 3],
+        'noise_level': 0.2,
+        'clusters': 2,
+        'cluster_std': [0.3, 0.5]
+    }
+}
+
 
 class Problem(ABC):
     """
@@ -64,41 +86,65 @@ class Problem(ABC):
 
 class AutoencoderProblem(Problem):
     """
-    Wraps your Curriculum-based reference autoencoder as a Problem.
+    Wraps the Curriculum-based reference autoencoder as a Problem.
+    This class now defines its own data generator.
     """
     def __init__(self, phase: str = "basic", seed: int = 0, batch_size: int = 100):
-        # load precomputed reference
-        self.curriculum = Curriculum(phase_type=phase)
+        # Create Curriculum instance using config from DEFAULT_PHASES
+        config = DEFAULT_PHASES[phase]
+        self.curriculum = Curriculum(config)
         wrapped = seed % self.curriculum.seeds_per_phase
         self._base_seed = wrapped
         self._batch_counter = 0
 
-        ref = self.curriculum.get_reference(0, wrapped)
+        # Train reference autoencoder using the internal _generate_data method.
+        ref = self.curriculum.get_reference(0, wrapped, self._generate_data)
         self._encoder = ref["encoder"]
         self._mse = ref["mse"]
         self._complexity = len(ref["config"]["encoder"])
         self.batch_size = batch_size
 
-        # record dims from the reference config
+        # Record dimensions from the reference config.
         ref_cfg = ref["config"]
         self._input_dim = ref_cfg["input_dim"]
         self._output_dim = ref_cfg["encoder"][-1]  # latent dimension
 
+    def _generate_data(self, n_samples: int, seed: int = None) -> np.ndarray:
+        """
+        Generates synthetic data for the autoencoder problem.
+        """
+        config = self.curriculum.config
+        X, _ = make_blobs(
+            n_samples=n_samples,
+            n_features=config['input_dim'],
+            centers=config['clusters'],
+            cluster_std=config['cluster_std'],
+            random_state=seed
+        )
+        # Normalize data to [0, 1]
+        X_min = X.min(axis=0)
+        X_range = X.max(axis=0) - X_min
+        X = (X - X_min) / (X_range + 1e-8)
+        # Add noise if specified.
+        if config['noise_level'] > 0:
+            X += np.random.normal(scale=config['noise_level'], size=X.shape)
+        return X
+
     def sample_batch(self, batch_size: int = None):
         bs = batch_size or self.batch_size
-        # advance seed each call to get fresh data
+        # Advance seed each call to get fresh data.
         seed = self._base_seed + self._batch_counter
         self._batch_counter += 1
 
-        # _generate_data returns a single array X of shape (n_samples, input_dim)
-        X_full = self.curriculum._generate_data(bs, seed)
+        # Use the internal generator.
+        X_full = self._generate_data(bs, seed)
         split = int(0.8 * len(X_full))
         Xtr, Xte = X_full[:split], X_full[split:]
-        # autoencoder uses only X; Y_train/Y_val = None placeholders
+        # Autoencoder tasks use X as both input and (placeholder) output.
         return (Xtr, None), (Xte, None)
 
     def reference_output(self, X_val):
-        # Use the pretrained encoder to get “ground truth” latents
+        # Use the pretrained encoder to obtain ground-truth latent representations.
         return self._encoder.predict(X_val)
 
     @property
@@ -124,9 +170,9 @@ class RegressionProblem(Problem):
     """
     def __init__(self, sampler_fn, input_vars, target_vars, batch_size: int = 100):
         """
-        sampler_fn(batch_size) -> dict mapping var names to np.arrays
-        input_vars: list of keys for X
-        target_vars: list of keys for Y
+        sampler_fn(batch_size) -> dict mapping variable names to np.arrays
+        input_vars: list of keys for inputs X
+        target_vars: list of keys for targets Y.
         """
         self.sampler_fn = sampler_fn
         self.input_vars = input_vars
@@ -146,24 +192,19 @@ class RegressionProblem(Problem):
         return (Xtr, Ytr), (Xte, Yte)
 
     def reference_output(self, X_val):
-        # return the Y_val that was sampled alongside X_val
         return self._last_val_Y
 
     @property
     def reference_mse(self) -> float:
-        # use the variance of Y as a normalization, for example
         return float(np.var(self._last_val_Y))
 
     def reference_complexity(self) -> float:
-        # simple constant, or user‐defined metric
         return float(len(self.input_vars) + len(self.target_vars))
 
     @property
     def input_dim(self) -> int:
-        # number of input features
         return len(self.input_vars)
 
     @property
     def output_dim(self) -> int:
-        # number of target features
         return len(self.target_vars)
