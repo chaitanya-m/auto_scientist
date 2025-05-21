@@ -88,23 +88,21 @@ class Problem(ABC):
 
 class AutoencoderProblem(Problem):
     """
-    Wraps the Curriculum-based reference autoencoder as a Problem.
+    Wraps the reference autoencoder as a Problem.
     This class now defines its own data generator.
     """
-    def __init__(self, phase: str = "basic", seed: int = 0, batch_size: int = 100):
+    def __init__(self, phase: str = "basic", problem_seed: int = 0, batch_size: int = 100):
         config = DEFAULT_PHASES[phase]
         # Validate architecture directly.
         self._validate_architecture(config)
         self.config = config
         
 
-        self.seeds_per_phase = 1
-        wrapped = seed % self.seeds_per_phase
-        self._base_seed = wrapped
+        self.problem_seed = problem_seed
         self._batch_counter = 0
 
         # Use the moved get_reference functionality (now in _get_reference)
-        ref = self._get_reference(0, wrapped, self._generate_data)
+        ref = self._get_reference(0, self.problem_seed, self._generate_data)
         self._encoder = ref["encoder"]
         self._mse = ref["mse"]
         self._complexity = len(ref["config"]["encoder"])
@@ -210,11 +208,11 @@ class AutoencoderProblem(Problem):
     def sample_batch(self, batch_size: int = None):
         bs = batch_size or self.batch_size
         # Advance seed each call to get fresh data.
-        seed = self._base_seed + self._batch_counter
+        sample_seed = self.problem_seed + self._batch_counter # Each problem may be sampled multiple times.
         self._batch_counter += 1
 
         # Use the internal generator.
-        X_full = self._generate_data(bs, seed)
+        X_full = self._generate_data(bs, sample_seed)
         split = int(0.8 * len(X_full))
         Xtr, Xte = X_full[:split], X_full[split:]
         # Autoencoder tasks use X as both input and (placeholder) output.

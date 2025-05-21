@@ -26,7 +26,7 @@ def build_uniform_policy(obs_dim: int, action_dim: int) -> models.Model:
 
 def run_simple_experiment(
     problem: Problem,
-    seed: int = 0,
+    problem_seed: int = 0,
     mcts_budget: int = 10,
     steps: int = 20,
 ) -> (pd.DataFrame, dict):
@@ -35,7 +35,7 @@ def run_simple_experiment(
     returning a DataFrame of per-step metrics and a summary dict.
     """
     # 1) Environment and agent setup
-    env = FunctionGraphEnv(problem=problem, seed=seed)
+    env = FunctionGraphEnv(problem=problem, seed=problem_seed)
     obs, _ = env.reset()
     obs_dim = obs.shape[0]
     action_dim = env.action_space.n
@@ -61,7 +61,7 @@ def run_simple_experiment(
         improvement = max(0.0, prev_best - env.current_mse)
 
         metrics.append({
-            "seed": seed,
+            "seed": problem_seed,
             "step": step,
             "action": action,
             "did_reuse": did_reuse,
@@ -76,7 +76,7 @@ def run_simple_experiment(
         })
 
         print(
-            f"[Seed {seed} | Step {step:2d}] "
+            f"[Seed {problem_seed} | Step {step:2d}] "
             f"act={action} | reuse={reuse_count} "
             f"| mse={env.current_mse:.4f} "
             f"| nodes={len(env.composer.nodes)} "
@@ -89,7 +89,7 @@ def run_simple_experiment(
     eps = 0.01 * problem.reference_mse
     steps_to_eps = df[df.mse <= problem.reference_mse + eps].step.min()
     summary = {
-        "seed": seed,
+        "seed": problem_seed,
         "steps_to_epsilon": float(steps_to_eps) if not np.isnan(steps_to_eps) else np.nan,
         "total_reuse": reuse_count,
         "final_mse": float(df.mse.iloc[-1]),
@@ -112,18 +112,18 @@ def main(
     os.makedirs(output_dir, exist_ok=True)
 
     # Create a prototype autoencoder to determine how many seeds exist.
-    base_autoencoder = AutoencoderProblem(phase=phase, seed=0)
-    num_seeds = base_autoencoder.seeds_per_phase
+    base_autoencoder = AutoencoderProblem(phase=phase, problem_seed=0)
+    num_problems = 2
 
     all_dfs = []
     summaries = []
 
-    for seed in range(num_seeds):
+    for problem_seed in range(num_problems):
         # instantiate a fresh problem for each seed
-        problem = AutoencoderProblem(phase=phase, seed=seed)
+        problem = AutoencoderProblem(phase=phase, problem_seed=problem_seed)
         df, summary = run_simple_experiment(
             problem=problem,
-            seed=seed,
+            problem_seed=problem_seed,
             mcts_budget=mcts_budget,
             steps=steps
         )
@@ -140,7 +140,7 @@ def main(
     sum_df = pd.DataFrame(summaries)
     print("\n=== Experiment Summary ===")
     print(f"Phase: {phase}")
-    print(f"Seeds: {num_seeds}")
+    print(f"Seeds: {num_problems}")
     print(f"Steps per run: {steps}\n")
 
     print("-- Steps to Epsilon (ε threshold) --")
