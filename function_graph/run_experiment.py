@@ -111,46 +111,15 @@ def main(
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    num_problems = 2
-
-    # Use the class-provided problem generator.
-    all_dfs = []
-    summaries = []
-
-    for problem in AutoencoderProblem.problem_generator(phase, num_problems):
-        # extract the problem seed from the problem instance if needed
-        df, summary = run_simple_experiment(
-            problem=problem,
-            problem_seed=problem.problem_seed,
-            mcts_budget=mcts_budget,
-            steps=steps
-        )
-        all_dfs.append(df)
-        summaries.append(summary)
-
-    # Concatenate all runs into one CSV.
-    master_df = pd.concat(all_dfs, ignore_index=True)
-    csv_path = os.path.join(output_dir, f"results_{phase}.csv")
-    master_df.to_csv(csv_path, index=False)
-    print(f"Saved detailed metrics to {csv_path}")
-
-    # Print terminal summary
-    sum_df = pd.DataFrame(summaries)
-    print("\n=== Experiment Summary ===")
-    print(f"Phase: {phase}")
-    print(f"Seeds: {num_problems}")
-    print(f"Steps per run: {steps}\n")
-
-    print("-- Steps to Epsilon (ε threshold) --")
-    print(sum_df.steps_to_epsilon.describe(), "\n")
-    print("-- Total Reuse Actions --")
-    print(sum_df.total_reuse.describe(), "\n")
-    print("-- Final MSE --")
-    print(sum_df.final_mse.describe(), "\n")
-    print("-- Final Node Counts --")
-    print(sum_df.final_nodes.describe(), "\n")
-    print("-- Final Repository Sizes --")
-    print(sum_df.final_repo_size.describe(), "\n")
+    from experiment_runner import run_experiments
+    run_experiments(
+        problem_cls=AutoencoderProblem,
+        phase=phase,
+        num_problems=2,
+        mcts_budget=mcts_budget,
+        steps=steps,
+        output_dir=output_dir
+    )
 
 if __name__ == "__main__":
     main()
