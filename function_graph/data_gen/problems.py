@@ -32,7 +32,7 @@ class AutoencoderProblem(Problem):
     Wraps the reference autoencoder as a Problem.
     This class now defines its own data generator.
     """
-    def __init__(self, phase: str = "basic", problem_seed: int = 0, batch_size: int = 100):
+    def __init__(self, phase: str = "basic", problem_seed: int = 0):
         config = DEFAULT_PHASES[phase]
         # Validate architecture directly.
         self._validate_architecture(config)
@@ -46,7 +46,6 @@ class AutoencoderProblem(Problem):
         self._encoder = ref["encoder"]
         self._mse = ref["mse"]
         self._complexity = len(ref["config"]["encoder"])
-        self.batch_size = batch_size
 
         # Record dimensions.
         ref_cfg = ref["config"]
@@ -143,8 +142,8 @@ class AutoencoderProblem(Problem):
             X += np.random.normal(scale=config['noise_level'], size=X.shape)
         return X
 
-    def sample_batch(self, batch_size: int = None):
-        bs = batch_size or self.batch_size
+    def sample_batch(self, batch_size: int):
+        bs = batch_size
         # Advance seed each call to get fresh data.
         sample_seed = self.problem_seed + self._batch_counter # Each problem may be sampled multiple times.
         self._batch_counter += 1
@@ -176,12 +175,12 @@ class AutoencoderProblem(Problem):
         return self._output_dim
 
     @classmethod
-    def problem_generator(cls, phase: str, num: int, batch_size: int = 100):
+    def problem_generator(cls, phase: str, num: int):
         """
         Yields a sequence of problem instances for the given phase.
         """
         for problem_seed in range(num):
-            yield cls(phase=phase, problem_seed=problem_seed, batch_size=batch_size)
+            yield cls(phase=phase, problem_seed=problem_seed)
 
 
 class RegressionProblem(Problem):
@@ -189,7 +188,7 @@ class RegressionProblem(Problem):
     Example: user plugs in any joint sampler and specifies
     which variables are inputs vs. targets.
     """
-    def __init__(self, sampler_fn, input_vars, target_vars, batch_size: int = 100):
+    def __init__(self, sampler_fn, input_vars, target_vars):
         """
         sampler_fn(batch_size) -> dict mapping variable names to np.arrays
         input_vars: list of keys for inputs X
@@ -198,11 +197,11 @@ class RegressionProblem(Problem):
         self.sampler_fn = sampler_fn
         self.input_vars = input_vars
         self.target_vars = target_vars
-        self.batch_size = batch_size
+
         self._last_val_Y = None
 
     def sample_batch(self, batch_size: int = None):
-        bs = batch_size or self.batch_size
+        bs = batch_size
         data = self.sampler_fn(bs)
         X = np.stack([data[k] for k in self.input_vars], axis=1)
         Y = np.stack([data[k] for k in self.target_vars], axis=1)

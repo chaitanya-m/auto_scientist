@@ -41,7 +41,7 @@ class Problem(ABC):
 
     @classmethod
     @abstractmethod
-    def problem_generator(cls, phase: str, num: int, batch_size: int = 100):
+    def problem_generator(cls, phase: str, num: int):
         """
         Should yield a sequence of problem instances for the given phase.
         """
