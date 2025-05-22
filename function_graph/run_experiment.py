@@ -99,12 +99,7 @@ def run_simple_experiment(
 
     return df, summary
 
-def main(
-    phase: str = "basic",
-    mcts_budget: int = 8,
-    steps: int = 15,
-    output_dir: str = "results",
-):
+def main(problem_cls, phase: str = "basic", mcts_budget: int = 8, steps: int = 15, output_dir: str = "results"):
     """
     Runs experiments across all seeds in the given phase,
     saving a single CSV and printing terminal summaries.
@@ -113,7 +108,7 @@ def main(
 
     from experiment_runner import run_experiments
     run_experiments(
-        problem_cls=AutoencoderProblem,
+        problem_cls=problem_cls,
         phase=phase,
         num_problems=2,
         mcts_budget=mcts_budget,
@@ -122,4 +117,17 @@ def main(
     )
 
 if __name__ == "__main__":
-    main()
+    import sys
+    from data_gen import problems as prob_mod
+
+    # If a class name is provided, try to use it as the problem class.
+    if len(sys.argv) > 1:
+        cls_name = sys.argv[1]
+        try:
+            problem_cls = getattr(prob_mod, cls_name)
+        except AttributeError:
+            sys.exit(f"Error: Problem class '{cls_name}' not found in data_gen.problems")
+    else:
+        from data_gen.problems import AutoencoderProblem as problem_cls
+
+    main(problem_cls=problem_cls)
