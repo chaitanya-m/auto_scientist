@@ -4,22 +4,22 @@ from data_gen.problems import Problem
 from data_gen.curriculum_interface import CurriculumInterface
 
 class Curriculum(CurriculumInterface):
-    def __init__(self, problem_generators: List[Callable[[str, int], Problem]]):
+    def __init__(self, problem_generator: Callable[[], Iterator[Problem]]):
         """
-        Manages a curriculum as a sequence of problem generators.
-        Each generator should be a callable accepting (phase, problem_seed) and returning a Problem instance.
+        Manages a curriculum using a single problem generator.
+        The generator should be a callable that returns an iterator over Problem instances.
         """
-        self.problem_generators = problem_generators
+        self.problem_generator = problem_generator
 
     def __iter__(self) -> Iterator[Problem]:
         """
-        Yields problems one by one.
+        Delegates iteration to the provided problem generator.
+        The generator is expected to internally handle phase and seed iteration.
         """
-        for generator in self.problem_generators:
-            yield generator()
+        return self.problem_generator()
 
     @classmethod
-    def seeded_problem_variations(cls, problem: Type["Problem"], phase: str, num: int):
+    def seeded_problem_variations(cls, problem: Type["Problem"], phase: int, num: int):
         """
         Yields a sequence of problem instances for a given problem class.
         """
