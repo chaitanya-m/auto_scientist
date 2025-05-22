@@ -38,3 +38,12 @@ class Problem(ABC):
     @abstractmethod
     def output_dim(self) -> int:
         pass
+
+    @classmethod
+    @abstractmethod
+    def get_phase(cls, phase: int) -> dict:
+        """
+        Returns the configuration dictionary for the given numeric phase.
+        Phase 0 is basic; phase 1 is intermediate; phases > 1 build on intermediate.
+        """
+        pass
