@@ -21,7 +21,13 @@ def run_experiments(problem_cls: Type[Problem], phase: int, num_problems: int, m
     all_dfs = []
     summaries = []
     
-    for problem in Curriculum.seeded_problem_variations(problem_cls, phase, num_problems):
+    # Create a curriculum using a generator that returns problem instances.
+    def problem_generator():
+        return Curriculum.seeded_problem_variations(problem_cls, phase, num_problems)
+    
+    curriculum = Curriculum(problem_generator)
+    
+    for problem in curriculum:
         df, summary = run_simple_experiment(
             problem=problem,
             problem_seed=problem.problem_seed,
