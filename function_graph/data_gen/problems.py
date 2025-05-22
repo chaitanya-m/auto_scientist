@@ -174,13 +174,7 @@ class AutoencoderProblem(Problem):
     def output_dim(self) -> int:
         return self._output_dim
 
-    @classmethod
-    def problem_generator(cls, phase: str, num: int):
-        """
-        Yields a sequence of problem instances for the given phase.
-        """
-        for problem_seed in range(num):
-            yield cls(phase=phase, problem_seed=problem_seed)
+
 
 
 class RegressionProblem(Problem):

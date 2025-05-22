@@ -38,11 +38,3 @@ class Problem(ABC):
     @abstractmethod
     def output_dim(self) -> int:
         pass
-
-    @classmethod
-    @abstractmethod
-    def problem_generator(cls, phase: str, num: int):
-        """
-        Should yield a sequence of problem instances for the given phase.
-        """
-        pass
