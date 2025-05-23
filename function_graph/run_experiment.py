@@ -1,13 +1,6 @@
 # run_experiment.py
 
-import os
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-from keras import layers, models
-
-from data_gen.problems import AutoencoderProblem, Problem
-from envs import FunctionGraphEnv
+from data_gen.curriculum import Curriculum
 
 def main(problem_cls, phase: int = 0, mcts_budget: int = 8, steps: int = 15, output_dir: str = "results"):
     """
@@ -15,13 +8,24 @@ def main(problem_cls, phase: int = 0, mcts_budget: int = 8, steps: int = 15, out
     
     phase       : Integer phase (0 = basic, 1 = intermediate, >1 extrapolated).
     """
-    os.makedirs(output_dir, exist_ok=True)
-
+    # Assume that the curriculum is created elsewhere based on desired experimental conditions.
+    # For example, one might construct it as follows (this is illustrative):
+    #
+    # from data_gen.curriculum import Curriculum
+    # def my_problem_generator():
+    #     # Return an iterator over Problem instances (with phase and seed handling already embedded).
+    #     return Curriculum.seeded_problem_variations(problem_cls, phase, 2)
+    # curriculum = Curriculum(my_problem_generator)
+    #
+    # Here, we assume that 'curriculum' is provided to main.
     from experiment_runner import run_experiments
+    # For demonstration, if problem_cls is provided, we create a default curriculum.
+    def default_generator():
+        return Curriculum.seeded_problem_variations(problem_cls, phase, 2)
+    curriculum = Curriculum(default_generator)
+
     run_experiments(
-        problem_cls=problem_cls,
-        phase=phase,
-        num_problems=2,
+        curriculum=curriculum,
         mcts_budget=mcts_budget,
         steps=steps,
         output_dir=output_dir
