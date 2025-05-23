@@ -12,11 +12,3 @@ class CurriculumInterface(ABC):
         """
         pass
 
-    @classmethod
-    @abstractmethod
-    def seeded_problem_variations(cls, problem: Type["Problem"], phase: str, num: int) -> Iterator["Problem"]:
-        """
-        Yields a sequence of problem instances for a given problem class.
-        """
-        pass
-

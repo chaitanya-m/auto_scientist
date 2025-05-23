@@ -17,11 +17,3 @@ class Curriculum(CurriculumInterface):
         The generator is expected to internally handle phase and seed iteration.
         """
         return self.problem_generator()
-
-    @classmethod
-    def seeded_problem_variations(cls, problem: Type["Problem"], phase: int, num: int):
-        """
-        Yields a sequence of problem instances for a given problem class.
-        """
-        for problem_seed in range(num):
-            yield problem(phase=phase, problem_seed=problem_seed)

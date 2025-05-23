@@ -3,7 +3,7 @@
 from sklearn.datasets import make_blobs
 import numpy as np
 import tensorflow as tf
-from typing import Dict, Callable
+from typing import Dict, Callable, Iterator
 
 from data_gen.problem_interface import Problem
 
@@ -102,6 +102,18 @@ class AutoencoderProblem(Problem):
             return config
         else:
             raise ValueError(f"Invalid phase: {phase}")
+
+    @classmethod
+    def seeded_problem_variations(cls, phase: int, num: int) -> Iterator["Problem"]:
+        """
+        Yields a sequence of AutoencoderProblem instances for the given phase.
+
+        Args:
+            phase (int): The phase number (0 = basic, 1 = intermediate, >1 extrapolated)
+            num (int): Number of distinct problem instances (seeds) to generate.
+        """
+        for problem_seed in range(num):
+            yield cls(phase=phase, problem_seed=problem_seed)
 
     def _train_reference_autoencoder(self, config: Dict, seed: int, data_generator: Callable[[int, int], np.ndarray]) -> Dict:
         """Train and store reference autoencoder and its components using provided data."""

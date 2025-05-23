@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Iterator
 
 class Problem(ABC):
     """
@@ -45,5 +46,17 @@ class Problem(ABC):
         """
         Returns the configuration dictionary for the given numeric phase.
         Phase 0 is basic; phase 1 is intermediate; phases > 1 build on intermediate.
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def seeded_problem_variations(cls, phase: int, num: int) -> Iterator["Problem"]:
+        """
+        Yields a sequence of problem instances for the given phase.
+
+        Arguments:
+           phase: An integer representing the problem phase.
+           num  : Number of problems (different seeds) to generate.
         """
         pass

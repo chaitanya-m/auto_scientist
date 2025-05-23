@@ -99,6 +99,20 @@ def run_simple_experiment(
 
     return df, summary
 
+def default_curriculum(problem_cls: Type[Problem], phase: int, num_problems: int = 2) -> Curriculum:
+    """
+    Returns a default Curriculum instance using the provided Problem class.
+    The default generator calls seeded_problem_variations on the problem_cls.
+    
+    Arguments:
+      problem_cls  : a Problem class implementing seeded_problem_variations.
+      phase        : the phase number to be used for problem generation.
+      num_problems : number of problems (seeds) to generate.
+    """
+    def default_generator():
+        return problem_cls.seeded_problem_variations(phase, num_problems)
+    return Curriculum(default_generator)
+
 def run_experiments(curriculum : Curriculum, mcts_budget: int, steps: int, output_dir: str):
     """
     Runs experiments over all problems in the given Curriculum.
@@ -108,6 +122,8 @@ def run_experiments(curriculum : Curriculum, mcts_budget: int, steps: int, outpu
       mcts_budget: search budget for each experiment.
       steps      : number of steps per experiment.
       output_dir : path to save CSV results.
+      
+    If needed, a default curriculum can be generated using default_curriculum().
     """
     os.makedirs(output_dir, exist_ok=True)
     all_dfs = []
