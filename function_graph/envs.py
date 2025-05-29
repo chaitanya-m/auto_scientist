@@ -56,11 +56,13 @@ class FunctionGraphEnv(gym.Env):
 
         random.seed(seed)
         np.random.seed(seed)
+        # NEW: Initialize repository here so it persists across resets/problems.
+        self.repository = []
         self.reset()
 
     def reset(self, *, seed=None, options=None):
         """
-        Reset to an empty graph with no repository entries.
+        Reset to an empty graph while keeping the persistent repository.
         """
         composer, _ = create_minimal_graphmodel(
             (self.input_dim,),
@@ -68,7 +70,8 @@ class FunctionGraphEnv(gym.Env):
             activation="relu"
         )
         self.composer = composer
-        self.repository = []
+        # Remove reinitialization of repository:
+        # self.repository = []   <-- REMOVED to persist repository between problems
         self.best_mse = float('inf')
         self.graph_actions = []
         self.deletion_count = 0

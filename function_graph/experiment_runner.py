@@ -85,16 +85,21 @@ def run_simple_experiment(
 
     df = pd.DataFrame(metrics)
 
-    # 3) Compute summary for this run
-    eps = 0.01 * problem.reference_mse
-    steps_to_eps = df[df.mse <= problem.reference_mse + eps].step.min()
+    # 3) Compute summary for this run using aggregated per-step metrics.
+    # Define epsilon threshold as reference mse + 1% of reference mse.
+    eps_threshold = problem.reference_mse + (0.01 * problem.reference_mse)
+    try:
+        steps_to_eps = df.loc[df["mse"] <= eps_threshold, "step"].iloc[0]
+    except IndexError:
+        steps_to_eps = np.nan
+
     summary = {
         "seed": problem_seed,
-        "steps_to_epsilon": float(steps_to_eps) if not np.isnan(steps_to_eps) else np.nan,
-        "total_reuse": reuse_count,
-        "final_mse": float(df.mse.iloc[-1]),
-        "final_nodes": int(df.nodes.iloc[-1]),
-        "final_repo_size": int(df.repo_size.iloc[-1])
+        "steps_to_epsilon": float(steps_to_eps),
+        "total_reuse": int(df["cumulative_reuse"].iloc[-1]),
+        "final_mse": float(df["mse"].iloc[-1]),
+        "final_nodes": int(df["nodes"].iloc[-1]),
+        "final_repo_size": int(df["repo_size"].iloc[-1])
     }
 
     return df, summary
@@ -136,6 +141,8 @@ def run_experiments(curriculum : Curriculum, mcts_budget: int, steps: int, outpu
             mcts_budget=mcts_budget,
             steps=steps
         )
+        # Inject the phase information from the curriculum.
+        summary["phase"] = getattr(curriculum, "phase", "N/A")
         all_dfs.append(df)
         summaries.append(summary)
     
@@ -150,7 +157,6 @@ def run_experiments(curriculum : Curriculum, mcts_budget: int, steps: int, outpu
 def print_experiment_summary(summaries):
     sum_df = pd.DataFrame(summaries)
     print("\n=== Experiment Summary ===")
-    print(f"Phase: {summaries[0]['phase'] if summaries else 'N/A'}")
     print(f"Total Problems: {len(summaries)}")
     print("-- Steps to Epsilon (ε threshold) --")
     print(sum_df.steps_to_epsilon.describe(), "\n")
