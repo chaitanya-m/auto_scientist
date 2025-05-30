@@ -3,9 +3,6 @@
 import math
 import random
 import numpy as np
-from copy import deepcopy
-import random
-import numpy as np
 
 class PolicyNetwork:
     """
@@ -54,6 +51,7 @@ class SimpleMCTSAgent:
     Monte Carlo Tree Search agent for Gymnasium-style environments.
     Expects the environment to implement:
       - reset(): returns (obs, info)
+      - clone(): returns a deep copy of the env at its current state
       - valid_actions(): returns list of valid action indices
       - step(action): returns (obs, reward, done, truncated, info)
       - observation_space, action_space
@@ -76,15 +74,21 @@ class SimpleMCTSAgent:
         Perform MCTS for self.search_budget iterations.
         Returns the best action index to take from the root state.
         """
-        obs, _ = self.base_env.reset()
-        self.root = MCTSNode(obs)
 
+
+
+        # 1) Start from the current env state (problem already set)
+        root_obs = self.base_env._get_obs()
+        self.root = MCTSNode(root_obs)
+
+
+        # 2) Perform rollouts
         for _ in range(self.search_budget):
             leaf, sim_env = self._select(self.root)
             reward = self._simulate(leaf, sim_env)
             self._backpropagate(leaf, reward)
 
-        # Pick best child of root by average value
+        # 3) Pick best child of root by average value
         if not self.root.children:
             # fallback: choose random valid action
             return random.choice(self.base_env.valid_actions())
@@ -93,14 +97,14 @@ class SimpleMCTSAgent:
 
     def _select(self, node):
         """
-        From `node`, synchronize a cloned env and expand one child if none exist,
-        otherwise descend by UCB.
+        From `node`, clone the base environment, replay the path to `node`,
+        then expand one child if none exist, otherwise descend by UCB.
         Returns (new_node, env_copy).
         """
-        env = deepcopy(self.base_env)
-        env.reset()
+        # Clone current env state (same problem, same graph, same repository)
+        env = self.base_env.clone()
 
-        # replay path
+        # replay path from root to this node
         path = []
         cur = node
         while cur.parent:
@@ -118,7 +122,7 @@ class SimpleMCTSAgent:
             node.children[a] = new_node
             return new_node, env
 
-        # selection
+        # selection by UCB
         while node.children:
             valid = env.valid_actions()
             probs = self.policy.predict(node.obs)

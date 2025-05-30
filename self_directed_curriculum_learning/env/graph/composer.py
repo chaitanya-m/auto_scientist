@@ -195,35 +195,49 @@ class GraphComposer:
         new_model.save(filepath.replace(".h5", ".keras"))
 
     def clone(self):
+        """
+        Produce a deep clone of this GraphComposer, including all trained weights.
+        """
         from keras import models
+        from env.graph.node import InputNode, SingleNeuron, DenseNode, SubGraphNode
 
+        # 1) Fresh composer
         new_comp = GraphComposer()
 
-        # 1) Reconstruct every node
+        # 2) Clone each node
         for name, node in self.nodes.items():
             if isinstance(node, SubGraphNode):
-                # Clone the bypass-model safely
+                # clone bypass_model with weights
                 cloned_bypass = models.clone_model(node.bypass_model)
                 cloned_bypass.set_weights(node.bypass_model.get_weights())
                 new_node = SubGraphNode(name=name, model=cloned_bypass)
+
+            elif isinstance(node, InputNode):
+                new_node = InputNode(name=name, input_shape=node.input_shape)
+
+            elif isinstance(node, SingleNeuron):
+                new_node = SingleNeuron(name=name, activation=node.activation)
+
+            elif isinstance(node, DenseNode):
+                # assume DenseNode has `.units` and `.activation`
+                new_node = DenseNode(
+                    name=name,
+                    units=node.units,
+                    activation=node.activation
+                )
+
             else:
-                # Recreate blueprint node from its config, not from deepcopy
-                if isinstance(node, InputNode):
-                    new_node = InputNode(name=name, input_shape=node.input_shape)
-                elif isinstance(node, SingleNeuron):
-                    new_node = SingleNeuron(name=name, activation=node.activation)
-                else:
-                    # If you have other node types (e.g. DenseNode),
-                    # add similar constructor logic here
-                    raise NotImplementedError(f"Clone logic missing for {type(node)}")
+                # if you add custom node types, handle them here!
+                raise NotImplementedError(f"Clone logic missing for {type(node)}")
+
             new_comp.add_node(new_node)
 
-        # 2) Copy over plain-Python state
+        # 3) Copy connections & I/O markers
         new_comp.connections = {k: list(v) for k, v in self.connections.items()}
         new_comp.input_node_name = self.input_node_name
         new_comp.output_node_names = list(self.output_node_names)
 
-        # 3) Build the Keras graph fresh, then overwrite weights
+        # 4) Build and copy weights
         new_model = new_comp.build()
         new_model.set_weights(self.keras_model.get_weights())
         new_comp.keras_model = new_model

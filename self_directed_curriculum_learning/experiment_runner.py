@@ -4,12 +4,13 @@ import pandas as pd
 import tensorflow as tf
 
 from keras import layers, models
-from typing import Type, Optional
+from typing import Optional
 from curriculum_generator.problems import Problem
 from curriculum_generator.curriculum import Curriculum
 
 from env.fg_env import FunctionGraphEnv
 from agents.mcts import SimpleMCTSAgent
+
 
 def build_uniform_policy(obs_dim: int, action_dim: int) -> models.Model:
     """
@@ -22,7 +23,7 @@ def build_uniform_policy(obs_dim: int, action_dim: int) -> models.Model:
         kernel_initializer=tf.constant_initializer(1.0 / action_dim),
         bias_initializer=tf.constant_initializer(0.0),
     )(inp)
-    model = models.Model(inp, out)
+    model = models.Model(inputs=inp, outputs=out)
     model.compile(optimizer="adam", loss="categorical_crossentropy")
     return model
 
@@ -32,14 +33,28 @@ def run_simple_experiment(
     problem_seed: int = 0,
     mcts_budget: int = 10,
     steps: int = 20,
+    train_epochs: int = 5,
+    batch_size: int = 100,
 ) -> tuple[pd.DataFrame, dict]:
     """
     Runs a single MCTS experiment on one Problem instance,
     returning a DataFrame of per-step metrics and a summary dict.
     """
+    # Wrap the single Problem in a one‐shot Curriculum
+    single_curr = Curriculum(
+        problem_generator=lambda: iter([problem]),
+        num_problems=1
+    )
 
-    # 1) Environment and agent setup
-    env = FunctionGraphEnv(problem=problem, seed=problem_seed)
+    # Environment and agent setup
+    env = FunctionGraphEnv(
+        curriculum=single_curr,
+        train_epochs=train_epochs,
+        batch_size=batch_size,
+        seed=problem_seed
+    )
+
+    # Reset once to pull the one problem
     obs, _ = env.reset()
     obs_dim = obs.shape[0]
     action_dim = env.action_space.n
@@ -49,13 +64,13 @@ def run_simple_experiment(
         env=env, policy_model=policy_model, search_budget=mcts_budget, c=1.0
     )
 
-    # 2) Run the search loop
+    # Run the search loop
     metrics = []
     reuse_count = 0
 
     for step in range(steps):
         prev_best = env.best_mse
-        action = agent.mcts_search()
+        action = agent.mcts_search()    # no reset() here
         obs, reward, done, truncated, info = env.step(action)
 
         did_reuse = (action == 2)
@@ -91,7 +106,7 @@ def run_simple_experiment(
 
     df = pd.DataFrame(metrics)
 
-    # 3) Compute summary for this run using aggregated per-step metrics.
+    # Compute summary for this run using aggregated per-step metrics.
     eps_threshold = problem.reference_mse + (0.01 * problem.reference_mse)
     try:
         steps_to_eps = df.loc[df["mse"] <= eps_threshold, "step"].iloc[0]
@@ -132,9 +147,11 @@ def run_experiments(
     for problem in curriculum:
         df, summary = run_simple_experiment(
             problem=problem,
-            problem_seed=problem.problem_seed,
+            problem_seed=getattr(problem, "problem_seed", 0),
             mcts_budget=mcts_budget,
             steps=steps,
+            train_epochs=5,
+            batch_size=100,
         )
         # Inject the current difficulty and batch size
         summary["difficulty"] = curriculum.difficulty
@@ -160,9 +177,3 @@ def print_experiment_summary(summaries):
     print(sum_df.total_reuse.describe(), "\n")
     print("-- Final MSE --")
     print(sum_df.final_mse.describe(), "\n")
-
-
-if __name__ == "__main__":
-    # Example usage with the default curriculum
-    curr = Curriculum.default(Problem, initial_difficulty=0, num_problems=2)
-    run_experiments(curr, mcts_budget=5, steps=10, output_dir="results")

@@ -4,15 +4,16 @@ import numpy as np
 import uuid
 import random
 
-from curriculum_generator.problems import Problem
+from curriculum_generator.curriculum_interface import CurriculumInterface
 from env.utils.nn import create_minimal_graphmodel
 from env.graph.composer import GraphTransformer
 from env.graph.node import SingleNeuron, SubGraphNode
 from env.utils.graph_utils import compute_complexity
 
+
 class FunctionGraphEnv(gym.Env):
     """
-    A Gymnasium environment for neural‐architecture search on any Problem.
+    A Gymnasium environment for neural-architecture search on any Problem.
 
     Observation:
       3D float vector: [current_mse, num_nodes, num_actions]
@@ -30,25 +31,33 @@ class FunctionGraphEnv(gym.Env):
     """
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self,
-                 problem: Problem,
-                 train_epochs: int = 5,
-                 batch_size: int = 100,
-                 seed: int = 0):
+    def __init__(
+        self,
+        *,
+        curriculum: CurriculumInterface,
+        train_epochs: int = 5,
+        batch_size: int = 100,
+        seed: int = 0
+    ):
         super().__init__()
-        assert isinstance(problem, Problem), "problem must implement the Problem interface"
-        self.problem = problem
+        # now driven by a Curriculum rather than a single Problem
+        assert isinstance(curriculum, CurriculumInterface), \
+            "curriculum must implement CurriculumInterface"
+        self.curriculum = curriculum
+        self._problem_iter = iter(curriculum)
+
         self.train_epochs = train_epochs
         self.batch_size = batch_size
 
-        # ground‐truth scalars
-        self.reference_mse = problem.reference_mse
-        self.reference_complexity = problem.reference_complexity()
+        # ground-truth scalars (set per-problem in reset)
+        self.reference_mse = None
+        self.reference_complexity = None
 
-        # build minimal graph using declared dims
-        self.input_dim = problem.input_dim
-        self.latent_dim = problem.output_dim
+        # dims (set per-problem in reset)
+        self.input_dim = None
+        self.latent_dim = None
 
+        # action & observation spaces
         self.action_space = spaces.Discrete(3)
         low = np.array([0.0, 1.0, 0.0], dtype=float)
         high = np.array([np.inf, np.inf, np.inf], dtype=float)
@@ -56,66 +65,46 @@ class FunctionGraphEnv(gym.Env):
 
         random.seed(seed)
         np.random.seed(seed)
-        # NEW: Initialize repository here so it persists across resets/problems.
+
+        # persistent repository of learned abstractions
         self.repository = []
-        self.reset()
 
+        # delay pulling the first problem until reset() is called
+        self.current_problem = None
+        self.composer = None
 
-    def clone(self):
-        """
-        Create a deep copy of this environment, including:
-        - A cloned GraphComposer (weights and all)
-        - Copied scalar state and history
-        - A fresh list for the repository, but not deep‐cloning its entries
-
-        We do *not* deep‐clone each repository entry here because:
-        1. Repository entries hold SubGraphNode objects whose bypass models
-            will be cloned on demand by GraphTransformer.add_abstraction_node.
-        2. Keeping the entries itself shallow (same objects) avoids unnecessary
-            duplication until they’re actually used, at which point the transformer
-            logic performs a proper clone_model + set_weights to get an independent copy.
-        """
-        # 1) New env with same config
-        new_env = FunctionGraphEnv(
-            problem=self.problem,
-            train_epochs=self.train_epochs,
-            batch_size=self.batch_size,
-            seed=None  # RNG state can be managed separately if needed
-        )
-
-        # 2) Clone the composer (architecture + weights)
-        new_env.composer = self.composer.clone()
-
-        # 3) Copy scalar fields & history
-        new_env.reference_mse        = self.reference_mse
-        new_env.reference_complexity = self.reference_complexity
-        new_env.input_dim            = self.input_dim
-        new_env.latent_dim           = self.latent_dim
-
-        new_env.best_mse          = self.best_mse
-        new_env.current_mse       = self.current_mse
-        new_env.graph_actions     = list(self.graph_actions)
-        new_env.deletion_count    = self.deletion_count
-        new_env.improvement_count = self.improvement_count
-
-        # 4) Shallow‐copy the repository list only
-        new_env.repository = list(self.repository)
-
-        return new_env
-
+        # initialize episode-specific fields so they exist prior to reset()
+        self.best_mse = float('inf')
+        self.graph_actions = []
+        self.deletion_count = 0
+        self.improvement_count = 0
+        self.current_mse = 1.0
 
     def reset(self, *, seed=None, options=None):
         """
         Reset to an empty graph while keeping the persistent repository.
+        Pulls the next Problem from the curriculum.
         """
+        # 1) Pull next problem
+        self.current_problem = next(self._problem_iter)
+
+        # 2) Update per-problem scalars
+        self.reference_mse = self.current_problem.reference_mse
+        self.reference_complexity = self.current_problem.reference_complexity()
+
+        # 3) Update dims
+        self.input_dim = self.current_problem.input_dim
+        self.latent_dim = self.current_problem.output_dim
+
+        # 4) Build minimal starter graph
         composer, _ = create_minimal_graphmodel(
             (self.input_dim,),
             output_units=self.latent_dim,
             activation="relu"
         )
         self.composer = composer
-        # Remove reinitialization of repository:
-        # self.repository = []   <-- REMOVED to persist repository between problems
+
+        # Episode-specific counters
         self.best_mse = float('inf')
         self.graph_actions = []
         self.deletion_count = 0
@@ -169,11 +158,10 @@ class FunctionGraphEnv(gym.Env):
                 remove_prob=1.0
             )
 
-        # draw data from the problem
-        (Xtr, Ytr), (Xte, Yte) = self.problem.sample_batch(self.batch_size)
-        # ground truth outputs
-        ytr = self.problem.reference_output(Xtr)
-        yte = self.problem.reference_output(Xte)
+        # draw data from the current problem
+        (Xtr, Ytr), (Xte, Yte) = self.current_problem.sample_batch(self.batch_size)
+        ytr = self.current_problem.reference_output(Xtr)
+        yte = self.current_problem.reference_output(Xte)
 
         # train candidate to match reference
         model = self.composer.build()
@@ -217,3 +205,47 @@ class FunctionGraphEnv(gym.Env):
         """
         print(f"MSE={self.current_mse:.4f} | Nodes={len(self.composer.nodes)} "
               f"| Actions={len(self.graph_actions)} | Repo={len(self.repository)}")
+
+    def clone(self):
+        """
+        Create a deep copy of this environment at its current episode state, including:
+          - A cloned GraphComposer (architecture + weights)
+          - Copied scalar state and history
+          - A fresh list for the repository (entries shallow-copied)
+          - A one-shot iterator that will re-play the same current_problem
+
+        We do *not* deep‐clone each repository entry; they’ll be cloned on demand
+        by GraphTransformer.add_abstraction_node when used.
+        """
+        # 1) New env shell with identical configuration
+        new_env = FunctionGraphEnv(
+            curriculum=self.curriculum,
+            train_epochs=self.train_epochs,
+            batch_size=self.batch_size,
+            seed=None  # RNG can be reseeded separately if needed
+        )
+
+        # 2) Override its problem iterator so it only yields the current problem
+        new_env._problem_iter = iter([self.current_problem])
+
+        # 3) Copy over per-problem scalars & dims
+        new_env.current_problem     = self.current_problem
+        new_env.reference_mse        = self.reference_mse
+        new_env.reference_complexity = self.reference_complexity
+        new_env.input_dim            = self.input_dim
+        new_env.latent_dim           = self.latent_dim
+
+        # 4) Clone the composer (weights + topology)
+        new_env.composer = self.composer.clone()
+
+        # 5) Shallow-copy repository list only
+        new_env.repository = list(self.repository)
+
+        # 6) Copy episode-specific counters & history
+        new_env.best_mse          = self.best_mse
+        new_env.graph_actions     = list(self.graph_actions)
+        new_env.deletion_count    = self.deletion_count
+        new_env.improvement_count = self.improvement_count
+        new_env.current_mse       = self.current_mse
+
+        return new_env
