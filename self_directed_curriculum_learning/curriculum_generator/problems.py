@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 from typing import Dict, Callable, Iterator
 
-from data_gen.problem_interface import Problem
+from curriculum_generator.problem_interface import Problem
 
 
 class AutoencoderProblem(Problem):

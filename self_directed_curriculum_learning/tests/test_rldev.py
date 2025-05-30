@@ -18,7 +18,7 @@ tf.random.set_seed(SEED)
 from envs.environment import RLEnvironment, State, AgentState
 from utils.nn import create_minimal_graphmodel, train_and_evaluate, AdamWithLRMultiplier
 from agents.deterministic import DeterministicAgent
-from data_gen.categorical_classification import DataSchemaFactory
+from curriculum_generator.categorical_classification import DataSchemaFactory
 from utils.rl import run_episode
 from graph.node import InputNode, SingleNeuron, SubGraphNode
 from utils.visualize import visualize_graph, print_graph_nodes

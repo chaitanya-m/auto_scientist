@@ -5,8 +5,8 @@ import tensorflow as tf
 
 from keras import layers, models
 from typing import Type, Optional
-from data_gen.problems import Problem
-from data_gen.curriculum import Curriculum
+from curriculum_generator.problems import Problem
+from curriculum_generator.curriculum import Curriculum
 
 from env.fg_env import FunctionGraphEnv
 from agents.mcts import SimpleMCTSAgent

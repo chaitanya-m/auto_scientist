@@ -1,6 +1,6 @@
 # run_experiment.py
 
-from data_gen.curriculum import Curriculum
+from curriculum_generator.curriculum import Curriculum
 
 def main(curriculum: Curriculum, mcts_budget: int = 5, steps: int = 10, output_dir: str = "results"):
     """
@@ -22,7 +22,7 @@ def main(curriculum: Curriculum, mcts_budget: int = 5, steps: int = 10, output_d
 
 
 if __name__ == "__main__":
-    from data_gen.problems import AutoencoderProblem
+    from curriculum_generator.problems import AutoencoderProblem
     # Create a default curriculum via the class factory
     curriculum = Curriculum.default(
         problem_cls=AutoencoderProblem,

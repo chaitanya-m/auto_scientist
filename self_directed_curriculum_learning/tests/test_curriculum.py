@@ -2,7 +2,7 @@
 import unittest
 import numpy as np
 import tensorflow as tf
-from data_gen.curriculum import Curriculum
+from curriculum_generator.curriculum import Curriculum
 
 class TestCurriculum(unittest.TestCase):
     def test_reference_consistency(self):

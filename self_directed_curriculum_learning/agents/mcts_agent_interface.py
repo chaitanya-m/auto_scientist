@@ -1,9 +1,9 @@
 #agents/mcts_agent_interface.py
 from abc import ABC, abstractmethod
-from data_gen.curriculum import Curriculum
-from graph.composer import GraphComposer
-from utils.nn import create_minimal_graphmodel
-from graph.node import SingleNeuron
+from curriculum_generator.curriculum import Curriculum
+from env.graph.composer import GraphComposer
+from env.utils.nn import create_minimal_graphmodel
+from env.graph.node import SingleNeuron
 import uuid
 
 class MCTSAgentInterface(ABC):

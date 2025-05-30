@@ -1,7 +1,7 @@
 from typing import Iterator, Callable, Optional, Type
 from itertools import count
-from data_gen.problems import Problem
-from data_gen.curriculum_interface import CurriculumInterface
+from curriculum_generator.problems import Problem
+from curriculum_generator.curriculum_interface import CurriculumInterface
 
 
 class Curriculum(CurriculumInterface):

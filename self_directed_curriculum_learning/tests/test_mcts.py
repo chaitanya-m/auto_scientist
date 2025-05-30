@@ -4,10 +4,10 @@ import numpy as np
 import os
 import uuid
 
-from utils.graph_utils import compute_complexity
-from utils.nn import create_minimal_graphmodel
-from graph.node import SubGraphNode
-from envs import FunctionGraphEnv
+from env.utils.graph_utils import compute_complexity
+from env.utils.nn import create_minimal_graphmodel
+from env.graph.node import SubGraphNode
+from self_directed_curriculum_learning.env.fg_env import FunctionGraphEnv
 from agents.mcts import SimpleMCTSAgent
 
 class TestGraphUtils(unittest.TestCase):

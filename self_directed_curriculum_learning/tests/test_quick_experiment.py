@@ -1,8 +1,8 @@
 import unittest
 import pandas as pd
 
-from data_gen.problems import AutoencoderProblem
-from envs import FunctionGraphEnv
+from curriculum_generator.problems import AutoencoderProblem
+from self_directed_curriculum_learning.env.fg_env import FunctionGraphEnv
 from run_experiment import run_simple_experiment
 
 class QuickExperimentTest(unittest.TestCase):

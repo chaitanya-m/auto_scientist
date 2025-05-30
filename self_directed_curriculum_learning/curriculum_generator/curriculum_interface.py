@@ -1,7 +1,7 @@
 # data_gen/curriculum.py
 from abc import ABC, abstractmethod
 from typing import Iterator, Callable, Optional
-from data_gen.problems import Problem
+from curriculum_generator.problems import Problem
 
 
 class CurriculumInterface(ABC):

@@ -6,7 +6,7 @@ from utils.rl import run_episode
 from utils.nn import create_minimal_graphmodel, train_learned_abstraction_model
 from agents.deterministic import DeterministicAgent
 from agents.qlearning import QLearningAgent
-from data_gen.categorical_classification import DataSchemaFactory
+from curriculum_generator.categorical_classification import DataSchemaFactory
 from graph.composer import GraphComposer, GraphTransformer
 
 

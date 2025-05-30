@@ -4,7 +4,7 @@ import numpy as np
 import uuid
 import random
 
-from data_gen.problems import Problem
+from curriculum_generator.problems import Problem
 from env.utils.nn import create_minimal_graphmodel
 from env.graph.composer import GraphTransformer
 from env.graph.node import SingleNeuron, SubGraphNode

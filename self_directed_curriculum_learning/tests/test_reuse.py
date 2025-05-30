@@ -1,6 +1,6 @@
 import unittest
 import uuid
-from envs import FunctionGraphEnv
+from self_directed_curriculum_learning.env.fg_env import FunctionGraphEnv
 
 class TestCycle(unittest.TestCase):
     def test_repeated_reuse_never_creates_cycles(self):
