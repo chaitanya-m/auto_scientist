@@ -60,6 +60,50 @@ class FunctionGraphEnv(gym.Env):
         self.repository = []
         self.reset()
 
+
+    def clone(self):
+        """
+        Create a deep copy of this environment, including:
+        - A cloned GraphComposer (weights and all)
+        - Copied scalar state and history
+        - A fresh list for the repository, but not deep‐cloning its entries
+
+        We do *not* deep‐clone each repository entry here because:
+        1. Repository entries hold SubGraphNode objects whose bypass models
+            will be cloned on demand by GraphTransformer.add_abstraction_node.
+        2. Keeping the entries itself shallow (same objects) avoids unnecessary
+            duplication until they’re actually used, at which point the transformer
+            logic performs a proper clone_model + set_weights to get an independent copy.
+        """
+        # 1) New env with same config
+        new_env = FunctionGraphEnv(
+            problem=self.problem,
+            train_epochs=self.train_epochs,
+            batch_size=self.batch_size,
+            seed=None  # RNG state can be managed separately if needed
+        )
+
+        # 2) Clone the composer (architecture + weights)
+        new_env.composer = self.composer.clone()
+
+        # 3) Copy scalar fields & history
+        new_env.reference_mse        = self.reference_mse
+        new_env.reference_complexity = self.reference_complexity
+        new_env.input_dim            = self.input_dim
+        new_env.latent_dim           = self.latent_dim
+
+        new_env.best_mse          = self.best_mse
+        new_env.current_mse       = self.current_mse
+        new_env.graph_actions     = list(self.graph_actions)
+        new_env.deletion_count    = self.deletion_count
+        new_env.improvement_count = self.improvement_count
+
+        # 4) Shallow‐copy the repository list only
+        new_env.repository = list(self.repository)
+
+        return new_env
+
+
     def reset(self, *, seed=None, options=None):
         """
         Reset to an empty graph while keeping the persistent repository.
