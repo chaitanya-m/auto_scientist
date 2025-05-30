@@ -1,6 +1,7 @@
 # utils/nn.py
-from graph.composer import GraphComposer, GraphTransformer
-from graph.node import InputNode, SingleNeuron, SubGraphNode
+from env.graph.composer import GraphComposer, GraphTransformer
+from env.graph.node import InputNode, SingleNeuron, DenseNode  # Ensure DenseNode is imported
+
 import tensorflow as tf
 
 def train_and_evaluate(model, dataset, train_ratio=0.5, epochs=1, verbose=0):
@@ -42,9 +43,7 @@ def train_and_evaluate(model, dataset, train_ratio=0.5, epochs=1, verbose=0):
     accuracy = (preds == test_labels).mean()
     return accuracy
 
-# utils/nn.py
-from graph.composer import GraphComposer
-from graph.node import InputNode, SingleNeuron, DenseNode  # Ensure DenseNode is imported
+
 
 def create_minimal_graphmodel(input_shape, output_units=1, activation='sigmoid'):
     """

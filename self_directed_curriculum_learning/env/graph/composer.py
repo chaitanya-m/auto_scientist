@@ -1,7 +1,7 @@
 # graph/composer.py
 import keras
 from collections import deque
-from graph.node import SingleNeuron, InputNode, SubGraphNode  # Import blueprint node types
+from env.graph.node import SingleNeuron, InputNode, SubGraphNode  # Import blueprint node types
 import random
 import uuid
 import hashlib  # Ensure hashlib is imported

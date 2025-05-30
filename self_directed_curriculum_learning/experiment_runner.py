@@ -8,6 +8,8 @@ from typing import Type, Optional
 from data_gen.problems import Problem
 from data_gen.curriculum import Curriculum
 
+from env.fg_env import FunctionGraphEnv
+from agents.mcts import SimpleMCTSAgent
 
 def build_uniform_policy(obs_dim: int, action_dim: int) -> models.Model:
     """
@@ -35,8 +37,6 @@ def run_simple_experiment(
     Runs a single MCTS experiment on one Problem instance,
     returning a DataFrame of per-step metrics and a summary dict.
     """
-    from envs import FunctionGraphEnv
-    from agents.mcts import SimpleMCTSAgent
 
     # 1) Environment and agent setup
     env = FunctionGraphEnv(problem=problem, seed=problem_seed)

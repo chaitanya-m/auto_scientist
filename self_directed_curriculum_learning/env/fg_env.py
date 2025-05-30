@@ -5,10 +5,10 @@ import uuid
 import random
 
 from data_gen.problems import Problem
-from utils.nn import create_minimal_graphmodel
-from graph.composer import GraphTransformer
-from graph.node import SingleNeuron, SubGraphNode
-from utils.graph_utils import compute_complexity
+from env.utils.nn import create_minimal_graphmodel
+from env.graph.composer import GraphTransformer
+from env.graph.node import SingleNeuron, SubGraphNode
+from env.utils.graph_utils import compute_complexity
 
 class FunctionGraphEnv(gym.Env):
     """
