@@ -194,6 +194,43 @@ class GraphComposer:
         new_model.set_weights(self.keras_model.get_weights())
         new_model.save(filepath.replace(".h5", ".keras"))
 
+    def clone(self):
+        from keras import models
+
+        new_comp = GraphComposer()
+
+        # 1) Reconstruct every node
+        for name, node in self.nodes.items():
+            if isinstance(node, SubGraphNode):
+                # Clone the bypass-model safely
+                cloned_bypass = models.clone_model(node.bypass_model)
+                cloned_bypass.set_weights(node.bypass_model.get_weights())
+                new_node = SubGraphNode(name=name, model=cloned_bypass)
+            else:
+                # Recreate blueprint node from its config, not from deepcopy
+                if isinstance(node, InputNode):
+                    new_node = InputNode(name=name, input_shape=node.input_shape)
+                elif isinstance(node, SingleNeuron):
+                    new_node = SingleNeuron(name=name, activation=node.activation)
+                else:
+                    # If you have other node types (e.g. DenseNode),
+                    # add similar constructor logic here
+                    raise NotImplementedError(f"Clone logic missing for {type(node)}")
+            new_comp.add_node(new_node)
+
+        # 2) Copy over plain-Python state
+        new_comp.connections = {k: list(v) for k, v in self.connections.items()}
+        new_comp.input_node_name = self.input_node_name
+        new_comp.output_node_names = list(self.output_node_names)
+
+        # 3) Build the Keras graph fresh, then overwrite weights
+        new_model = new_comp.build()
+        new_model.set_weights(self.keras_model.get_weights())
+        new_comp.keras_model = new_model
+
+        return new_comp
+
+
 
 class GraphTransformer:
     """

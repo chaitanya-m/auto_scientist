@@ -16,9 +16,80 @@ graphs are composed, connected, trained, and used for predictions.
 import unittest
 import numpy as np
 import keras
-from keras import layers
-from graph.composer import GraphComposer, GraphHasher
-from graph.node import InputNode, SingleNeuron, SubGraphNode, GraphNode
+from keras import layers, models
+from env.graph.composer import GraphComposer, GraphHasher
+from env.graph.node import InputNode, SingleNeuron, SubGraphNode, GraphNode
+
+
+class TestGraphComposerClone(unittest.TestCase):
+    def setUp(self):
+        # Build a simple composer with one input, one SingleNeuron, and one SubGraphNode
+        self.composer = GraphComposer()
+        # Input node
+        inp = InputNode(name='input', input_shape=(4,))
+        self.composer.add_node(inp)
+        self.composer.set_input_node('input')
+
+        # SingleNeuron node
+        sn = SingleNeuron(name='neuron', activation='linear')
+        self.composer.add_node(sn)
+        self.composer.connect('input', 'neuron')
+
+                # Create a bypass_model for SubGraphNode using the Functional API to ensure .input is defined
+        inp_layer = layers.Input(shape=(1,), name='bypass_in')
+        dense_out = layers.Dense(2, activation='linear', name='bypass_dense')(inp_layer)
+        bypass = models.Model(inputs=inp_layer, outputs=dense_out)
+        # Initialize unique weights for bypass
+        weights = [np.full_like(w, fill_value=idx+1) for idx, w in enumerate(bypass.get_weights())]
+        bypass.set_weights(weights)
+
+        sgn = SubGraphNode(name='subgraph', model=bypass)
+        self.composer.add_node(sgn)
+        self.composer.connect('neuron', 'subgraph')
+        self.composer.set_output_node('subgraph')
+
+        # Build and compile original model
+        self.original_model = self.composer.build()
+        self.original_model.compile(optimizer='sgd', loss='mse')
+        # Set distinct weights in original_model
+        orig_weights = [np.arange(w.size).reshape(w.shape) for w in self.original_model.get_weights()]
+        self.original_model.set_weights(orig_weights)
+
+    def test_clone_preserves_weights_and_structure(self):
+        # Clone the composer
+        cloned_composer = self.composer.clone()
+        cloned_model = cloned_composer.keras_model
+
+        # Models should not be the same object
+        self.assertIsNot(cloned_model, self.original_model)
+
+                # Check structure: same number of layers
+        orig_layers = [layer.name for layer in self.original_model.layers]
+        clone_layers = [layer.name for layer in cloned_model.layers]
+        self.assertEqual(len(orig_layers), len(clone_layers))
+        # Allow UUID suffix differences in layer names (prefix must match)
+        for orig_name, clone_name in zip(orig_layers, clone_layers):
+            if orig_name != clone_name:
+                # Compare prefixes up to the last underscore
+                orig_prefix = '_'.join(orig_name.split('_')[:-1])
+                clone_prefix = '_'.join(clone_name.split('_')[:-1])
+                self.assertEqual(orig_prefix, clone_prefix)
+
+        # Check weights: values equal but not same object: values equal but not same object
+        for orig_w, clone_w in zip(self.original_model.get_weights(), cloned_model.get_weights()):
+            np.testing.assert_array_equal(orig_w, clone_w)
+            self.assertIsNot(orig_w, clone_w)
+
+        # Check composer metadata
+        self.assertEqual(self.composer.input_node_name, cloned_composer.input_node_name)
+        self.assertListEqual(self.composer.output_node_names, cloned_composer.output_node_names)
+        self.assertDictEqual(self.composer.connections, cloned_composer.connections)
+
+    def test_clone_nodes_are_deep_copies(self):
+        cloned = self.composer.clone()
+        # Node objects should not be the same
+        for name in self.composer.nodes:
+            self.assertIsNot(self.composer.nodes[name], cloned.nodes[name])
 
 
 class TestGraphComposer(unittest.TestCase):
@@ -456,3 +527,4 @@ class TestGraphHash(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
