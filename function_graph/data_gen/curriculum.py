@@ -1,4 +1,5 @@
 from typing import Iterator, Callable, Optional, Type
+from itertools import count
 from data_gen.problems import Problem
 from data_gen.curriculum_interface import CurriculumInterface
 
@@ -80,45 +81,53 @@ class Curriculum(CurriculumInterface):
         cls,
         problem_cls: Type[Problem],
         initial_difficulty: int,
-        num_problems: int = 2
+        num_problems: Optional[int] = 2
     ) -> 'Curriculum':
         """
         Factory for a default Curriculum instance using a Problem subclass.
-        By default, yields a finite batch of `num_problems` at `initial_difficulty`, with
-        built-in handlers that adjust the difficulty.
+        - If num_problems is finite, yields that finite batch once, with no adjustment handlers.
+        - If num_problems is None, yields an infinite stream and enables difficulty adjustment.
 
         Args:
             problem_cls: A Problem subclass implementing seeded_problem_variations.
             initial_difficulty: The starting difficulty for problem generation.
-            num_problems: Number of problems (seeds) to generate per iteration.
+            num_problems: Number of problems (seeds) per iteration; None for infinite.
 
         Returns:
             A Curriculum object configured for the default behavior.
         """
-        # Mutable closure for difficulty
+        # Prepare mutable difficulty holder
         holder = {'difficulty': initial_difficulty}
 
-        def gen() -> Iterator[Problem]:
-            return iter(problem_cls.seeded_problem_variations(holder['difficulty'], num_problems))
-
+        # Define generator based on finite vs infinite
         if num_problems is None:
-            # enable difficulty handlers for infinite streams
+            def gen() -> Iterator[Problem]:
+                # infinite stream: one problem at a time
+                for _ in count():
+                    yield from problem_cls.seeded_problem_variations(holder['difficulty'], 1)
+        else:
+            def gen() -> Iterator[Problem]:
+                # finite batch
+                return iter(problem_cls.seeded_problem_variations(holder['difficulty'], num_problems))
+
+        # Setup adjustment handlers only for infinite streams
+        if num_problems is None:
             def inc(cur: 'Curriculum') -> None:
                 holder['difficulty'] += 1
 
             def dec(cur: 'Curriculum') -> None:
                 holder['difficulty'] = max(0, holder['difficulty'] - 1)
         else:
-            # disable handlers for finite batches
             inc = None
             dec = None
 
-        # Attach holder for the property
+        # Instantiate and attach difficulty holder only if infinite
         curr = cls(
             problem_generator=gen,
             increase_fn=inc,
             decrease_fn=dec,
             num_problems=num_problems
         )
-        curr._difficulty_holder = holder
+        if num_problems is None:
+            curr._difficulty_holder = holder
         return curr
