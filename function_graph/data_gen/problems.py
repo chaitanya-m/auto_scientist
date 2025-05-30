@@ -14,7 +14,7 @@ class AutoencoderProblem(Problem):
     This class now defines its own data generator.
     """
     def __init__(self, phase: int = 0, problem_seed: int = 0):
-        config = self.get_phase(phase)
+        config = self.get_phase_config(phase)
         # Validate architecture directly.
         self._validate_architecture(config)
         self.config = config
@@ -34,7 +34,7 @@ class AutoencoderProblem(Problem):
         self._output_dim = ref_cfg["encoder"][-1]  # latent dimension
 
     @classmethod
-    def get_phase(cls, phase: int) -> dict:
+    def get_phase_config(cls, phase: int) -> dict:
         """
         Returns the configuration dictionary for the given numeric phase.
 

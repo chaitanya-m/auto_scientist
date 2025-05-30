@@ -66,7 +66,7 @@ class SimpleMCTSAgent:
             search_budget (int): Number of MCTS iterations per call.
             c (float): Exploration constant for UCB.
         """
-        self.env_proto = env
+        self.base_env = env
         self.policy = PolicyNetwork(policy_model)
         self.search_budget = search_budget
         self.c = c
@@ -76,7 +76,7 @@ class SimpleMCTSAgent:
         Perform MCTS for self.search_budget iterations.
         Returns the best action index to take from the root state.
         """
-        obs, _ = self.env_proto.reset()
+        obs, _ = self.base_env.reset()
         self.root = MCTSNode(obs)
 
         for _ in range(self.search_budget):
@@ -87,7 +87,7 @@ class SimpleMCTSAgent:
         # Pick best child of root by average value
         if not self.root.children:
             # fallback: choose random valid action
-            return random.choice(self.env_proto.valid_actions())
+            return random.choice(self.base_env.valid_actions())
         best_child = max(self.root.children.values(), key=lambda n: n.average_value())
         return best_child.action
 
@@ -97,7 +97,7 @@ class SimpleMCTSAgent:
         otherwise descend by UCB.
         Returns (new_node, env_copy).
         """
-        env = deepcopy(self.env_proto)
+        env = deepcopy(self.base_env)
         env.reset()
 
         # replay path
