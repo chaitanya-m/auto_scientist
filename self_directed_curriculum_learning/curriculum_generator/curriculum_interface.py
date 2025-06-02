@@ -10,7 +10,8 @@ class CurriculumInterface(ABC):
         self,
         problem_generator: Callable[[], Iterator[Problem]],
         increase_fn: Optional[Callable[['CurriculumInterface'], None]] = None,
-        decrease_fn: Optional[Callable[['CurriculumInterface'], None]] = None
+        decrease_fn: Optional[Callable[['CurriculumInterface'], None]] = None,
+        maintain_fn: Optional[Callable[['CurriculumInterface'], None]] = None
     ):
         """
         Initialize a curriculum with user-supplied logic.
@@ -38,5 +39,11 @@ class CurriculumInterface(ABC):
     def decrease_difficulty(self) -> None:
         """
         Invoke the user-supplied decrease function to lower difficulty, if any.
+        """
+        raise NotImplementedError
+
+    def maintain_difficulty(self) -> None:
+        """
+        Invoke the user-supplied maintain function to keep difficulty constant, if any.
         """
         raise NotImplementedError

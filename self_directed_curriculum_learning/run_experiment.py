@@ -1,9 +1,9 @@
 # run_experiment.py
 
-from curriculum_generator.curriculum import Curriculum
+from curriculum_generator.curriculum import AutoEncoderCurriculum
 
 def main(
-    curriculum: Curriculum,
+    curriculum: AutoEncoderCurriculum,
     mcts_budget: int = 5,
     steps: int = 10,
     output_dir: str = "results"
@@ -17,8 +17,8 @@ def main(
       steps      : number of steps per experiment.
       output_dir : path to save CSV results.
     """
-    from experiment_runner import run_experiments
-    run_experiments(
+    from experiment_runner import solve_problems
+    solve_problems(
         curriculum=curriculum,
         mcts_budget=mcts_budget,
         steps=steps,
@@ -27,12 +27,12 @@ def main(
 
 
 if __name__ == "__main__":
-    from curriculum_generator.problems import AutoencoderProblem
+    from curriculum_generator.problems import AutoEncoderProblem
 
     # Create a default curriculum via the class factory
-    curriculum = Curriculum.default(
-        problem_cls=AutoencoderProblem,
+    curriculum = AutoEncoderCurriculum.default(
+        problem_cls=AutoEncoderProblem,
         initial_difficulty=0,
-        num_problems=2
+        num_problems=10
     )
     main(curriculum=curriculum)

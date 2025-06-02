@@ -1,13 +1,13 @@
 import unittest
 import pandas as pd
 
-from curriculum_generator.problems import AutoencoderProblem
+from curriculum_generator.problems import AutoEncoderProblem
 from self_directed_curriculum_learning.env.fg_env import FunctionGraphEnv
 from run_experiment import run_simple_experiment
 
 class QuickExperimentTest(unittest.TestCase):
     def test_env_step_and_observation(self):
-        problem = AutoencoderProblem(phase="basic", seed=0)
+        problem = AutoEncoderProblem(phase="basic", seed=0)
         env = FunctionGraphEnv(problem=problem, seed=0)
         obs, _ = env.reset()
 
@@ -31,7 +31,7 @@ class QuickExperimentTest(unittest.TestCase):
         self.assertTrue(hasattr(env, "composer"))
 
     def test_run_simple_experiment_structure(self):
-        problem = AutoencoderProblem(phase="basic", seed=0)
+        problem = AutoEncoderProblem(phase="basic", seed=0)
         df, summary = run_simple_experiment(
             problem=problem,
             seed=0,

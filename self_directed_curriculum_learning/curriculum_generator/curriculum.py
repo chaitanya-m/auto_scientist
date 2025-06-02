@@ -4,7 +4,11 @@ from curriculum_generator.problems import Problem
 from curriculum_generator.curriculum_interface import CurriculumInterface
 
 
-class Curriculum(CurriculumInterface):
+class AutoEncoderCurriculum(CurriculumInterface):
+    """
+    A Curriculum for generating problems with adjustable difficulty.
+    The implementor must provide a problem generator and optional difficulty adjustment functions.
+    """
     @property
     def difficulty(self) -> Optional[int]:
         """Current difficulty level of this curriculum, if available."""
@@ -21,8 +25,9 @@ class Curriculum(CurriculumInterface):
     def __init__(
         self,
         problem_generator: Callable[[], Iterator[Problem]],
-        increase_fn: Optional[Callable[['Curriculum'], None]] = None,
-        decrease_fn: Optional[Callable[['Curriculum'], None]] = None,
+        increase_fn: Optional[Callable[['AutoEncoderCurriculum'], None]] = None,
+        decrease_fn: Optional[Callable[['AutoEncoderCurriculum'], None]] = None,
+        maintain_fn: Optional[Callable[['AutoEncoderCurriculum'], None]] = None,
         num_problems: Optional[int] = None
     ):
         """
@@ -32,20 +37,19 @@ class Curriculum(CurriculumInterface):
             problem_generator: Callable that returns an iterator of Problem instances.
             increase_fn: Optional function to adjust difficulty when increase_difficulty is called.
             decrease_fn: Optional function to adjust difficulty when decrease_difficulty is called.
+            maintain_fn: Optional function to maintain difficulty when maintain_difficulty is called.
             num_problems: If finite, indicates a one-time batch; None enables infinite adjustment.
 
         Raises:
             ValueError: if num_problems is finite and any difficulty handler is provided.
         """
-        if num_problems is not None and (increase_fn or decrease_fn):
-            raise ValueError(
-                "Cannot supply difficulty adjustment handlers for a finite batch. "
-                "Set num_problems=None for infinite streams."
-            )
+        # (we allow hooks on finite or infinite streams;
+        #  to disable adjustment simply pass increase_fn/decrease_fn=None)
 
         self._generator = problem_generator
         self._increase_fn = increase_fn
         self._decrease_fn = decrease_fn
+        self._maintain_fn = maintain_fn
         self._num_problems = num_problems
 
     def __iter__(self) -> Iterator[Problem]:
@@ -76,13 +80,24 @@ class Curriculum(CurriculumInterface):
             raise NotImplementedError("This curriculum cannot decrease difficulty.")
         self._decrease_fn(self)
 
+    def maintain_difficulty(self) -> None:
+        """
+        Invoke the user-supplied maintain function (no-op by default).
+
+        Raises:
+            NotImplementedError: if no maintain_fn was given.
+        """
+        if not self._maintain_fn:
+            raise NotImplementedError("This curriculum cannot maintain difficulty.")
+        self._maintain_fn(self)
+
     @classmethod
     def default(
         cls,
         problem_cls: Type[Problem],
         initial_difficulty: int,
         num_problems: Optional[int] = 2
-    ) -> 'Curriculum':
+    ) -> 'AutoEncoderCurriculum':
         """
         Factory for a default Curriculum instance using a Problem subclass.
         - If num_problems is finite, yields that finite batch once, with no adjustment handlers.
@@ -110,24 +125,22 @@ class Curriculum(CurriculumInterface):
                 # finite batch
                 return iter(problem_cls.seeded_problem_variations(holder['difficulty'], num_problems))
 
-        # Setup adjustment handlers only for infinite streams
-        if num_problems is None:
-            def inc(cur: 'Curriculum') -> None:
-                holder['difficulty'] += 1
+        # Always wire up a difficulty holder and the three hooks.
+        def inc(cur: 'AutoEncoderCurriculum') -> None:
+            holder['difficulty'] += 1
 
-            def dec(cur: 'Curriculum') -> None:
-                holder['difficulty'] = max(0, holder['difficulty'] - 1)
-        else:
-            inc = None
-            dec = None
+        def dec(cur: 'AutoEncoderCurriculum') -> None:
+            holder['difficulty'] = max(0, holder['difficulty'] - 1)
 
-        # Instantiate and attach difficulty holder only if infinite
+        def keep(cur: 'AutoEncoderCurriculum') -> None:
+            pass
+
         curr = cls(
             problem_generator=gen,
             increase_fn=inc,
             decrease_fn=dec,
+            maintain_fn=keep,
             num_problems=num_problems
         )
-        if num_problems is None:
-            curr._difficulty_holder = holder
+        curr._difficulty_holder = holder
         return curr

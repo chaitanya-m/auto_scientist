@@ -4,7 +4,7 @@ import math
 import random
 import numpy as np
 
-class PolicyNetwork:
+class SimulationStepPolicyNetwork:
     """
     Simple MLP policy network mapping state feature vectors to action probabilities.
     Input: raw observation vector (env.observation_space.shape)
@@ -28,6 +28,33 @@ class PolicyNetwork:
             np.array: Probability vector over actions of shape (action_dim,).
         """
         return self.model.predict(np.atleast_2d(obs), verbose=0)[0]
+
+
+class EpisodePolicyNetwork:
+    """
+    Policy network for difficulty adjustment actions.
+    Maps state observations and episode reward to probabilities over difficulty actions.
+    """
+    def __init__(self, model):
+        """
+        Args:
+            model (tf.keras.Model): A compiled Keras model with softmax output.
+        """
+        self.model = model
+
+    def predict(self, obs, episode_reward):
+        """
+        Predict difficulty adjustment probabilities given an observation and episode reward.
+
+        Args:
+            obs (np.array): Observation vector of shape (obs_dim,).
+            episode_reward (float): Total reward earned during the episode.
+
+        Returns:
+            np.array: Probability vector over difficulty actions [increase, decrease, maintain].
+        """
+        input_data = np.concatenate([obs, [episode_reward]])
+        return self.model.predict(np.atleast_2d(input_data), verbose=0)[0]
 
 
 class MCTSNode:
@@ -56,16 +83,18 @@ class SimpleMCTSAgent:
       - step(action): returns (obs, reward, done, truncated, info)
       - observation_space, action_space
     """
-    def __init__(self, env, policy_model, search_budget=20, c=1.41):
+    def __init__(self, env, policy_model, difficulty_policy_model, search_budget=20, c=1.41):
         """
         Args:
-            env: A Gymnasium-style environment instance.
-            policy_model: A compiled tf.keras.Model with softmax output over env.action_space.n.
-            search_budget (int): Number of MCTS iterations per call.
-            c (float): Exploration constant for UCB.
+            env: The environment instance.
+            policy_model: The policy network for MCTS action selection.
+            difficulty_policy_model: The policy network for difficulty adjustment.
+            search_budget: Number of simulations per MCTS search.
+            c: Exploration constant for UCB.
         """
-        self.base_env = env
-        self.policy = PolicyNetwork(policy_model)
+        self.env = env
+        self.policy = SimulationStepPolicyNetwork(policy_model)  # Existing policy network for MCTS actions
+        self.difficulty_policy = EpisodePolicyNetwork(difficulty_policy_model)  # New policy network for difficulty adjustment
         self.search_budget = search_budget
         self.c = c
 
@@ -74,13 +103,9 @@ class SimpleMCTSAgent:
         Perform MCTS for self.search_budget iterations.
         Returns the best action index to take from the root state.
         """
-
-
-
         # 1) Start from the current env state (problem already set)
-        root_obs = self.base_env._get_obs()
+        root_obs = self.env._get_obs()  # Use self.env instead of self.base_env
         self.root = MCTSNode(root_obs)
-
 
         # 2) Perform rollouts
         for _ in range(self.search_budget):
@@ -91,20 +116,20 @@ class SimpleMCTSAgent:
         # 3) Pick best child of root by average value
         if not self.root.children:
             # fallback: choose random valid action
-            return random.choice(self.base_env.valid_actions())
+            return random.choice(self.env.valid_actions())  # Use self.env instead of self.base_env
         best_child = max(self.root.children.values(), key=lambda n: n.average_value())
         return best_child.action
 
     def _select(self, node):
         """
-        From `node`, clone the base environment, replay the path to `node`,
+        From `node`, clone the current environment, replay the path to `node`,
         then expand one child if none exist, otherwise descend by UCB.
         Returns (new_node, env_copy).
         """
         # Clone current env state (same problem, same graph, same repository)
-        env = self.base_env.clone()
+        env = self.env.clone()  # Use self.env instead of self.base_env
 
-        # replay path from root to this node
+        # Replay path from root to this node
         path = []
         cur = node
         while cur.parent:
@@ -113,7 +138,7 @@ class SimpleMCTSAgent:
         for a in reversed(path):
             env.step(a)
 
-        # expansion if no children
+        # Expansion if no children
         valid = env.valid_actions()
         if not node.children and valid:
             a = random.choice(valid)
@@ -122,7 +147,7 @@ class SimpleMCTSAgent:
             node.children[a] = new_node
             return new_node, env
 
-        # selection by UCB
+        # Selection by UCB
         while node.children:
             valid = env.valid_actions()
             probs = self.policy.predict(node.obs)
@@ -152,7 +177,8 @@ class SimpleMCTSAgent:
         """
         Perform a one-step rollout: pick a random valid action and return its reward.
         """
-        action = random.choice(env.valid_actions())
+        legal = env.valid_actions()
+        action = random.choice(legal)
         _, reward, _, _, _ = env.step(action)
         return reward
 
@@ -165,3 +191,17 @@ class SimpleMCTSAgent:
             cur.visits += 1
             cur.total_value += reward
             cur = cur.parent
+
+    def choose_difficulty_action(self, best_obs, episode_reward):
+        """
+        Use the difficulty policy network to choose a difficulty adjustment action.
+
+        Args:
+            best_obs (np.array): Best observation vector of shape (obs_dim,).
+            episode_reward (float): Total reward earned during the episode.
+
+        Returns:
+            int: Difficulty adjustment action (3=↑diff, 4=↓diff, 5=maintain).
+        """
+        probs = self.difficulty_policy.predict(best_obs, episode_reward)
+        return np.argmax(probs) + 3  # Map probabilities to actions [3, 4, 5]

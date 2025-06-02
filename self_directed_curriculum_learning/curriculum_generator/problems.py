@@ -8,7 +8,7 @@ from typing import Dict, Callable, Iterator
 from curriculum_generator.problem_interface import Problem
 
 
-class AutoencoderProblem(Problem):
+class AutoEncoderProblem(Problem):
     """
     Wraps the reference autoencoder as a Problem.
     This class now defines its own data generator.

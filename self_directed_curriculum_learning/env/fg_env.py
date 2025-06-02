@@ -37,7 +37,8 @@ class FunctionGraphEnv(gym.Env):
         curriculum: CurriculumInterface,
         train_epochs: int = 5,
         batch_size: int = 100,
-        seed: int = 0
+        seed: int = 0,
+        config: dict = None  # Configuration dictionary for scaling factors
     ):
         super().__init__()
         # now driven by a Curriculum rather than a single Problem
@@ -49,6 +50,13 @@ class FunctionGraphEnv(gym.Env):
         self.train_epochs = train_epochs
         self.batch_size = batch_size
 
+        # Default configuration for difficulty adjustment rewards
+        self.config = config or {
+            "increase_scale": 0.5,  # 50% of episode reward for harder problems
+            "decrease_scale": -0.5,  # -50% of episode reward for easier problems
+            "maintain_scale": 0.0   # No reward for maintaining difficulty
+        }
+
         # ground-truth scalars (set per-problem in reset)
         self.reference_mse = None
         self.reference_complexity = None
@@ -57,8 +65,8 @@ class FunctionGraphEnv(gym.Env):
         self.input_dim = None
         self.latent_dim = None
 
-        # action & observation spaces
-        self.action_space = spaces.Discrete(3)
+        # action & observation spaces (0–2 = graph ops; 3=↑diff, 4=↓diff, 5=maintain)
+        self.action_space = spaces.Discrete(6)
         low = np.array([0.0, 1.0, 0.0], dtype=float)
         high = np.array([np.inf, np.inf, np.inf], dtype=float)
         self.observation_space = spaces.Box(low=low, high=high, dtype=float)
@@ -73,12 +81,18 @@ class FunctionGraphEnv(gym.Env):
         self.current_problem = None
         self.composer = None
 
+        # phase flag: after a graph step+reward, await difficulty action
+        self._awaiting_diff = False
+
         # initialize episode-specific fields so they exist prior to reset()
         self.best_mse = float('inf')
         self.graph_actions = []
         self.deletion_count = 0
         self.improvement_count = 0
         self.current_mse = 1.0
+
+        # Track the best observation vector during the episode
+        self.best_obs = None
 
     def reset(self, *, seed=None, options=None):
         """
@@ -111,12 +125,26 @@ class FunctionGraphEnv(gym.Env):
         self.improvement_count = 0
         self.current_mse = 1.0
 
+        # fresh problem → next step is a graph step
+        self._awaiting_diff = False
+
         return self._get_obs(), {}
 
     def valid_actions(self):
         """
-        Returns valid action indices. 2 only if repository non-empty.
+        Two‐phase:
+         - If awaiting a diff‐change (and the curriculum implements all three),
+           only [3,4,5] are valid.
+         - Otherwise standard graph ops [0,1,(2)].
         """
+        # phase 2: difficulty choices only if hooks are actually provided
+        inc_fn = getattr(self.curriculum, "_increase_fn", None)
+        dec_fn = getattr(self.curriculum, "_decrease_fn", None)
+        keep_fn = getattr(self.curriculum, "_maintain_fn", None)
+        if self._awaiting_diff and inc_fn and dec_fn and keep_fn:
+            return [3, 4, 5]
+
+        # phase 1: graph ops
         valids = [0, 1]
         if self.repository:
             valids.append(2)
@@ -128,6 +156,8 @@ class FunctionGraphEnv(gym.Env):
         and return (obs, reward, done, truncated, info).
         """
         assert action in self.valid_actions(), f"Invalid action {action}"
+
+        # phase 1: apply a graph operation
         act_map = {0: "add_neuron", 1: "delete_repository_entry", 2: "add_from_repository"}
         act = act_map[action]
         self.graph_actions.append(act)
@@ -171,9 +201,11 @@ class FunctionGraphEnv(gym.Env):
         mse = history.history["val_loss"][-1]
         self.current_mse = mse
 
+        # Update the best observation vector if the current MSE improves
         if mse < self.best_mse:
             self.best_mse = mse
             self.improvement_count += 1
+            self.best_obs = self._get_obs()  # Save the best observation vector
             sub = SubGraphNode(name=f"sub_{uuid.uuid4().hex}", model=self.composer.build())
             transformer = GraphTransformer(self.composer)
             transformer.add_abstraction_node(
@@ -187,7 +219,9 @@ class FunctionGraphEnv(gym.Env):
         cand_complexity = compute_complexity(self.composer)
         reward = (self.reference_mse / self.reference_complexity) - (mse / cand_complexity)
 
-        return self._get_obs(), reward, False, False, {}
+        # include current difficulty so your logs can see it
+        info = {"difficulty": self.curriculum.difficulty}
+        return self._get_obs(), reward, False, False, info
 
     def _get_obs(self):
         """
@@ -203,8 +237,13 @@ class FunctionGraphEnv(gym.Env):
         """
         Simple textual representation of the current state.
         """
-        print(f"MSE={self.current_mse:.4f} | Nodes={len(self.composer.nodes)} "
-              f"| Actions={len(self.graph_actions)} | Repo={len(self.repository)}")
+        print(
+            f"MSE={self.current_mse:.4f} | "
+            f"Nodes={len(self.composer.nodes)} | "
+            f"Actions={len(self.graph_actions)} | "
+            f"Repo={len(self.repository)} | "
+            f"Difficulty={self.curriculum.difficulty}"
+        )
 
     def clone(self):
         """
@@ -225,27 +264,53 @@ class FunctionGraphEnv(gym.Env):
             seed=None  # RNG can be reseeded separately if needed
         )
 
-        # 2) Override its problem iterator so it only yields the current problem
-        new_env._problem_iter = iter([self.current_problem])
-
-        # 3) Copy over per-problem scalars & dims
+        # 2) Copy over per-problem scalars & dims
         new_env.current_problem     = self.current_problem
         new_env.reference_mse        = self.reference_mse
         new_env.reference_complexity = self.reference_complexity
         new_env.input_dim            = self.input_dim
         new_env.latent_dim           = self.latent_dim
 
-        # 4) Clone the composer (weights + topology)
+        # 3) Clone the composer (weights + topology)
         new_env.composer = self.composer.clone()
 
-        # 5) Shallow-copy repository list only
+        # 4) Shallow-copy repository list only
         new_env.repository = list(self.repository)
 
-        # 6) Copy episode-specific counters & history
+        # 5) Copy episode-specific counters & history
         new_env.best_mse          = self.best_mse
         new_env.graph_actions     = list(self.graph_actions)
         new_env.deletion_count    = self.deletion_count
         new_env.improvement_count = self.improvement_count
         new_env.current_mse       = self.current_mse
+        # *** copy the phase flag so valid_actions() stays in sync ***
+        new_env._awaiting_diff    = self._awaiting_diff
 
         return new_env
+
+    def adjust_difficulty(self, action, episode_reward):
+        """
+        Adjust the difficulty of the curriculum after the episode ends.
+        This method should be called explicitly after all cloned environments are closed.
+        Assigns a reward based on the difficulty adjustment action and the episode reward.
+        
+        Args:
+            action (int): Difficulty adjustment action (3=↑diff, 4=↓diff, 5=maintain).
+            episode_reward (float): Total reward earned during the episode.
+        """
+        assert action in [3, 4, 5], f"Invalid difficulty adjustment action {action}"
+
+        if action == 3:
+            self.curriculum.increase_difficulty()
+            act = "increase_difficulty"
+            reward = self.config["increase_scale"] * episode_reward
+        elif action == 4:
+            self.curriculum.decrease_difficulty()
+            act = "decrease_difficulty"
+            reward = self.config["decrease_scale"] * episode_reward
+        else:
+            self.curriculum.maintain_difficulty()
+            act = "maintain_difficulty"
+            reward = self.config["maintain_scale"] * episode_reward
+
+        return {"action": act, "difficulty": self.curriculum.difficulty, "reward": reward}
