@@ -198,7 +198,7 @@ class TabularCriticUpdater(CriticUpdater[Any, ActionT]):
 # 3.  Agent orchestrator
 # -----------------------------------------------------------------------------
 class QLearningAgent:
-    """Glue class that holds the table & policy and runs the TD‑update."""
+    """Simple orchestrator that delegates to interface implementations."""
 
     def __init__(
         self,
@@ -211,34 +211,24 @@ class QLearningAgent:
         clip_low: Sequence[float] | float = -4.8,
         clip_high: Sequence[float] | float = 4.8,
     ) -> None:
+        """Constructor that maintains backward compatibility with existing main function."""
         if not hasattr(env.action_space, "n"):
             raise TypeError("QLearningAgent requires a discrete action space.")
+        
         self.env = env
         self.actions = list(range(env.action_space.n))
         self.gamma = gamma
 
-        # Create shared Q-table
-        self.q_table = TabularQ(alpha=alpha, gamma=gamma)
-        self.target_policy = EpsilonGreedy(
-            q_table=self.q_table,
-            actions=self.actions,
-            eps_start=epsilon,
-            eps_end=0.01,  # Lower minimum exploration
-            eps_decay=0.9995,  # Slower decay
-            discretizer=None,  # will be set later
-        )
-        self.behavior_policy = DeterministicPolicy(self.target_policy)
-
-        # Build discretizer over continuous space
+        # Create discretizer if needed
         obs_space = env.observation_space
+        self.discretizer = None
         if hasattr(obs_space, "low") and hasattr(obs_space, "high"):
-            # 1) base env bounds
             obs_low = np.array(obs_space.low, dtype=float)
             obs_high = np.array(obs_space.high, dtype=float)
-            # 2) hard-clip the unbounded velocity dims
-            obs_low[1], obs_high[1] = -3.0,  3.0   # cart velocity
-            obs_low[3], obs_high[3] = -3.5,  3.5   # pole angular velocity
-            # 3) if user passed per-dim overrides, convert them
+            # Hard-clip the unbounded velocity dims for CartPole
+            obs_low[1], obs_high[1] = -3.0, 3.0   # cart velocity
+            obs_low[3], obs_high[3] = -3.5, 3.5   # pole angular velocity
+            
             if not isinstance(clip_low, (int, float)):
                 clip_low_arr = np.array(clip_low, dtype=float)
             else:
@@ -248,39 +238,47 @@ class QLearningAgent:
             else:
                 clip_high_arr = obs_high
 
-            # **Pass low & high positionally** then named args
             self.discretizer = Discretizer(
-                obs_low,
-                obs_high,
+                obs_low, obs_high,
                 bins=bins,
                 clip_low=clip_low_arr,
                 clip_high=clip_high_arr,
             )
-        else:
-            self.discretizer = None
 
-        # Also need to set discretizer on the policy after creating it
-        self.target_policy.discretizer = self.discretizer
-
-        # Add critic updater
+        # Create components using dependency injection pattern
+        self.q_table = TabularQ(alpha=alpha, gamma=gamma)
+        self.target_policy = EpsilonGreedy(
+            q_table=self.q_table,
+            actions=self.actions,
+            eps_start=epsilon,
+            eps_end=0.01,
+            eps_decay=0.9995,
+            discretizer=self.discretizer,
+        )
+        self.behavior_policy = DeterministicPolicy(self.target_policy)
         self.critic_updater = TabularCriticUpdater(self.q_table, alpha=alpha)
+        self.experience_generator = Experience()
 
-    # ------------------------------------------------------------------
-    def learn_episode(self, max_steps: int | None = None) -> float:  # noqa: D401
-        """ Run a single episode of Q-learning, updating the Q-table."""
+    def collect_experience(self, n_steps: int = 1) -> Sequence[Transition[Any, ActionT]]:
+        """Delegate to experience generator."""
+        return self.experience_generator.collect(self.target_policy, self.env, n_steps)
+
+    def update(self, experiences: Sequence[Transition[Any, ActionT]]) -> Mapping[str, float]:
+        """Delegate to critic updater."""
+        # Remove the double discretization - experiences are already discretized!
+        return self.critic_updater.step(experiences)
+
+    def learn_episode(self, max_steps: int | None = None) -> float:
+        """Convenience method that maintains backward compatibility."""
         obs = self.env.reset()
         state = obs[0] if isinstance(obs, tuple) else obs
         total_reward = 0.0
         steps = 0
+        experiences = []
+        
         while True:
-            action = self.target_policy(state)   # this already discretizes for sampling
-
-            # Discretize current state for the Q-update
-            if self.discretizer is not None and isinstance(state, np.ndarray):
-                s_key = self.discretizer(state)
-            else:
-                s_key = state
-
+            action = self.target_policy.sample(state)
+            
             step = self.env.step(action)
             if len(step) == 5:
                 next_state, reward, term, trunc, _ = step
@@ -288,25 +286,32 @@ class QLearningAgent:
             else:
                 next_state, reward, done, _ = step
 
-            # Discretize next state for the TD target
-            if self.discretizer is not None and isinstance(next_state, np.ndarray):
-                s_next_key = self.discretizer(next_state)
-            else:
-                s_next_key = next_state
-
-            # TD target: r + γ max_a' Q(s', a')
-            best_next = self.q_table.v(s_next_key)
-            target = reward + (0.0 if done else self.gamma * best_next)
-            self.q_table.update_single(s_key, action, target)
+            # Discretize states for the transition
+            s_key = self.discretizer(state) if self.discretizer else state
+            s_next_key = self.discretizer(next_state) if self.discretizer else next_state
+            
+            transition = Transition(
+                state=s_key,  # Already discretized
+                action=action,
+                reward=reward,
+                next_state=s_next_key,  # Already discretized
+                done=done,
+                info={}
+            )
+            experiences.append(transition)
 
             total_reward += reward
-            state = next_state
+            state = next_state  # Keep raw state for next iteration
             steps += 1
+            
             if done or (max_steps is not None and steps >= max_steps):
                 break
-        
-        # Move epsilon decay to end of episode instead of every action
-        # Remove the decay from EpsilonGreedy.sample() and add here:
+    
+        # Update with all experiences from this episode
+        if experiences:
+            self.update(experiences)  # Now passes correctly discretized experiences
+    
+        # Handle epsilon decay
         self.target_policy.epsilon = max(
             self.target_policy.eps_end, 
             self.target_policy.epsilon * self.target_policy.eps_decay
@@ -314,92 +319,36 @@ class QLearningAgent:
         
         return total_reward
 
-    # ------------------------------------------------------------------
-    def collect_experience(self, n_steps: int = 1) -> List[Transition[Any, ActionT]]:
-        """Collect experience using target policy."""
-        experiences = []
-        obs = self.env.reset()
-        state = obs[0] if isinstance(obs, tuple) else obs
-        
-        for _ in range(n_steps):
-            action = self.target_policy.sample(state)
-            
-            step = self.env.step(action)
-            if len(step) == 5:
-                next_state, reward, term, trunc, info = step
-                done = term or trunc
-            else:
-                next_state, reward, done, info = step, {}
-            
-            transition = Transition(
-                state=state,
-                action=action, 
-                reward=reward,
-                next_state=next_state,
-                done=done,
-                info=info
-            )
-            experiences.append(transition)
-            
-            if done:
-                obs = self.env.reset()
-                state = obs[0] if isinstance(obs, tuple) else obs
-                break
-            else:
-                state = next_state
-                
-        return experiences
-
-    # ------------------------------------------------------------------
-    def update(self, experiences: Sequence[Transition[Any, ActionT]]) -> Mapping[str, float]:
-        """Update Q-table using collected experiences."""
-        # Discretize experiences first
-        discretized_experiences = []
-        for exp in experiences:
-            s_key = self.discretizer(exp.state) if self.discretizer else exp.state
-            s_next_key = self.discretizer(exp.next_state) if self.discretizer else exp.next_state
-            
-            discretized_exp = Transition(
-                state=s_key,
-                action=exp.action,
-                reward=exp.reward,
-                next_state=s_next_key,
-                done=exp.done,
-                info=exp.info
-            )
-            discretized_experiences.append(discretized_exp)
-        
-        # Let the critic updater handle everything
-        return self.critic_updater.step(discretized_experiences)
-
-    # ------------------------------------------------------------------
     def evaluate(self, episodes: int = 5) -> float:
-        """Run evaluation with a pure greedy policy (no ε-exploration)."""
-        # wrap our ε-greedy policy into a deterministic BehaviorPolicy
-        scores: List[float] = []
-
+        """Run evaluation episodes using behavior policy."""
+        scores = []
+        
         for _ in range(episodes):
             obs = self.env.reset()
             state = obs[0] if isinstance(obs, tuple) else obs
             episode_reward = 0.0
             done = False
+            
             while not done:
                 action = self.behavior_policy.action(state)
                 step = self.env.step(action)
                 if len(step) == 5:
-                    state, r, term, trunc, _ = step
+                    state, reward, term, trunc, _ = step
                     done = term or trunc
                 else:
-                    state, r, done, _ = step
-                episode_reward += r
+                    state, reward, done, _ = step
+                episode_reward += reward
+                
             scores.append(episode_reward)
+            
         return float(np.mean(scores))
 
 
 __all__ = [
     "TabularQ",
     "EpsilonGreedy",
-    "GymExperienceSource",
+    "DeterministicPolicy", 
+    "TabularCriticUpdater",
     "QLearningAgent",
 ]
 
