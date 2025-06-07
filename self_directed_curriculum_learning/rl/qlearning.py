@@ -30,11 +30,7 @@ import numpy as np
 
 from interfaces import (
     ActionT,
-    PolicyFunction,
-    StateT,
-    Transition,
     ValueFunction,
-    ExperienceGenerator,
     TargetPolicy,
     BehaviorPolicy,
 )
@@ -121,8 +117,6 @@ class EpsilonGreedy(TargetPolicy[Any, ActionT]):
             action = random.choice(self.actions)
         else:
             action = self._greedy_action(s)
-        # decay epsilon
-        self.epsilon = max(self.eps_end, self.epsilon * self.eps_decay)
         return action
 
     def action(self, state: Any, *, deterministic: bool | None = None) -> ActionT:
@@ -157,8 +151,7 @@ class DeterministicPolicy(BehaviorPolicy[Any, ActionT]):
         return self.base.action(state, deterministic=True)
 
     def update(self, gradients: Any) -> None:
-        # forward update if any (no-op for EpsilonGreedy)
-        self.base.update(gradients)
+        pass  # noqa: D401  # no-op, as no gradients apply to the q_table
 
 
 # -----------------------------------------------------------------------------
@@ -183,6 +176,18 @@ class QLearningAgent:
         self.env = env
         self.actions = list(range(env.action_space.n))
         self.gamma = gamma
+
+        # Create shared Q-table
+        self.q_table = TabularQ(alpha=alpha, gamma=gamma)
+        self.target_policy = EpsilonGreedy(
+            q_table=self.q_table,
+            actions=self.actions,
+            eps_start=epsilon,
+            eps_end=0.01,  # Lower minimum exploration
+            eps_decay=0.9995,  # Slower decay
+            discretizer=None,  # will be set later
+        )
+        self.behavior_policy = DeterministicPolicy(self.target_policy)
 
         # Build discretizer over continuous space
         obs_space = env.observation_space
@@ -214,19 +219,18 @@ class QLearningAgent:
         else:
             self.discretizer = None
 
-        self.q_table = TabularQ(alpha=alpha, gamma=gamma)
-        self.policy = EpsilonGreedy(
-            self.q_table, self.actions, epsilon, discretizer=self.discretizer
-        )
+        # Also need to set discretizer on the policy after creating it
+        self.target_policy.discretizer = self.discretizer
 
     # ------------------------------------------------------------------
     def learn_episode(self, max_steps: int | None = None) -> float:  # noqa: D401
+        """ Run a single episode of Q-learning, updating the Q-table."""
         obs = self.env.reset()
         state = obs[0] if isinstance(obs, tuple) else obs
         total_reward = 0.0
         steps = 0
         while True:
-            action = self.policy(state)   # this already discretizes for sampling
+            action = self.target_policy(state)   # this already discretizes for sampling
 
             # Discretize current state for the Q-update
             if self.discretizer is not None and isinstance(state, np.ndarray):
@@ -257,13 +261,20 @@ class QLearningAgent:
             steps += 1
             if done or (max_steps is not None and steps >= max_steps):
                 break
+        
+        # Move epsilon decay to end of episode instead of every action
+        # Remove the decay from EpsilonGreedy.sample() and add here:
+        self.target_policy.epsilon = max(
+            self.target_policy.eps_end, 
+            self.target_policy.epsilon * self.target_policy.eps_decay
+        )
+        
         return total_reward
 
     # ------------------------------------------------------------------
     def evaluate(self, episodes: int = 5) -> float:
         """Run evaluation with a pure greedy policy (no ε-exploration)."""
         # wrap our ε-greedy policy into a deterministic BehaviorPolicy
-        greedy = DeterministicPolicy(self.policy)
         scores: List[float] = []
 
         for _ in range(episodes):
@@ -272,7 +283,7 @@ class QLearningAgent:
             episode_reward = 0.0
             done = False
             while not done:
-                action = greedy.action(state)
+                action = self.behavior_policy.action(state)
                 step = self.env.step(action)
                 if len(step) == 5:
                     state, r, term, trunc, _ = step
