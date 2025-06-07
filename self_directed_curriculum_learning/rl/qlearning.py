@@ -24,6 +24,7 @@ from __future__ import annotations
 import random
 from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Sequence, Tuple, Union
+from utils import hashable_state, Discretizer, Experience
 
 import numpy as np
 
@@ -37,68 +38,6 @@ from interfaces import (
 )
 
 
-# -----------------------------------------------------------------------------
-# 0.  State discretizer for continuous spaces
-# -----------------------------------------------------------------------------
-class Discretizer:
-    """Maps continuous observations to discrete buckets for tabular Q-learning."""
-
-    def __init__(
-        self,
-        low: np.ndarray,
-        high: np.ndarray,
-        bins: int = 10,
-        clip_low: Union[np.ndarray, float] = -4.8,
-        clip_high: Union[np.ndarray, float] = 4.8,
-    ) -> None:
-        # Accept per-dimension or scalar clip bounds
-        self.bins = bins
-        self.edges: List[np.ndarray] = []
-
-        # Ensure clip_low and clip_high are arrays of same shape as low/high
-        clip_low_arr = (
-            np.full_like(low, float(clip_low))
-            if isinstance(clip_low, (int, float))
-            else np.array(clip_low, dtype=float)
-        )
-        clip_high_arr = (
-            np.full_like(high, float(clip_high))
-            if isinstance(clip_high, (int, float))
-            else np.array(clip_high, dtype=float)
-        )
-
-        for i in range(len(low)):
-            lo = max(low[i], clip_low_arr[i])
-            hi = min(high[i], clip_high_arr[i])
-            if lo == -np.inf or hi == np.inf or lo >= hi:
-                # Fallback to symmetric range if env gives infinite bounds
-                delta = 1.0
-                lo = -delta
-                hi = delta
-            # Create bin edges, excluding endpoints
-            self.edges.append(np.linspace(lo, hi, bins + 1)[1:-1])
-
-    def __call__(self, state: np.ndarray) -> Tuple[int, ...]:
-        """Convert a continuous state into a tuple of bucket indices."""
-        buckets: List[int] = []
-        for i, edges in enumerate(self.edges):
-            # Digitize returns 0..bins, but clamp to 0..(bins-1)
-            idx = int(np.digitize(state[i], edges))
-            if idx < 0:
-                idx = 0
-            elif idx >= self.bins:
-                idx = self.bins - 1
-            buckets.append(idx)
-        return tuple(buckets)
-
-
-def _hashable_state(state: StateT) -> Any:
-    """Ensure any state—discrete tuple or continuous array—is hashable."""
-    if isinstance(state, tuple):
-        return state
-    if isinstance(state, np.ndarray):
-        return tuple(state.ravel())
-    return state
 
 
 # -----------------------------------------------------------------------------
@@ -118,12 +57,12 @@ class TabularQ(ValueFunction[Any, ActionT]):
     # Value queries
     # ------------------------------------------------------------------
     def v(self, state: Any) -> float:  # noqa: D401  – V(s) as max‑Q
-        key = _hashable_state(state)
+        key = hashable_state(state)
         qs = self._table[key]
         return max(qs.values()) if qs else 0.0
 
     def q(self, state: Any, action: ActionT) -> float:  # noqa: D401
-        key = _hashable_state(state)
+        key = hashable_state(state)
         return self._table[key][action]
 
     # ------------------------------------------------------------------
@@ -134,7 +73,7 @@ class TabularQ(ValueFunction[Any, ActionT]):
         pass
 
     def update_single(self, state: Any, action: ActionT, target: float) -> None:
-        key = _hashable_state(state)
+        key = hashable_state(state)
         q_old = self._table[key][action]
         self._table[key][action] = q_old + self.alpha * (target - q_old)
 
@@ -192,7 +131,7 @@ class EpsilonGreedy(PolicyFunction[Any, ActionT]):
         return self.sample(state)
 
     def _greedy_action(self, state: Any) -> ActionT:
-        key = _hashable_state(state)
+        key = hashable_state(state)
         qs = self.q_table._table[key]
         if not qs:  # unseen state – act uniformly at random
             return random.choice(self.actions)
@@ -203,35 +142,11 @@ class EpsilonGreedy(PolicyFunction[Any, ActionT]):
         pass
 
 
-# -----------------------------------------------------------------------------
-# 3. Experience source for Gym environments (implements ExperienceGenerator)
-# -----------------------------------------------------------------------------
-class Experience(ExperienceGenerator[Any, ActionT]):
-    """Collects full transitions from an OpenAI Gym / Gymnasium env."""
 
-    def collect(self, policy: PolicyFunction, env: Any, n_steps: int = 1) -> List[Transition]:  # noqa: D401
-        trans: List[Transition] = []
-        obs = env.reset()
-        state = obs[0] if isinstance(obs, tuple) else obs
-        for _ in range(n_steps):
-            action = policy(state)
-            step = env.step(action)
-            if len(step) == 5:
-                next_state, reward, term, trunc, info = step
-                done = term or trunc
-            else:
-                next_state, reward, done, info = step
-            trans.append(Transition(state, action, reward, next_state, done, info))
-            if done:
-                obs = env.reset()
-                state = obs[0] if isinstance(obs, tuple) else obs
-            else:
-                state = next_state
-        return trans
 
 
 # -----------------------------------------------------------------------------
-# 4.  Agent orchestrator
+# 3.  Agent orchestrator
 # -----------------------------------------------------------------------------
 class QLearningAgent:
     """Glue class that holds the table & policy and runs the TD‑update."""
