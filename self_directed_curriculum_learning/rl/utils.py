@@ -1,8 +1,6 @@
 from typing import Any, List, Tuple, Union
 import numpy as np
-from interfaces import StateT, ActionT, PolicyFunction, Transition, ExperienceGenerator
-
-__all__ = ["Discretizer", "hashable_state", "Experience"] # imports to be used in other modules
+from interfaces import StateT, ActionT, PolicyFunction, Transition, ExperienceGenerator, BehaviorPolicy
 
 # -----------------------------------------------------------------------------
 # 0.  State discretizer for continuous spaces
@@ -66,6 +64,35 @@ def hashable_state(state: StateT) -> Any:
     if isinstance(state, np.ndarray):
         return tuple(state.ravel())
     return state
+
+
+def evaluate_policy(
+    policy: BehaviorPolicy, 
+    env: Any, 
+    episodes: int = 5
+) -> float:
+    """Evaluate a policy over multiple episodes."""
+    scores = []
+    
+    for _ in range(episodes):
+        obs = env.reset()
+        state = obs[0] if isinstance(obs, tuple) else obs
+        episode_reward = 0.0
+        done = False
+        
+        while not done:
+            action = policy.action(state)
+            step = env.step(action)
+            if len(step) == 5:
+                state, reward, term, trunc, _ = step
+                done = term or trunc
+            else:
+                state, reward, done, _ = step
+            episode_reward += reward
+            
+        scores.append(episode_reward)
+        
+    return float(np.mean(scores))
 
 
 # -----------------------------------------------------------------------------
@@ -140,3 +167,4 @@ class Experience(ExperienceGenerator[Any, ActionT]):
                 break
         
         return transitions, total_reward
+

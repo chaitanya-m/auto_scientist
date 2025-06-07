@@ -24,7 +24,7 @@ from __future__ import annotations
 import random
 from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Mapping, Sequence, Tuple, Union
-from utils import hashable_state, Discretizer, Experience
+from utils import hashable_state, Discretizer, Experience, evaluate_policy
 
 import numpy as np
 
@@ -224,6 +224,7 @@ class QLearningAgent:
 
     def learn_episode(self, max_steps: int | None = None) -> float:
         """Simple orchestration: collect experience from full episode, then update."""
+        
         # Collect experience directly from interface
         experiences, total_reward = self.experience_generator.collect_episode(
             self.target_policy.sample, 
@@ -236,30 +237,6 @@ class QLearningAgent:
         self.critic_updater.step(experiences)
         
         return total_reward
-
-    def evaluate(self, episodes: int = 5) -> float:
-        """Run evaluation episodes using behavior policy."""
-        scores = []
-        
-        for _ in range(episodes):
-            obs = self.env.reset()
-            state = obs[0] if isinstance(obs, tuple) else obs
-            episode_reward = 0.0
-            done = False
-            
-            while not done:
-                action = self.behavior_policy.action(state)
-                step = self.env.step(action)
-                if len(step) == 5:
-                    state, reward, term, trunc, _ = step
-                    done = term or trunc
-                else:
-                    state, reward, done, _ = step
-                episode_reward += reward
-                
-            scores.append(episode_reward)
-            
-        return float(np.mean(scores))
 
 
 # Factory function for easy setup
@@ -362,11 +339,13 @@ if __name__ == "__main__":
             avg = sum(block) / len(block)
             start = episode - freq + 1
             end = episode + 1
-            evaluations.append(agent.evaluate(episodes=100))
+            evaluations.append(evaluate_policy(agent.behavior_policy, env, episodes=100))  # Use utility function
 
             print(f"Average reward for episodes {start}–{end}: {avg:.2f}")
    
     # Print all the evaluations at the end
     print("Final evaluations:", evaluations)
+    evaluation_score = evaluate_policy(agent.behavior_policy, env, episodes=100)
+    print("Evaluation score:", evaluation_score)
     env.close()
 
