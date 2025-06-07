@@ -238,6 +238,52 @@ class QLearningAgent:
         
         return total_reward
 
+    def learn(self, max_steps: int | None = None, update_frequency: int = -1) -> float:
+        """
+        Learn with configurable update frequency.
+        
+        Args:
+            max_steps: Maximum steps per episode
+            update_frequency: -1 = full episode (Monte Carlo), n = every n steps (TD/mini-batch)
+        """
+        if update_frequency == -1:
+            # Monte Carlo: collect full episode, then update once
+            experiences, total_reward = self.experience_generator.collect_episode(
+                self.target_policy.sample, 
+                self.env, 
+                max_steps, 
+                self.discretizer
+            )
+            self.critic_updater.step(experiences)
+            return total_reward
+        
+        else:
+            # TD or mini-batch: use step-based collection with periodic updates
+            total_reward = 0.0
+            steps = 0
+            
+            while steps < (max_steps or float('inf')):
+                # Collect n steps
+                experiences = self.experience_generator.collect(
+                    self.target_policy.sample, 
+                    self.env, 
+                    update_frequency
+                )
+                
+                # Update with collected experiences
+                self.critic_updater.step(experiences)
+                
+                # Track reward and steps
+                episode_reward = sum(exp.reward for exp in experiences)
+                total_reward += episode_reward
+                steps += len(experiences)
+                
+                # Check if episode ended
+                if any(exp.done for exp in experiences):
+                    break
+                    
+            return total_reward
+
 
 # Factory function for easy setup
 def create_qlearning_agent(
