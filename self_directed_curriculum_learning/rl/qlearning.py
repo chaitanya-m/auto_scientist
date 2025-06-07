@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
-from typing import Any, DefaultDict, Dict, List, Sequence, Tuple, Union
+from typing import Any, DefaultDict, Dict, List, Mapping, Sequence, Tuple, Union
 from utils import hashable_state, Discretizer, Experience
 
 import numpy as np
@@ -33,6 +33,8 @@ from interfaces import (
     ValueFunction,
     TargetPolicy,
     BehaviorPolicy,
+    CriticUpdater,
+    Transition
 )
 
 
@@ -154,6 +156,44 @@ class DeterministicPolicy(BehaviorPolicy[Any, ActionT]):
         pass  # noqa: D401  # no-op, as no gradients apply to the q_table
 
 
+# Add a CriticUpdater for tabular Q-learning
+class TabularCriticUpdater(CriticUpdater[Any, ActionT]):
+    """Updates TabularQ using MSE loss and direct table updates."""
+    
+    def __init__(self, q_table: TabularQ, alpha: float = 0.1):
+        self.q_table = q_table
+        self.alpha = alpha
+    
+    def loss(self, predictions: Sequence[float], targets: Sequence[float]) -> float:
+        """Compute MSE loss for diagnostics."""
+        return sum((p - t) ** 2 for p, t in zip(predictions, targets)) / len(predictions)
+    
+    def step(self, experiences: Sequence[Transition[Any, ActionT]]) -> Mapping[str, float]:
+        """Actually perform the Q-table updates."""
+        predictions = []
+        targets = []
+        
+        for exp in experiences:
+            # Discretize states (this should be moved to agent level)
+            s_key = exp.state  # assume already discretized
+            s_next_key = exp.next_state
+            
+            # Current Q-value
+            pred = self.q_table.q(s_key, exp.action)
+            
+            # TD target
+            best_next = self.q_table.v(s_next_key) if not exp.done else 0.0
+            target = exp.reward + 0.99 * best_next  # gamma should be passed in
+            
+            # Apply update
+            self.q_table.update_single(s_key, exp.action, target)
+            
+            predictions.append(pred)
+            targets.append(target)
+        
+        loss = self.loss(predictions, targets)
+        return {"critic_loss": loss}
+
 # -----------------------------------------------------------------------------
 # 3.  Agent orchestrator
 # -----------------------------------------------------------------------------
@@ -222,6 +262,9 @@ class QLearningAgent:
         # Also need to set discretizer on the policy after creating it
         self.target_policy.discretizer = self.discretizer
 
+        # Add critic updater
+        self.critic_updater = TabularCriticUpdater(self.q_table, alpha=alpha)
+
     # ------------------------------------------------------------------
     def learn_episode(self, max_steps: int | None = None) -> float:  # noqa: D401
         """ Run a single episode of Q-learning, updating the Q-table."""
@@ -270,6 +313,64 @@ class QLearningAgent:
         )
         
         return total_reward
+
+    # ------------------------------------------------------------------
+    def collect_experience(self, n_steps: int = 1) -> List[Transition[Any, ActionT]]:
+        """Collect experience using target policy."""
+        experiences = []
+        obs = self.env.reset()
+        state = obs[0] if isinstance(obs, tuple) else obs
+        
+        for _ in range(n_steps):
+            action = self.target_policy.sample(state)
+            
+            step = self.env.step(action)
+            if len(step) == 5:
+                next_state, reward, term, trunc, info = step
+                done = term or trunc
+            else:
+                next_state, reward, done, info = step, {}
+            
+            transition = Transition(
+                state=state,
+                action=action, 
+                reward=reward,
+                next_state=next_state,
+                done=done,
+                info=info
+            )
+            experiences.append(transition)
+            
+            if done:
+                obs = self.env.reset()
+                state = obs[0] if isinstance(obs, tuple) else obs
+                break
+            else:
+                state = next_state
+                
+        return experiences
+
+    # ------------------------------------------------------------------
+    def update(self, experiences: Sequence[Transition[Any, ActionT]]) -> Mapping[str, float]:
+        """Update Q-table using collected experiences."""
+        # Discretize experiences first
+        discretized_experiences = []
+        for exp in experiences:
+            s_key = self.discretizer(exp.state) if self.discretizer else exp.state
+            s_next_key = self.discretizer(exp.next_state) if self.discretizer else exp.next_state
+            
+            discretized_exp = Transition(
+                state=s_key,
+                action=exp.action,
+                reward=exp.reward,
+                next_state=s_next_key,
+                done=exp.done,
+                info=exp.info
+            )
+            discretized_experiences.append(discretized_exp)
+        
+        # Let the critic updater handle everything
+        return self.critic_updater.step(discretized_experiences)
 
     # ------------------------------------------------------------------
     def evaluate(self, episodes: int = 5) -> float:
