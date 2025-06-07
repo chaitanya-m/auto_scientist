@@ -93,3 +93,50 @@ class Experience(ExperienceGenerator[Any, ActionT]):
             else:
                 state = next_state
         return trans
+
+    def collect_episode(
+        self, 
+        policy: PolicyFunction, 
+        env: Any, 
+        max_steps: int | None = None,
+        discretizer: Any = None
+    ) -> Tuple[List[Transition], float]:
+        """Collect a full episode of experience."""
+        transitions: List[Transition] = []
+        total_reward = 0.0
+        
+        obs = env.reset()
+        state = obs[0] if isinstance(obs, tuple) else obs
+        steps = 0
+        
+        while True:
+            action = policy(state)
+            
+            step = env.step(action)
+            if len(step) == 5:
+                next_state, reward, term, trunc, info = step
+                done = term or trunc
+            else:
+                next_state, reward, done, info = step
+
+            # Discretize states if discretizer provided
+            s_key = discretizer(state) if discretizer else state
+            s_next_key = discretizer(next_state) if discretizer else next_state
+            
+            transitions.append(Transition(
+                state=s_key,
+                action=action,
+                reward=reward,
+                next_state=s_next_key,
+                done=done,
+                info=info
+            ))
+
+            total_reward += reward
+            state = next_state
+            steps += 1
+            
+            if done or (max_steps is not None and steps >= max_steps):
+                break
+        
+        return transitions, total_reward

@@ -106,10 +106,10 @@ class EpsilonGreedy(TargetPolicy[Any, ActionT]):
         self.q_table = q_table
         self.actions = list(actions)
         self.discretizer = discretizer
+        self.episode_count = 0
 
     def sample(self, state: Any) -> ActionT:
-        """Pick an action, then decay ε."""
-        # discretize for lookup
+        """Pick an action using epsilon-greedy strategy."""
         s = (
             self.discretizer(state)
             if self.discretizer and isinstance(state, np.ndarray)
@@ -119,6 +119,7 @@ class EpsilonGreedy(TargetPolicy[Any, ActionT]):
             action = random.choice(self.actions)
         else:
             action = self._greedy_action(s)
+        
         return action
 
     def action(self, state: Any, *, deterministic: bool | None = None) -> ActionT:
@@ -138,6 +139,10 @@ class EpsilonGreedy(TargetPolicy[Any, ActionT]):
     # Fixed‑policy; gradients don’t apply.
     def update(self, gradients: Any) -> None:  # noqa: D401
         pass
+
+    def end_episode(self) -> None:
+        """Handle epsilon decay at end of episode."""
+        self.epsilon = max(self.eps_end, self.epsilon * self.eps_decay)
 
 
 # ---------------------------------------------------------------------
@@ -217,63 +222,18 @@ class QLearningAgent:
         self.experience_generator = experience_generator
         self.discretizer = discretizer
 
-    def collect_experience(self, n_steps: int = 1) -> Sequence[Transition[Any, ActionT]]:
-        """Delegate to experience generator."""
-        return self.experience_generator.collect(self.target_policy, self.env, n_steps)
-
-    def update(self, experiences: Sequence[Transition[Any, ActionT]]) -> Mapping[str, float]:
-        """Delegate to critic updater."""
-        return self.critic_updater.step(experiences)
-
     def learn_episode(self, max_steps: int | None = None) -> float:
         """Simple orchestration: collect experience from full episode, then update."""
-        # Collect full episode of experience
-        experiences = []
-        obs = self.env.reset()
-        state = obs[0] if isinstance(obs, tuple) else obs
-        total_reward = 0.0
-        steps = 0
+        # Collect experience directly from interface
+        experiences, total_reward = self.experience_generator.collect_episode(
+            self.target_policy.sample, 
+            self.env, 
+            max_steps, 
+            self.discretizer
+        )
         
-        while True:
-            action = self.target_policy.sample(state)
-            
-            step = self.env.step(action)
-            if len(step) == 5:
-                next_state, reward, term, trunc, _ = step
-                done = term or trunc
-            else:
-                next_state, reward, done, _ = step
-
-            # Discretize states for the transition
-            s_key = self.discretizer(state) if self.discretizer else state
-            s_next_key = self.discretizer(next_state) if self.discretizer else next_state
-            
-            experiences.append(Transition(
-                state=s_key,
-                action=action,
-                reward=reward,
-                next_state=s_next_key,
-                done=done,
-                info={}
-            ))
-
-            total_reward += reward
-            state = next_state
-            steps += 1
-            
-            if done or (max_steps is not None and steps >= max_steps):
-                break
-    
-        # Update with collected experiences
-        if experiences:
-            self.update(experiences)
-    
-        # Handle epsilon decay (could be moved to policy)
-        if hasattr(self.target_policy, 'epsilon'):
-            self.target_policy.epsilon = max(
-                self.target_policy.eps_end, 
-                self.target_policy.epsilon * self.target_policy.eps_decay
-            )
+        # Update directly via interface
+        self.critic_updater.step(experiences)
         
         return total_reward
 
@@ -329,7 +289,7 @@ def create_qlearning_agent(
         actions=actions,
         eps_start=epsilon,
         eps_end=0.01,
-        eps_decay=0.9995,
+        eps_decay=0.9995,  # Back to episode-based rate
         discretizer=discretizer,
     )
     behavior_policy = DeterministicPolicy(target_policy)
