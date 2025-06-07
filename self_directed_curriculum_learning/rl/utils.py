@@ -101,25 +101,57 @@ def evaluate_policy(
 class Experience(ExperienceGenerator[Any, ActionT]):
     """Collects full transitions from an OpenAI Gym / Gymnasium env."""
 
-    def collect(self, policy: PolicyFunction, env: Any, n_steps: int = 1) -> List[Transition]:  # noqa: D401
-        trans: List[Transition] = []
-        obs = env.reset()
-        state = obs[0] if isinstance(obs, tuple) else obs
-        for _ in range(n_steps):
-            action = policy(state)
-            step = env.step(action)
-            if len(step) == 5:
-                next_state, reward, term, trunc, info = step
-                done = term or trunc
-            else:
-                next_state, reward, done, info = step
-            trans.append(Transition(state, action, reward, next_state, done, info))
-            if done:
-                obs = env.reset()
-                state = obs[0] if isinstance(obs, tuple) else obs
-            else:
+    def collect(self, policy: PolicyFunction, env: Any, n_steps: int = 1, discretizer: Any = None) -> Tuple[List[Transition], float]:
+        """
+        Unified collection method.
+        
+        Args:
+            n_steps: -1 = full episode, n > 0 = exactly n steps
+            discretizer: Optional state discretizer
+        
+        Returns:
+            (transitions, total_reward)
+        """
+        if n_steps == -1:
+            # Full episode collection
+            return self.collect_episode(policy, env, max_steps=None, discretizer=discretizer)
+        else:
+            # N-step collection with reward tracking
+            transitions = []
+            total_reward = 0.0
+            
+            obs = env.reset()
+            state = obs[0] if isinstance(obs, tuple) else obs
+            
+            for _ in range(n_steps):
+                action = policy(state)
+                step = env.step(action)
+                if len(step) == 5:
+                    next_state, reward, term, trunc, info = step
+                    done = term or trunc
+                else:
+                    next_state, reward, done, info = step
+
+                # Discretize states if discretizer provided
+                s_key = discretizer(state) if discretizer else state
+                s_next_key = discretizer(next_state) if discretizer else next_state
+                
+                transitions.append(Transition(
+                    state=s_key,
+                    action=action,
+                    reward=reward,
+                    next_state=s_next_key,
+                    done=done,
+                    info=info
+                ))
+
+                total_reward += reward
                 state = next_state
-        return trans
+                
+                if done:
+                    break
+            
+            return transitions, total_reward
 
     def collect_episode(
         self, 

@@ -222,67 +222,21 @@ class QLearningAgent:
         self.experience_generator = experience_generator
         self.discretizer = discretizer
 
-    def learn_episode(self, max_steps: int | None = None) -> float:
-        """Simple orchestration: collect experience from full episode, then update."""
+    def learn(self, max_steps: int | None = None, update_frequency: int = -1) -> float:
+        """Learn with configurable update frequency."""
         
-        # Collect experience directly from interface
-        experiences, total_reward = self.experience_generator.collect_episode(
+        # Collect experiences based on update frequency
+        experiences, total_reward = self.experience_generator.collect(
             self.target_policy.sample, 
             self.env, 
-            max_steps, 
-            self.discretizer
+            n_steps=update_frequency,
+            discretizer=self.discretizer
         )
         
-        # Update directly via interface
+        # Update critic
         self.critic_updater.step(experiences)
         
         return total_reward
-
-    def learn(self, max_steps: int | None = None, update_frequency: int = -1) -> float:
-        """
-        Learn with configurable update frequency.
-        
-        Args:
-            max_steps: Maximum steps per episode
-            update_frequency: -1 = full episode (Monte Carlo), n = every n steps (TD/mini-batch)
-        """
-        if update_frequency == -1:
-            # Monte Carlo: collect full episode, then update once
-            experiences, total_reward = self.experience_generator.collect_episode(
-                self.target_policy.sample, 
-                self.env, 
-                max_steps, 
-                self.discretizer
-            )
-            self.critic_updater.step(experiences)
-            return total_reward
-        
-        else:
-            # TD or mini-batch: use step-based collection with periodic updates
-            total_reward = 0.0
-            steps = 0
-            
-            while steps < (max_steps or float('inf')):
-                # Collect n steps
-                experiences = self.experience_generator.collect(
-                    self.target_policy.sample, 
-                    self.env, 
-                    update_frequency
-                )
-                
-                # Update with collected experiences
-                self.critic_updater.step(experiences)
-                
-                # Track reward and steps
-                episode_reward = sum(exp.reward for exp in experiences)
-                total_reward += episode_reward
-                steps += len(experiences)
-                
-                # Check if episode ended
-                if any(exp.done for exp in experiences):
-                    break
-                    
-            return total_reward
 
 
 # Factory function for easy setup
@@ -374,7 +328,8 @@ if __name__ == "__main__":
     rewards: List[float] = []
     evaluations = []
     for episode in range(3000):
-        total_reward = agent.learn_episode(max_steps=env._max_episode_steps)
+        # Use the new learn method with episode-based updates (default)
+        total_reward = agent.learn(max_steps=env._max_episode_steps, update_frequency=-1)
         rewards.append(total_reward)
 
         #print(f"Episode {episode + 1}: Total Reward = {total_reward}")
@@ -385,7 +340,7 @@ if __name__ == "__main__":
             avg = sum(block) / len(block)
             start = episode - freq + 1
             end = episode + 1
-            evaluations.append(evaluate_policy(agent.behavior_policy, env, episodes=100))  # Use utility function
+            evaluations.append(evaluate_policy(agent.behavior_policy, env, episodes=100))
 
             print(f"Average reward for episodes {start}–{end}: {avg:.2f}")
    
@@ -394,4 +349,3 @@ if __name__ == "__main__":
     evaluation_score = evaluate_policy(agent.behavior_policy, env, episodes=100)
     print("Evaluation score:", evaluation_score)
     env.close()
-
