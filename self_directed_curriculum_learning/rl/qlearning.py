@@ -35,6 +35,8 @@ from interfaces import (
     Transition,
     ValueFunction,
     ExperienceGenerator,
+    TargetPolicy,
+    BehaviorPolicy,
 )
 
 
@@ -79,9 +81,9 @@ class TabularQ(ValueFunction[Any, ActionT]):
 
 
 # -----------------------------------------------------------------------------
-# 2.  ε‑greedy policy
+# 2.  Target (policy to learn) and behavior (policy to use) policies
 # -----------------------------------------------------------------------------
-class EpsilonGreedy(PolicyFunction[Any, ActionT]):
+class EpsilonGreedy(TargetPolicy[Any, ActionT]):
     """Samples ε‑greedy from a :class:`TabularQ`."""
 
     stochastic = True
@@ -142,7 +144,21 @@ class EpsilonGreedy(PolicyFunction[Any, ActionT]):
         pass
 
 
+# ---------------------------------------------------------------------
+class DeterministicPolicy(BehaviorPolicy[Any, ActionT]):
+    """Wrap EpsilonGreedy or other TargetPolicy to always act deterministically for off-policy control."""
+    stochastic = False
 
+    def __init__(self, base_policy: TargetPolicy[Any, ActionT]) -> None:
+        self.base = base_policy
+
+    def action(self, state: Any, *, deterministic: bool | None = None) -> ActionT:
+        # force deterministic=True on the wrapped policy
+        return self.base.action(state, deterministic=True)
+
+    def update(self, gradients: Any) -> None:
+        # forward update if any (no-op for EpsilonGreedy)
+        self.base.update(gradients)
 
 
 # -----------------------------------------------------------------------------
@@ -244,10 +260,10 @@ class QLearningAgent:
         return total_reward
 
     # ------------------------------------------------------------------
-    def evaluate(self, episodes: int = 5) -> float:  # noqa: D401 – return mean reward
-        # zero ε for pure greedy evaluation
-        eps_backup = self.policy.epsilon
-        self.policy.epsilon = 0.0
+    def evaluate(self, episodes: int = 5) -> float:
+        """Run evaluation with a pure greedy policy (no ε-exploration)."""
+        # wrap our ε-greedy policy into a deterministic BehaviorPolicy
+        greedy = DeterministicPolicy(self.policy)
         scores: List[float] = []
 
         for _ in range(episodes):
@@ -256,7 +272,7 @@ class QLearningAgent:
             episode_reward = 0.0
             done = False
             while not done:
-                action = self.policy(state, deterministic=True)
+                action = greedy.action(state)
                 step = self.env.step(action)
                 if len(step) == 5:
                     state, r, term, trunc, _ = step
@@ -265,8 +281,6 @@ class QLearningAgent:
                     state, r, done, _ = step
                 episode_reward += r
             scores.append(episode_reward)
-        # restore ε
-        self.policy.epsilon = eps_backup
         return float(np.mean(scores))
 
 

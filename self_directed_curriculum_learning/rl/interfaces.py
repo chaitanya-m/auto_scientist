@@ -67,6 +67,10 @@ class PolicyFunction(abc.ABC, Generic[StateT, ActionT]):
     def __call__(
         self, state: StateT, *, deterministic: bool | None = None
     ) -> ActionT:
+        """Return an action for the given *state*.
+        If *deterministic* is `True`, use a greedy action; if `False`, sample
+        from the policy distribution.  If `None`, use the default policy behavior.
+        """
         return self.action(state, deterministic=deterministic)
 
     @abc.abstractmethod
@@ -92,6 +96,18 @@ class PolicyFunction(abc.ABC, Generic[StateT, ActionT]):
     def update(self, gradients: Any) -> None:
         """Apply *gradients* (framework‑specific tensor)."""
         raise NotImplementedError
+
+
+class BehaviorPolicy(PolicyFunction[StateT, ActionT]):
+    """Policy used to generate actions in the environment (behavior)."""
+    # Inherit .action and .__call__ behavior
+    pass
+
+
+class TargetPolicy(PolicyFunction[StateT, ActionT]):
+    """Policy used to select actions for computing TD targets (target)."""
+    # Inherit .action and .__call__ behavior
+    pass
 
 
 # -----------------------------------------------------------------------------
