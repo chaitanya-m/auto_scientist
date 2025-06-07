@@ -203,61 +203,19 @@ class QLearningAgent:
     def __init__(
         self,
         env: Any,
-        *,
-        alpha: float = 0.1,
-        gamma: float = 0.99,
-        epsilon: float = 0.1,
-        bins: Union[int, Sequence[int]] = 10,
-        clip_low: Sequence[float] | float = -4.8,
-        clip_high: Sequence[float] | float = 4.8,
+        target_policy: TargetPolicy[Any, ActionT],
+        behavior_policy: BehaviorPolicy[Any, ActionT],
+        critic_updater: CriticUpdater[Any, ActionT],
+        experience_generator: Any,  # Experience from utils.py
+        discretizer: Discretizer | None = None,
     ) -> None:
-        """Constructor that maintains backward compatibility with existing main function."""
-        if not hasattr(env.action_space, "n"):
-            raise TypeError("QLearningAgent requires a discrete action space.")
-        
+        """Pure dependency injection constructor."""
         self.env = env
-        self.actions = list(range(env.action_space.n))
-        self.gamma = gamma
-
-        # Create discretizer if needed
-        obs_space = env.observation_space
-        self.discretizer = None
-        if hasattr(obs_space, "low") and hasattr(obs_space, "high"):
-            obs_low = np.array(obs_space.low, dtype=float)
-            obs_high = np.array(obs_space.high, dtype=float)
-            # Hard-clip the unbounded velocity dims for CartPole
-            obs_low[1], obs_high[1] = -3.0, 3.0   # cart velocity
-            obs_low[3], obs_high[3] = -3.5, 3.5   # pole angular velocity
-            
-            if not isinstance(clip_low, (int, float)):
-                clip_low_arr = np.array(clip_low, dtype=float)
-            else:
-                clip_low_arr = obs_low
-            if not isinstance(clip_high, (int, float)):
-                clip_high_arr = np.array(clip_high, dtype=float)
-            else:
-                clip_high_arr = obs_high
-
-            self.discretizer = Discretizer(
-                obs_low, obs_high,
-                bins=bins,
-                clip_low=clip_low_arr,
-                clip_high=clip_high_arr,
-            )
-
-        # Create components using dependency injection pattern
-        self.q_table = TabularQ(alpha=alpha, gamma=gamma)
-        self.target_policy = EpsilonGreedy(
-            q_table=self.q_table,
-            actions=self.actions,
-            eps_start=epsilon,
-            eps_end=0.01,
-            eps_decay=0.9995,
-            discretizer=self.discretizer,
-        )
-        self.behavior_policy = DeterministicPolicy(self.target_policy)
-        self.critic_updater = TabularCriticUpdater(self.q_table, alpha=alpha)
-        self.experience_generator = Experience()
+        self.target_policy = target_policy
+        self.behavior_policy = behavior_policy
+        self.critic_updater = critic_updater
+        self.experience_generator = experience_generator
+        self.discretizer = discretizer
 
     def collect_experience(self, n_steps: int = 1) -> Sequence[Transition[Any, ActionT]]:
         """Delegate to experience generator."""
@@ -265,16 +223,16 @@ class QLearningAgent:
 
     def update(self, experiences: Sequence[Transition[Any, ActionT]]) -> Mapping[str, float]:
         """Delegate to critic updater."""
-        # Remove the double discretization - experiences are already discretized!
         return self.critic_updater.step(experiences)
 
     def learn_episode(self, max_steps: int | None = None) -> float:
-        """Convenience method that maintains backward compatibility."""
+        """Simple orchestration: collect experience from full episode, then update."""
+        # Collect full episode of experience
+        experiences = []
         obs = self.env.reset()
         state = obs[0] if isinstance(obs, tuple) else obs
         total_reward = 0.0
         steps = 0
-        experiences = []
         
         while True:
             action = self.target_policy.sample(state)
@@ -290,32 +248,32 @@ class QLearningAgent:
             s_key = self.discretizer(state) if self.discretizer else state
             s_next_key = self.discretizer(next_state) if self.discretizer else next_state
             
-            transition = Transition(
-                state=s_key,  # Already discretized
+            experiences.append(Transition(
+                state=s_key,
                 action=action,
                 reward=reward,
-                next_state=s_next_key,  # Already discretized
+                next_state=s_next_key,
                 done=done,
                 info={}
-            )
-            experiences.append(transition)
+            ))
 
             total_reward += reward
-            state = next_state  # Keep raw state for next iteration
+            state = next_state
             steps += 1
             
             if done or (max_steps is not None and steps >= max_steps):
                 break
     
-        # Update with all experiences from this episode
+        # Update with collected experiences
         if experiences:
-            self.update(experiences)  # Now passes correctly discretized experiences
+            self.update(experiences)
     
-        # Handle epsilon decay
-        self.target_policy.epsilon = max(
-            self.target_policy.eps_end, 
-            self.target_policy.epsilon * self.target_policy.eps_decay
-        )
+        # Handle epsilon decay (could be moved to policy)
+        if hasattr(self.target_policy, 'epsilon'):
+            self.target_policy.epsilon = max(
+                self.target_policy.eps_end, 
+                self.target_policy.epsilon * self.target_policy.eps_decay
+            )
         
         return total_reward
 
@@ -344,13 +302,83 @@ class QLearningAgent:
         return float(np.mean(scores))
 
 
-__all__ = [
-    "TabularQ",
-    "EpsilonGreedy",
-    "DeterministicPolicy", 
-    "TabularCriticUpdater",
-    "QLearningAgent",
-]
+# Factory function for easy setup
+def create_qlearning_agent(
+    env: Any,
+    *,
+    alpha: float = 0.1,
+    gamma: float = 0.99,
+    epsilon: float = 0.1,
+    bins: Union[int, Sequence[int]] = 10,
+    clip_low: Sequence[float] | float = -4.8,
+    clip_high: Sequence[float] | float = 4.8,
+) -> QLearningAgent:
+    """Factory to create a complete Q-learning setup with all dependencies."""
+    if not hasattr(env.action_space, "n"):
+        raise TypeError("QLearningAgent requires a discrete action space.")
+    
+    actions = list(range(env.action_space.n))
+    
+    # Create discretizer if needed
+    discretizer = _create_discretizer(env, bins, clip_low, clip_high)
+    
+    # Create components
+    q_table = TabularQ(alpha=alpha, gamma=gamma)
+    target_policy = EpsilonGreedy(
+        q_table=q_table,
+        actions=actions,
+        eps_start=epsilon,
+        eps_end=0.01,
+        eps_decay=0.9995,
+        discretizer=discretizer,
+    )
+    behavior_policy = DeterministicPolicy(target_policy)
+    critic_updater = TabularCriticUpdater(q_table, alpha=alpha)
+    experience_generator = Experience()
+    
+    return QLearningAgent(
+        env=env,
+        target_policy=target_policy,
+        behavior_policy=behavior_policy,
+        critic_updater=critic_updater,
+        experience_generator=experience_generator,
+        discretizer=discretizer,
+    )
+
+
+def _create_discretizer(
+    env: Any,
+    bins: Union[int, Sequence[int]],
+    clip_low: Sequence[float] | float,
+    clip_high: Sequence[float] | float
+) -> Discretizer | None:
+    """Helper to create discretizer for continuous observation spaces."""
+    obs_space = env.observation_space
+    if not (hasattr(obs_space, "low") and hasattr(obs_space, "high")):
+        return None
+        
+    obs_low = np.array(obs_space.low, dtype=float)
+    obs_high = np.array(obs_space.high, dtype=float)
+    
+    # Handle CartPole unbounded velocities
+    obs_low[1], obs_high[1] = -3.0, 3.0   # cart velocity
+    obs_low[3], obs_high[3] = -3.5, 3.5   # pole angular velocity
+    
+    if not isinstance(clip_low, (int, float)):
+        clip_low_arr = np.array(clip_low, dtype=float)
+    else:
+        clip_low_arr = obs_low
+    if not isinstance(clip_high, (int, float)):
+        clip_high_arr = np.array(clip_high, dtype=float)
+    else:
+        clip_high_arr = obs_high
+
+    return Discretizer(
+        obs_low, obs_high,
+        bins=bins,
+        clip_low=clip_low_arr,
+        clip_high=clip_high_arr,
+    )
 
 
 if __name__ == "__main__":
@@ -358,7 +386,7 @@ if __name__ == "__main__":
     import gym
 
     env = gym.make("CartPole-v1")
-    agent = QLearningAgent(env, alpha=0.1, gamma=0.99, epsilon=0.1)
+    agent = create_qlearning_agent(env, alpha=0.1, gamma=0.99, epsilon=0.1)
 
     rewards: List[float] = []
     evaluations = []
