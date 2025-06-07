@@ -1,4 +1,4 @@
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Tuple, Union, Sequence
 import numpy as np
 from interfaces import StateT, ActionT, PolicyFunction, Transition, ExperienceGenerator, BehaviorPolicy
 
@@ -200,3 +200,41 @@ class Experience(ExperienceGenerator[Any, ActionT]):
         
         return transitions, total_reward
 
+def create_discretizer(
+    env: Any,
+    bins: Union[int, Sequence[int]],
+    clip_low: Sequence[float] | float,
+    clip_high: Sequence[float] | float
+) -> Discretizer | None:
+    """Helper to create discretizer for continuous observation spaces."""
+    obs_space = env.observation_space
+    if not (hasattr(obs_space, "low") and hasattr(obs_space, "high")):
+        return None
+        
+    obs_low = np.array(obs_space.low, dtype=float)
+    obs_high = np.array(obs_space.high, dtype=float)
+    
+    # Handle infinite bounds by using clip values
+    if not isinstance(clip_low, (int, float)):
+        clip_low_arr = np.array(clip_low, dtype=float)
+    else:
+        clip_low_arr = np.full_like(obs_low, float(clip_low))
+        
+    if not isinstance(clip_high, (int, float)):
+        clip_high_arr = np.array(clip_high, dtype=float)
+    else:
+        clip_high_arr = np.full_like(obs_high, float(clip_high))
+
+    # Replace infinite bounds with clip values
+    mask_low_inf = np.isinf(obs_low)
+    mask_high_inf = np.isinf(obs_high)
+    
+    obs_low = np.where(mask_low_inf, clip_low_arr, obs_low)
+    obs_high = np.where(mask_high_inf, clip_high_arr, obs_high)
+
+    return Discretizer(
+        obs_low, obs_high,
+        bins=bins,
+        clip_low=clip_low_arr,
+        clip_high=clip_high_arr,
+    )

@@ -24,7 +24,7 @@ from __future__ import annotations
 import random
 from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Mapping, Sequence, Tuple, Union
-from utils import hashable_state, Discretizer, Experience, evaluate_policy
+from utils import hashable_state, Discretizer, Experience, evaluate_policy, create_discretizer
 
 import numpy as np
 
@@ -36,8 +36,6 @@ from interfaces import (
     CriticUpdater,
     Transition
 )
-
-
 
 
 # -----------------------------------------------------------------------------
@@ -256,8 +254,14 @@ def create_qlearning_agent(
     
     actions = list(range(env.action_space.n))
     
-    # Create discretizer if needed
-    discretizer = _create_discretizer(env, bins, clip_low, clip_high)
+    # Create discretizer with environment-appropriate bounds
+    # For CartPole, use velocity-specific bounds
+    if hasattr(env, 'spec') and env.spec and 'CartPole' in env.spec.id:
+        # CartPole-specific bounds for unbounded velocity dimensions
+        clip_low = [-4.8, -3.0, -0.5, -3.5]  # pos, vel, angle, angular_vel
+        clip_high = [4.8, 3.0, 0.5, 3.5]
+    
+    discretizer = create_discretizer(env, bins, clip_low, clip_high)
     
     # Create components
     q_table = TabularQ(alpha=alpha, gamma=gamma)
@@ -283,39 +287,6 @@ def create_qlearning_agent(
     )
 
 
-def _create_discretizer(
-    env: Any,
-    bins: Union[int, Sequence[int]],
-    clip_low: Sequence[float] | float,
-    clip_high: Sequence[float] | float
-) -> Discretizer | None:
-    """Helper to create discretizer for continuous observation spaces."""
-    obs_space = env.observation_space
-    if not (hasattr(obs_space, "low") and hasattr(obs_space, "high")):
-        return None
-        
-    obs_low = np.array(obs_space.low, dtype=float)
-    obs_high = np.array(obs_space.high, dtype=float)
-    
-    # Handle CartPole unbounded velocities
-    obs_low[1], obs_high[1] = -3.0, 3.0   # cart velocity
-    obs_low[3], obs_high[3] = -3.5, 3.5   # pole angular velocity
-    
-    if not isinstance(clip_low, (int, float)):
-        clip_low_arr = np.array(clip_low, dtype=float)
-    else:
-        clip_low_arr = obs_low
-    if not isinstance(clip_high, (int, float)):
-        clip_high_arr = np.array(clip_high, dtype=float)
-    else:
-        clip_high_arr = obs_high
-
-    return Discretizer(
-        obs_low, obs_high,
-        bins=bins,
-        clip_low=clip_low_arr,
-        clip_high=clip_high_arr,
-    )
 
 
 if __name__ == "__main__":
