@@ -197,6 +197,109 @@ class TabularCriticUpdater(CriticUpdater[Any, ActionT]):
         loss = self.loss(predictions, targets)
         return {"critic_loss": loss}
 
+class EligibilityTraceCriticUpdater(CriticUpdater[Any, ActionT]):
+    """
+    Applies eligibility traces for temporal credit assignment.
+    
+    λ = 1: All visited states in batch updated equally. 
+        If the update frequency is a full episode (set to -1 in this code), this is equivalent to Monte Carlo, 
+        i.e. all states in the the entire episode trajectory prior to a state get updated with equal credit.
+    
+    λ = 0: Only the most recent state-action pair in the batch is updated. this is equivalent to temporal-difference learning. 
+
+    0 < λ < 1: Exponentially decaying credit assignment to states depending on how long ago they were visited in the trajectory.
+    """
+    
+    def __init__(self, q_table: TabularQ, alpha: float = 0.1, gamma: float = 0.99, lambda_: float = 0.9):
+        self.q_table = q_table
+        self.alpha = alpha
+        self.gamma = gamma
+        self.lambda_ = lambda_
+        self.traces: DefaultDict[Any, Dict[ActionT, float]] = defaultdict(lambda: defaultdict(float))
+        self._episode_active = False
+    
+    def loss(self, predictions: Sequence[float], targets: Sequence[float]) -> float:
+        """Compute MSE loss for diagnostics."""
+        return sum((p - t) ** 2 for p, t in zip(predictions, targets)) / len(predictions)
+
+    def step(self, experiences: Sequence[Transition[Any, ActionT]]) -> Mapping[str, float]:
+        """Apply eligibility trace updates to the Q-table."""
+        
+        # Clear traces at episode start
+        if not self._episode_active:
+            self.traces.clear()
+            self._episode_active = True
+        
+        total_td_error = 0.0
+        updates_made = 0
+        
+        for exp in experiences:
+            s_key = exp.state
+            s_next_key = exp.next_state
+            
+            # Compute TD error (same as standard Q-learning)
+            current_q = self.q_table.q(s_key, exp.action)
+            best_next = self.q_table.v(s_next_key) if not exp.done else 0.0
+            target = exp.reward + self.gamma * best_next
+            td_error = target - current_q
+            
+            total_td_error += abs(td_error)
+            
+            # FIRST: Update all existing traces with TD error
+            states_to_remove = []
+            for state in self.traces:
+                actions_to_remove = []
+                for action in self.traces[state]:
+                    trace = self.traces[state][action]
+                    
+                    if trace > 0.01:  # Only update significant traces
+                        # Apply proportional update
+                        old_q = self.q_table.q(state, action)
+                        new_q = old_q + self.alpha * td_error * trace
+                        self.q_table._table[state][action] = new_q
+                        updates_made += 1
+                    
+                    # Decay trace
+                    self.traces[state][action] *= self.gamma * self.lambda_
+                    
+                    # Mark small traces for removal
+                    if self.traces[state][action] < 0.01:
+                        actions_to_remove.append(action)
+                
+                # Remove small traces
+                for action in actions_to_remove:
+                    del self.traces[state][action]
+                
+                # Mark empty states for removal
+                if not self.traces[state]:
+                    states_to_remove.append(state)
+        
+            # Remove empty states
+            for state in states_to_remove:
+                del self.traces[state]
+        
+            # THEN: Set eligibility trace for current state-action to 1.0 (replacing traces)
+            self.traces[s_key][exp.action] = 1.0
+            
+            # Also update the current state-action with the TD error
+            old_q = self.q_table.q(s_key, exp.action)
+            new_q = old_q + self.alpha * td_error * 1.0
+            self.q_table._table[s_key][exp.action] = new_q
+            updates_made += 1
+            
+            # Clear traces on episode end
+            if exp.done:
+                self.traces.clear()
+                self._episode_active = False
+    
+        avg_td_error = total_td_error / len(experiences) if experiences else 0.0
+        active_traces = sum(len(state_traces) for state_traces in self.traces.values())
+        
+        return {
+            "td_error": avg_td_error,
+            "active_traces": active_traces,
+            "trace_updates": updates_made
+        }
 # -----------------------------------------------------------------------------
 # 3.  Agent orchestrator
 # -----------------------------------------------------------------------------

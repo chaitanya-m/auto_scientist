@@ -106,7 +106,7 @@ class Experience(ExperienceGenerator[Any, ActionT]):
         Unified collection method.
         
         Args:
-            n_steps: -1 = full episode, n > 0 = exactly n steps
+            n_steps: -1 = full episode (Monte Carlo), n > 0 = exactly n steps (1 = Temporal Difference)
             discretizer: Optional state discretizer
         
         Returns:
