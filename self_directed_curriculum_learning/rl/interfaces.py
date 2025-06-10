@@ -33,6 +33,7 @@ from typing import (
     TypeVar,
     Protocol,
 )
+from dataclasses import dataclass
 
 # -----------------------------------------------------------------------------
 # 1.  Generic type aliases
@@ -42,15 +43,15 @@ ActionT = TypeVar("ActionT", covariant=True)
 RewardT = float  # scalar reward – libs can override with Tensor alias
 
 
-class Transition(NamedTuple, Generic[StateT, ActionT]):
-    """A single interaction slice (s, a, r, s′, done[, info])."""
-
+@dataclass
+class Transition(Generic[StateT, ActionT]):
+    """Single environment transition for learning."""
     state: StateT
     action: ActionT
-    reward: RewardT
+    reward: float
     next_state: StateT
     done: bool
-    info: Optional[Mapping[str, Any]] = None
+    next_action: ActionT | None = None  # For on-policy methods like SARSA
 
 
 # -----------------------------------------------------------------------------

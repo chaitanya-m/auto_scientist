@@ -134,7 +134,7 @@ class EpsilonGreedy(TargetPolicy[Any, ActionT]):
             return random.choice(self.actions)
         return max(qs.items(), key=lambda kv: kv[1])[0]
 
-    # Fixed‑policy; gradients don’t apply.
+    # Fixed‑policy; gradients don't apply.
     def update(self, gradients: Any) -> None:  # noqa: D401
         pass
 
@@ -163,9 +163,10 @@ class DeterministicPolicy(BehaviorPolicy[Any, ActionT]):
 class TabularCriticUpdater(CriticUpdater[Any, ActionT]):
     """Updates TabularQ using MSE loss and direct table updates."""
     
-    def __init__(self, q_table: TabularQ, alpha: float = 0.1):
+    def __init__(self, q_table: TabularQ, alpha: float = 0.1, on_policy: bool = False):
         self.q_table = q_table
         self.alpha = alpha
+        self.on_policy = on_policy
     
     def loss(self, predictions: Sequence[float], targets: Sequence[float]) -> float:
         """Compute MSE loss for diagnostics."""
@@ -177,16 +178,26 @@ class TabularCriticUpdater(CriticUpdater[Any, ActionT]):
         targets = []
         
         for exp in experiences:
-            # Discretize states (this should be moved to agent level)
-            s_key = exp.state  # assume already discretized
+            s_key = exp.state
             s_next_key = exp.next_state
             
             # Current Q-value
             pred = self.q_table.q(s_key, exp.action)
             
-            # TD target
-            best_next = self.q_table.v(s_next_key) if not exp.done else 0.0
-            target = exp.reward + 0.99 * best_next  # gamma should be passed in
+            if self.on_policy:
+                # SARSA: Use the actual next action that was taken
+                # For terminal states, there's no next action
+                if exp.done:
+                    target = exp.reward
+                else:
+                    # Need to get the actual next action from experience
+                    # This requires extending Transition to include next_action
+                    next_q = self.q_table.q(s_next_key, exp.next_action) if hasattr(exp, 'next_action') and exp.next_action is not None else self.q_table.v(s_next_key)
+                    target = exp.reward + 0.99 * next_q
+            else:
+                # Q-learning: Use greedy action (max Q-value) for next state
+                best_next = self.q_table.v(s_next_key) if not exp.done else 0.0
+                target = exp.reward + 0.99 * best_next
             
             # Apply update
             self.q_table.update_single(s_key, exp.action, target)
@@ -200,21 +211,14 @@ class TabularCriticUpdater(CriticUpdater[Any, ActionT]):
 class EligibilityTraceCriticUpdater(CriticUpdater[Any, ActionT]):
     """
     Applies eligibility traces for temporal credit assignment.
-    
-    λ = 1: All visited states in batch updated equally. 
-        If the update frequency is a full episode (set to -1 in this code), this is equivalent to Monte Carlo, 
-        i.e. all states in the the entire episode trajectory prior to a state get updated with equal credit.
-    
-    λ = 0: Only the most recent state-action pair in the batch is updated. this is equivalent to temporal-difference learning. 
-
-    0 < λ < 1: Exponentially decaying credit assignment to states depending on how long ago they were visited in the trajectory.
     """
     
-    def __init__(self, q_table: TabularQ, alpha: float = 0.1, gamma: float = 0.99, lambda_: float = 0.9):
+    def __init__(self, q_table: TabularQ, alpha: float = 0.1, gamma: float = 0.99, lambda_: float = 0.9, on_policy: bool = True):
         self.q_table = q_table
         self.alpha = alpha
         self.gamma = gamma
         self.lambda_ = lambda_
+        self.on_policy = on_policy
         self.traces: DefaultDict[Any, Dict[ActionT, float]] = defaultdict(lambda: defaultdict(float))
         self._episode_active = False
     
@@ -237,12 +241,22 @@ class EligibilityTraceCriticUpdater(CriticUpdater[Any, ActionT]):
             s_key = exp.state
             s_next_key = exp.next_state
             
-            # Compute TD error (same as standard Q-learning)
+            # Compute TD error based on update policy
             current_q = self.q_table.q(s_key, exp.action)
-            best_next = self.q_table.v(s_next_key) if not exp.done else 0.0
-            target = exp.reward + self.gamma * best_next
-            td_error = target - current_q
             
+            if self.on_policy:
+                # SARSA(λ): Use actual next action
+                if exp.done:
+                    target = exp.reward
+                else:
+                    next_q = self.q_table.q(s_next_key, exp.next_action) if hasattr(exp, 'next_action') and exp.next_action is not None else self.q_table.v(s_next_key)
+                    target = exp.reward + self.gamma * next_q
+            else:
+                # Q(λ): Use greedy next action
+                best_next = self.q_table.v(s_next_key) if not exp.done else 0.0
+                target = exp.reward + self.gamma * best_next
+            
+            td_error = target - current_q
             total_td_error += abs(td_error)
             
             # FIRST: Update all existing traces with TD error
@@ -309,16 +323,14 @@ class QLearningAgent:
     def __init__(
         self,
         env: Any,
-        target_policy: TargetPolicy[Any, ActionT],
-        behavior_policy: BehaviorPolicy[Any, ActionT],
+        policy: TargetPolicy[Any, ActionT],  # Single policy for both behavior and target
         critic_updater: CriticUpdater[Any, ActionT],
-        experience_generator: Any,  # Experience from utils.py
+        experience_generator: Any,
         discretizer: Discretizer | None = None,
     ) -> None:
         """Pure dependency injection constructor."""
         self.env = env
-        self.target_policy = target_policy
-        self.behavior_policy = behavior_policy
+        self.policy = policy
         self.critic_updater = critic_updater
         self.experience_generator = experience_generator
         self.discretizer = discretizer
@@ -326,16 +338,20 @@ class QLearningAgent:
     def learn(self, max_steps: int | None = None, update_frequency: int = -1) -> float:
         """Learn with configurable update frequency."""
         
-        # Collect experiences based on update frequency
+        # Collect experiences using the same policy for behavior
         experiences, total_reward = self.experience_generator.collect(
-            self.target_policy.sample, 
+            self.policy.sample,  # Use the actual sampling behavior
             self.env, 
             n_steps=update_frequency,
             discretizer=self.discretizer
         )
         
-        # Update critic
+        # Update critic (which decides whether to use actual behavior or greedy)
         self.critic_updater.step(experiences)
+        
+        # Handle episode end for policy
+        if hasattr(self.policy, 'end_episode'):
+            self.policy.end_episode()
         
         return total_reward
 
@@ -350,6 +366,7 @@ def create_qlearning_agent(
     bins: Union[int, Sequence[int]] = 10,
     clip_low: Sequence[float] | float = -4.8,
     clip_high: Sequence[float] | float = 4.8,
+    on_policy: bool = False,  # False = Q-learning, True = SARSA
 ) -> QLearningAgent:
     """Factory to create a complete Q-learning setup with all dependencies."""
     if not hasattr(env.action_space, "n"):
@@ -368,28 +385,24 @@ def create_qlearning_agent(
     
     # Create components
     q_table = TabularQ(alpha=alpha, gamma=gamma)
-    target_policy = EpsilonGreedy(
+    policy = EpsilonGreedy(
         q_table=q_table,
         actions=actions,
         eps_start=epsilon,
         eps_end=0.01,
-        eps_decay=0.9995,  # Back to episode-based rate
+        eps_decay=0.9995,
         discretizer=discretizer,
     )
-    behavior_policy = DeterministicPolicy(target_policy)
-    critic_updater = TabularCriticUpdater(q_table, alpha=alpha)
+    critic_updater = TabularCriticUpdater(q_table, alpha=alpha, on_policy=on_policy)
     experience_generator = Experience()
     
     return QLearningAgent(
         env=env,
-        target_policy=target_policy,
-        behavior_policy=behavior_policy,
+        policy=policy,  # Single policy used for both behavior and target
         critic_updater=critic_updater,
         experience_generator=experience_generator,
         discretizer=discretizer,
     )
-
-
 
 
 if __name__ == "__main__":
@@ -414,12 +427,12 @@ if __name__ == "__main__":
             avg = sum(block) / len(block)
             start = episode - freq + 1
             end = episode + 1
-            evaluations.append(evaluate_policy(agent.behavior_policy, env, episodes=100))
+            evaluations.append(evaluate_policy(agent.policy, env, episodes=100))  # Fixed: use agent.policy
 
             print(f"Average reward for episodes {start}–{end}: {avg:.2f}")
    
     # Print all the evaluations at the end
     print("Final evaluations:", evaluations)
-    evaluation_score = evaluate_policy(agent.behavior_policy, env, episodes=100)
+    evaluation_score = evaluate_policy(agent.policy, env, episodes=100)  # Fixed: use agent.policy
     print("Evaluation score:", evaluation_score)
     env.close()

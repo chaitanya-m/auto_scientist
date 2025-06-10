@@ -58,55 +58,28 @@ class SARSACriticUpdater(CriticUpdater[Any, ActionT]):
         return sum((p - t) ** 2 for p, t in zip(predictions, targets)) / len(predictions)
     
     def step(self, experiences: Sequence[Transition[Any, ActionT]]) -> Mapping[str, float]:
-        """
-        Perform TRUE SARSA updates on the Q-table.
-        
-        SARSA Update Rule: Q(s,a) ← Q(s,a) + α[r + γ Q(s',a') - Q(s,a)]
-        
-        Where a' is the ACTUAL action taken in state s', not the optimal action.
-        This requires having the complete action sequence from the episode.
-        """
         predictions = []
         targets = []
         
-        # Process all but the last experience (since we need the next action)
-        for i in range(len(experiences) - 1):
-            exp = experiences[i]
-            next_exp = experiences[i + 1]
-            
-            # Current Q-value for the state-action pair
+        for exp in experiences:
             pred = self.q_table.q(exp.state, exp.action)
             
             if exp.done:
-                # Terminal state: no future reward
                 target = exp.reward
             else:
-                # TRUE SARSA: Use the ACTUAL next action from the next experience
-                # This is the key difference from Q-learning!
-                next_action = next_exp.action
-                next_q = self.q_table.q(exp.next_state, next_action)
-                target = exp.reward + self.gamma * next_q
+                # Use the actual next action from the transition
+                if hasattr(exp, 'next_action') and exp.next_action is not None:
+                    next_q = self.q_table.q(exp.next_state, exp.next_action)
+                    target = exp.reward + self.gamma * next_q
+                else:
+                    # Fallback to Q-learning if next_action not available
+                    target = exp.reward + self.gamma * self.q_table.v(exp.next_state)
             
-            # Apply the SARSA update
             self.q_table.update_single(exp.state, exp.action, target)
-            
             predictions.append(pred)
             targets.append(target)
         
-        # Handle the last experience (no next action available)
-        if experiences:
-            last_exp = experiences[-1]
-            pred = self.q_table.q(last_exp.state, last_exp.action)
-            
-            # For terminal states or when no next action is available
-            target = last_exp.reward
-            
-            self.q_table.update_single(last_exp.state, last_exp.action, target)
-            predictions.append(pred)
-            targets.append(target)
-        
-        loss = self.loss(predictions, targets) if predictions else 0.0
-        return {"critic_loss": loss}
+        return {"critic_loss": self.loss(predictions, targets)}
 
 
 def create_sarsa_agent(
@@ -123,11 +96,11 @@ def create_sarsa_agent(
     Factory to create SARSA (on-policy) agent by modifying Q-learning setup.
     
     SARSA vs Q-Learning differences:
-    1. Behavior policy = Target policy (on-policy learning)
+    1. Uses on_policy=True flag (SARSA uses actual next actions)
        - Q-learning uses separate policies: behavior explores, target is greedy
        - SARSA uses same policy for both: learns about the policy it follows
     
-    2. Uses SARSACriticUpdater instead of TabularCriticUpdater
+    2. Uses on-policy critic updater
        - Q-learning: Q(s,a) ← Q(s,a) + α[r + γ max Q(s',a') - Q(s,a)]
        - SARSA: Q(s,a) ← Q(s,a) + α[r + γ Q(s',a') - Q(s,a)]
     
@@ -135,9 +108,10 @@ def create_sarsa_agent(
     including the effects of exploration, rather than assuming optimal play.
     """
     
-    # Start with Q-learning agent setup (reuse all the component creation)
+    # Create the base agent with on_policy=True for SARSA behavior
     agent = create_qlearning_agent(
         env, 
+        on_policy=True, 
         alpha=alpha, 
         gamma=gamma, 
         epsilon=epsilon, 
@@ -145,15 +119,6 @@ def create_sarsa_agent(
         clip_low=clip_low, 
         clip_high=clip_high
     )
-    
-    # Make it on-policy: behavior policy = target policy
-    # This means the agent learns about the same policy it uses for action selection
-    agent.behavior_policy = agent.target_policy
-    
-    # Use SARSA update rule instead of Q-learning
-    # Extract the Q-table from the existing critic updater
-    q_table = agent.critic_updater.q_table
-    agent.critic_updater = SARSACriticUpdater(q_table, alpha=alpha, gamma=gamma)
     
     return agent
 
@@ -179,12 +144,12 @@ if __name__ == "__main__":
             avg = sum(block) / len(block)
             start = episode - freq + 1
             end = episode + 1
-            evaluations.append(evaluate_policy(agent.behavior_policy, env, episodes=100))
+            evaluations.append(evaluate_policy(agent.policy, env, episodes=100))  # Fixed: use agent.policy
 
             print(f"SARSA - Average reward for episodes {start}–{end}: {avg:.2f}")
    
     # Print all the evaluations at the end
     print("SARSA Final evaluations:", evaluations)
-    evaluation_score = evaluate_policy(agent.behavior_policy, env, episodes=100)
+    evaluation_score = evaluate_policy(agent.policy, env, episodes=100)  # Fixed: use agent.policy
     print("SARSA Evaluation score:", evaluation_score)
     env.close()

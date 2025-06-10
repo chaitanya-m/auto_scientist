@@ -127,10 +127,10 @@ class Experience(ExperienceGenerator[Any, ActionT]):
                 action = policy(state)
                 step = env.step(action)
                 if len(step) == 5:
-                    next_state, reward, term, trunc, info = step
+                    next_state, reward, term, trunc, _ = step
                     done = term or trunc
                 else:
-                    next_state, reward, done, info = step
+                    next_state, reward, done, _ = step
 
                 # Discretize states if discretizer provided
                 s_key = discretizer(state) if discretizer else state
@@ -141,8 +141,7 @@ class Experience(ExperienceGenerator[Any, ActionT]):
                     action=action,
                     reward=reward,
                     next_state=s_next_key,
-                    done=done,
-                    info=info
+                    done=done
                 ))
 
                 total_reward += reward
@@ -173,10 +172,10 @@ class Experience(ExperienceGenerator[Any, ActionT]):
             
             step = env.step(action)
             if len(step) == 5:
-                next_state, reward, term, trunc, info = step
+                next_state, reward, term, trunc, _ = step
                 done = term or trunc
             else:
-                next_state, reward, done, info = step
+                next_state, reward, done, _ = step
 
             # Discretize states if discretizer provided
             s_key = discretizer(state) if discretizer else state
@@ -187,8 +186,7 @@ class Experience(ExperienceGenerator[Any, ActionT]):
                 action=action,
                 reward=reward,
                 next_state=s_next_key,
-                done=done,
-                info=info
+                done=done
             ))
 
             total_reward += reward
