@@ -53,6 +53,35 @@ class GraphComposer:
             self.output_node_names = [node_names]
 
     def connect(self, from_node, to_node, merge_mode='concat'):
+        """
+        Connects two nodes in the graph with the specified merge mode.
+        
+        TODO: Currently we detect cycles only when build() is called via _topological_sort().
+        This works but is inefficient - cycles could be detected earlier by checking after
+        each connection is added. A more efficient approach would be to add cycle detection
+        here:
+        
+            # Temporarily add the connection
+            self.connections.setdefault(to_node, []).append((from_node, merge_mode))
+            
+            # Check if this creates a cycle
+            try:
+                self._topological_sort()
+            except ValueError:
+                # Remove the connection that would create a cycle
+                self.connections[to_node].pop()
+                if not self.connections[to_node]:
+                    del self.connections[to_node]
+                raise ValueError(f"Adding connection from '{from_node}' to '{to_node}' would create a cycle")
+        
+        This would prevent cycles by construction rather than detecting them after multiple
+        operations have been performed.
+        
+        Args:
+            from_node (str): Name of the source node
+            to_node (str): Name of the target node  
+            merge_mode (str): How to combine inputs ('concat' or 'add')
+        """
         if from_node not in self.nodes:
             raise ValueError(f"From-node '{from_node}' not found.")
         if to_node not in self.nodes:
